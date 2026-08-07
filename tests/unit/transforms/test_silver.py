@@ -208,6 +208,122 @@ def test_incomplete_concurrent_slate_does_not_attach_unrelated_odds() -> None:
     assert mapping == ("unmapped", "no_exact_commence_and_team_match", None, 0)
 
 
+def test_swapped_home_away_teams_do_not_wrong_attach() -> None:
+    """Side-aware identity: matching clubs on the wrong sides must stay unmapped."""
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(
+        connection,
+        5020,
+        "2026-04-01 20:10:00",
+        home_id=137,
+        away_id=119,
+        home_name="San Francisco Giants",
+        away_name="Los Angeles Dodgers",
+    )
+    _odds(
+        connection,
+        "swapped",
+        "2026-04-01T20:10:00Z",
+        home_team="Los Angeles Dodgers",
+        away_team="San Francisco Giants",
+    )
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE source_event_id = 'swapped'
+        """
+    ).fetchone()
+
+    assert mapping == ("unmapped", "no_exact_commence_and_team_match", None, 0)
+
+
+def test_null_provider_team_names_never_commence_only_attach() -> None:
+    """Legacy NULL bronze team names must not map via sole commence match."""
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 5030, "2026-04-01 20:10:00")
+    commence = datetime(2026, 4, 1, 20, 10, tzinfo=timezone.utc)
+    snap = datetime(2026, 4, 1, 16, 0, tzinfo=timezone.utc)
+    for outcome, price in (("home", -120), ("away", 110)):
+        connection.execute(
+            "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                "provider",
+                "legacy-null-teams",
+                "book",
+                outcome,
+                price,
+                snap,
+                commence,
+                None,
+                None,
+            ],
+        )
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE source_event_id = 'legacy-null-teams'
+        """
+    ).fetchone()
+
+    assert mapping == ("unmapped", "missing_provider_team_names", None, 0)
+
+
+def test_mlb_game_missing_payload_team_names_cannot_be_commence_only_attached() -> None:
+    """Sole commence candidate without MLB team names must stay unmapped."""
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(
+        connection,
+        5040,
+        "2026-04-01 20:10:00",
+        payload_teams={"home": {"team": {"id": 137}}, "away": {"team": {"id": 119}}},
+    )
+    _odds(connection, "named-odds", "2026-04-01T20:10:00Z")
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE source_event_id = 'named-odds'
+        """
+    ).fetchone()
+
+    assert mapping == ("unmapped", "no_exact_commence_and_team_match", None, 0)
+
+
+def test_team_name_case_and_whitespace_still_map_when_sides_match() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 5050, "2026-04-01 20:10:00")
+    _odds(
+        connection,
+        "casefold",
+        "2026-04-01T20:10:00Z",
+        home_team="  SAN FRANCISCO GIANTS ",
+        away_team="los angeles dodgers",
+    )
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE source_event_id = 'casefold'
+        """
+    ).fetchone()
+
+    assert mapping == ("mapped", "unique_exact_commence_and_team_match", 5050, 1)
+
+
 def test_team_statistics_extract_only_supported_schedule_fields() -> None:
     connection = duckdb.connect()
     _bronze(connection)
