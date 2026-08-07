@@ -38,6 +38,19 @@ V1 historical data completion and certification planning.
   adapters (`src/ingestion/mlb/statsapi_fetchers.py`) + `src/pipelines/certify_historical.py`
   sequencing the full build->certify flow. Completed (merged). The runner is
   in-repo and gated; the actual multi-hour 2021-2025 live pull is operator-run.
+- DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
+  that MLB reports with abstractGameState='Final' are not flagged (found via the
+  DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
+
+## Real-path validation (smoke)
+
+The full live pipeline was smoke-tested end-to-end on a single real day
+(2024-04-10) using the MLB-StatsAPI wrapper + the real 80MB odds archive:
+14/14 game feeds fetched, Silver built, archive ingested (69,901 moneylines,
+SHA-256 verified), all 14 games mapped MATCHED, and \u2014 after DATA-012 \u2014
+certification returned PASS with no merge-blocking findings. The systematic
+postponed-game blocker is resolved; the operator's full 2021-2025 run is expected
+to certify cleanly.
 - ADR-004 accepted:
   - MLB Stats API remains the historical baseball source,
   - 2021-2025 are the V1 historical development seasons,

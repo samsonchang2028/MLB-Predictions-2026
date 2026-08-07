@@ -19,6 +19,7 @@ format.
 | DATA-009 | done | DATA-004, DATA-008 | merged; odds->game_pk mapping audit + odds validation + coverage report (`src/validation/odds_mapping.py`) |
 | DATA-010 | done | DATA-005 | merged a87ef2b; MLB backfill restart resilience (reused run_id upsert + per-game integrity isolation) |
 | DATA-011 | done | DATA-005/006/007/008/009 | merged; MLB-StatsAPI fetchers + `pipelines/certify_historical.py` runner. Real multi-hour build is operator-run |
+| DATA-012 | done | DATA-006 | merged; fix results.valid_scores for postponed games reported as abstract Final (found via DATA-011 real smoke) |
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | blocked | DATA-007 | needs certified pitcher appearance data |
 | FEAT-003 | blocked | DATA-007 | needs certified pitcher appearance data |
