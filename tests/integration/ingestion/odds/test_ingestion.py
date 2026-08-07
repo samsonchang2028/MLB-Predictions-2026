@@ -52,7 +52,8 @@ def test_multiple_books_times_and_prices_coexist_without_overwrite(
         assert ingest_the_odds_api_moneylines(connection, later) == 2
         rows = connection.execute(
             """
-            SELECT bookmaker, outcome, american_price, snapshot_timestamp, commence_time
+            SELECT bookmaker, outcome, american_price, snapshot_timestamp, commence_time,
+                   home_team, away_team
             FROM bronze.odds_moneyline_snapshots
             ORDER BY bookmaker, snapshot_timestamp, outcome
             """
@@ -71,6 +72,8 @@ def test_multiple_books_times_and_prices_coexist_without_overwrite(
     assert {row[4] for row in rows} == {
         datetime(2026, 4, 1, 20, 10, tzinfo=timezone.utc)
     }
+    assert {row[5] for row in rows} == {"San Francisco Giants"}
+    assert {row[6] for row in rows} == {"Los Angeles Dodgers"}
 
 
 def test_same_snapshot_identity_cannot_replace_an_existing_price(
@@ -216,3 +219,89 @@ def test_conflicting_duplicate_inside_payload_fails_before_insert(
         ).fetchone()[0]
 
     assert count == 0
+
+
+def test_same_snapshot_identity_cannot_replace_stored_team_names(
+    tmp_path: Path,
+) -> None:
+    paths = initialize_storage(tmp_path / "data")
+    first = load_fixture()
+    conflicting = deepcopy(first)
+    conflicting[0]["bookmakers"] = [conflicting[0]["bookmakers"][0]]
+    conflicting[0]["home_team"] = "New York Yankees"
+    conflicting[0]["away_team"] = "Boston Red Sox"
+    conflicting[0]["bookmakers"][0]["markets"][0]["outcomes"][0]["name"] = (
+        "New York Yankees"
+    )
+    conflicting[0]["bookmakers"][0]["markets"][0]["outcomes"][1]["name"] = (
+        "Boston Red Sox"
+    )
+
+    with connect_database(paths["database"]) as connection:
+        ingest_the_odds_api_moneylines(connection, first)
+
+        with pytest.raises(OddsDataError, match="immutable incoming observation"):
+            ingest_the_odds_api_moneylines(connection, conflicting)
+
+        teams = connection.execute(
+            """
+            SELECT DISTINCT home_team, away_team
+            FROM bronze.odds_moneyline_snapshots
+            """
+        ).fetchall()
+
+    assert teams == [("San Francisco Giants", "Los Angeles Dodgers")]
+
+
+def test_legacy_odds_table_without_team_columns_is_migrated_on_ingest(
+    tmp_path: Path,
+) -> None:
+    paths = initialize_storage(tmp_path / "data")
+
+    with connect_database(paths["database"]) as connection:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
+        connection.execute(
+            """
+            CREATE TABLE bronze.odds_moneyline_snapshots (
+                source VARCHAR NOT NULL,
+                source_event_id VARCHAR NOT NULL,
+                bookmaker VARCHAR NOT NULL,
+                outcome VARCHAR NOT NULL CHECK (outcome IN ('home', 'away')),
+                american_price INTEGER NOT NULL CHECK (
+                    american_price <= -100 OR american_price >= 100
+                ),
+                snapshot_timestamp TIMESTAMPTZ NOT NULL,
+                commence_time TIMESTAMPTZ NOT NULL,
+                PRIMARY KEY (
+                    source,
+                    source_event_id,
+                    bookmaker,
+                    outcome,
+                    snapshot_timestamp
+                )
+            )
+            """
+        )
+
+        assert ingest_the_odds_api_moneylines(connection, load_fixture()) == 4
+        columns = {
+            row[0]
+            for row in connection.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'bronze'
+                    AND table_name = 'odds_moneyline_snapshots'
+                """
+            ).fetchall()
+        }
+        teams = connection.execute(
+            """
+            SELECT DISTINCT home_team, away_team
+            FROM bronze.odds_moneyline_snapshots
+            """
+        ).fetchall()
+
+    assert "home_team" in columns
+    assert "away_team" in columns
+    assert teams == [("San Francisco Giants", "Los Angeles Dodgers")]
