@@ -230,3 +230,244 @@ def test_one_odds_event_with_multiple_commence_times_is_cardinality_failure() ->
     assert connection.execute(
         "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'silver'"
     ).fetchone() == (0,)
+
+
+def test_repeated_normalization_is_deterministic_despite_bronze_insert_order() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    # Insert reverse chronological / reverse pk order to prove ordering is not
+    # an artifact of Bronze physical insert order.
+    _game(connection, 102, "2026-04-01 22:05:00")
+    _game(connection, 101, "2026-04-01 18:05:00")
+    _odds(connection, "late", "2026-04-01T22:05:00Z", snapshot_time="2026-04-01T17:00:00Z")
+    _odds(connection, "early", "2026-04-01T18:05:00Z", snapshot_time="2026-04-01T16:00:00Z")
+
+    first_counts = normalize_silver(connection)
+    first = {
+        table: connection.execute(f"SELECT * FROM silver.{table} ORDER BY ALL").fetchall()
+        for table in (
+            "games",
+            "team_game_statistics",
+            "pitcher_appearances",
+            "odds_snapshots",
+            "odds_event_game_mapping",
+        )
+    }
+    second_counts = normalize_silver(connection)
+    second = {
+        table: connection.execute(f"SELECT * FROM silver.{table} ORDER BY ALL").fetchall()
+        for table in first
+    }
+
+    assert first_counts == second_counts
+    assert first == second
+    assert [row[0] for row in first["games"]] == [101, 102]
+    assert [row[1] for row in first["odds_event_game_mapping"]] == ["early", "late"]
+
+
+def test_mapped_events_join_games_one_to_one_and_never_many_to_many() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 601, "2026-04-01 19:10:00", home_id=10, away_id=20)
+    _game(connection, 602, "2026-04-01 19:10:00", home_id=30, away_id=40)
+    _game(connection, 603, "2026-04-01 22:10:00", home_id=50, away_id=60)
+    _odds(connection, "solo-a", "2026-04-01T22:10:00Z")
+    _odds(connection, "solo-b", "2026-04-01T22:10:00Z", bookmaker="other")
+    _odds(connection, "clash", "2026-04-01T19:10:00Z")
+    _odds(connection, "orphan", "2026-04-02T19:10:00Z")
+
+    normalize_silver(connection)
+
+    mapped_join = connection.execute(
+        """
+        SELECT m.source_event_id, m.game_pk
+        FROM silver.odds_event_game_mapping m
+        INNER JOIN silver.games g ON g.game_pk = m.game_pk
+        WHERE m.mapping_status = 'mapped'
+        ORDER BY m.source_event_id, m.source
+        """
+    ).fetchall()
+    mapped_rows = connection.execute(
+        """
+        SELECT source_event_id, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE mapping_status = 'mapped'
+        ORDER BY source_event_id
+        """
+    ).fetchall()
+    unresolved = connection.execute(
+        """
+        SELECT source_event_id, mapping_status, game_pk
+        FROM silver.odds_event_game_mapping
+        WHERE mapping_status <> 'mapped'
+        ORDER BY source_event_id
+        """
+    ).fetchall()
+    events_per_mapped_game = connection.execute(
+        """
+        SELECT game_pk, count(*)
+        FROM silver.odds_event_game_mapping
+        WHERE mapping_status = 'mapped'
+        GROUP BY game_pk
+        ORDER BY game_pk
+        """
+    ).fetchall()
+
+    assert mapped_rows == [("solo-a", 603, 1), ("solo-b", 603, 1)]
+    assert mapped_join == [("solo-a", 603), ("solo-b", 603)]
+    assert len(mapped_join) == len(mapped_rows)
+    assert unresolved == [
+        ("clash", "ambiguous", None),
+        ("orphan", "unmapped", None),
+    ]
+    # Many events may share one game; one event never expands to many games.
+    assert events_per_mapped_game == [(603, 2)]
+
+
+def test_same_team_date_doubleheader_is_not_identified_by_team_date_alone() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    # Classic doubleheader identity: same clubs and official_date, distinct game_pk.
+    _game(connection, 701, "2026-04-01 13:05:00", home_id=137, away_id=119)
+    _game(connection, 702, "2026-04-01 19:05:00", home_id=137, away_id=119)
+    _odds(connection, "game1", "2026-04-01T13:05:00Z")
+    # Same calendar day, wrong commence — must stay unmapped (not team/date attach).
+    _odds(connection, "wrong-time-same-day", "2026-04-01T16:00:00Z")
+
+    normalize_silver(connection)
+    games = connection.execute(
+        """
+        SELECT game_pk, home_team_id, away_team_id, official_date, game_number
+        FROM silver.games ORDER BY game_pk
+        """
+    ).fetchall()
+    mappings = connection.execute(
+        """
+        SELECT source_event_id, mapping_status, game_pk
+        FROM silver.odds_event_game_mapping ORDER BY source_event_id
+        """
+    ).fetchall()
+
+    assert games == [
+        (701, 137, 119, datetime(2026, 4, 1).date(), 2),
+        (702, 137, 119, datetime(2026, 4, 1).date(), 1),
+    ]
+    assert mappings == [
+        ("game1", "mapped", 701),
+        ("wrong-time-same-day", "unmapped", None),
+    ]
+
+
+def test_identical_commence_doubleheader_stays_ambiguous_not_silently_attached() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 801, "2026-04-01 18:05:00", home_id=137, away_id=119)
+    _game(connection, 802, "2026-04-01 18:05:00", home_id=137, away_id=119)
+    _odds(connection, "dh-collision", "2026-04-01T18:05:00Z")
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        """
+    ).fetchone()
+
+    assert mapping == (
+        "ambiguous",
+        "multiple_exact_commence_time_matches",
+        None,
+        2,
+    )
+
+
+def test_source_timestamps_are_preserved_on_games_stats_and_odds() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    teams = {
+        "home": {"team": {"id": 137}, "score": 4, "isWinner": True},
+        "away": {"team": {"id": 119}, "score": 1, "isWinner": False},
+    }
+    observed = datetime(2026, 3, 31, 12, 0, 0)
+    connection.execute(
+        """
+        INSERT INTO bronze.mlb_games VALUES (
+            901, '2026', 'R', '2026-04-01 20:10:00'::TIMESTAMP, '2026-04-01',
+            137, 119, 'N', 1, 'Final', 'Final', 'F', 'F', NULL, NULL, NULL,
+            'hash-901', ?, ?
+        )
+        """,
+        [observed, json.dumps({"gamePk": 901, "teams": teams})],
+    )
+    snapshot = datetime(2026, 4, 1, 11, 0, tzinfo=timezone.utc)
+    # Non-UTC offset that is the same instant as 20:10Z.
+    commence = datetime.fromisoformat("2026-04-01T13:10:00-07:00")
+    connection.execute(
+        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ["provider", "evt-901", "book", "home", -105, snapshot, commence],
+    )
+    connection.execute(
+        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+        ["provider", "evt-901", "book", "away",  -115, snapshot, commence],
+    )
+
+    normalize_silver(connection)
+
+    game_lineage = connection.execute(
+        """
+        SELECT source_payload_sha256, source_observed_at, source_game_json
+        FROM silver.games WHERE game_pk = 901
+        """
+    ).fetchone()
+    stat_lineage = connection.execute(
+        """
+        SELECT DISTINCT source_payload_sha256, source_observed_at, game_date
+        FROM silver.team_game_statistics WHERE game_pk = 901
+        """
+    ).fetchall()
+    odds_lineage = connection.execute(
+        """
+        SELECT snapshot_timestamp, commence_time
+        FROM silver.odds_snapshots
+        WHERE source_event_id = 'evt-901'
+        ORDER BY outcome
+        """
+    ).fetchall()
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, game_pk, commence_time
+        FROM silver.odds_event_game_mapping WHERE source_event_id = 'evt-901'
+        """
+    ).fetchone()
+
+    assert game_lineage[0] == "hash-901"
+    assert game_lineage[1] == observed
+    payload = game_lineage[2]
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    assert payload["gamePk"] == 901
+    assert stat_lineage == [("hash-901", observed, datetime(2026, 4, 1, 20, 10))]
+    assert odds_lineage == [
+        (snapshot, commence.astimezone(timezone.utc)),
+        (snapshot, commence.astimezone(timezone.utc)),
+    ]
+    assert mapping == ("mapped", 901, commence.astimezone(timezone.utc))
+
+
+def test_empty_bronze_still_materializes_empty_silver_contracts() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+
+    counts = normalize_silver(connection)
+
+    assert counts == {
+        "games": 0,
+        "team_game_statistics": 0,
+        "pitcher_appearances": 0,
+        "odds_snapshots": 0,
+        "odds_event_game_mapping": 0,
+    }
+    for table in counts:
+        assert connection.execute(f"SELECT count(*) FROM silver.{table}").fetchone() == (
+            0,
+        )
