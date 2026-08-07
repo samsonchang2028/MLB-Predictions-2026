@@ -427,34 +427,76 @@ def check_bronze_provenance(connection: Any) -> CheckResult:
     return finding("bronze.provenance", "P1", _flatten(bad), "game-detail rows missing provenance")
 
 
-def check_processing_determinism(connection: Any) -> CheckResult:
-    """Silver rebuilds from Bronze must be byte-for-byte identical across runs.
+_SILVER_TABLES = (
+    "games",
+    "team_game_statistics",
+    "pitcher_appearances",
+    "pitcher_starters",
+    "odds_snapshots",
+    "odds_event_game_mapping",
+)
 
-    Establishes ADR-001/data-rule reproducibility: derived datasets are a pure
-    function of raw inputs and code.
+
+def check_processing_determinism(connection: Any) -> CheckResult:
+    """The committed Silver dataset must be reproducible from Bronze + code.
+
+    Rebuilds Silver from the current Bronze data in an *isolated* in-memory
+    scratch database and compares it against the committed Silver tables. A
+    divergence means the certified dataset is not a pure, deterministic function
+    of raw inputs and code (ADR-001 / data reproducibility rule) — i.e. drift or
+    non-determinism.
+
+    Critically, this check is side-effect-free: it never mutates the committed
+    Silver being certified. ``certify``/``run_all`` can therefore be run against
+    the live certified dataset without rewriting it (and without masking drift by
+    overwriting the committed rows with a fresh rebuild).
     """
     from transforms import normalize_silver
 
-    tables = (
-        "games",
-        "team_game_statistics",
-        "pitcher_appearances",
-        "pitcher_starters",
-        "odds_snapshots",
-        "odds_event_game_mapping",
-    )
+    # Snapshot the committed (certified) Silver first, from the live catalog.
+    # This is left untouched.
+    committed = {
+        t: _fetch(connection, f"SELECT * FROM silver.{t} ORDER BY ALL")
+        for t in _SILVER_TABLES
+    }
+
+    origin = _scalar(connection, "SELECT current_database()")
+    scratch = "val_determinism_scratch"
     try:
-        normalize_silver(connection)
-        first = {t: _fetch(connection, f"SELECT * FROM silver.{t} ORDER BY ALL") for t in tables}
-        normalize_silver(connection)
-        second = {t: _fetch(connection, f"SELECT * FROM silver.{t} ORDER BY ALL") for t in tables}
+        connection.execute(f"ATTACH ':memory:' AS {scratch}")
+    except Exception as error:  # pragma: no cover - environment/setup failure
+        return fail(
+            "bronze.processing_determinism", "P1",
+            f"could not create isolated rebuild database: {error}",
+        )
+    try:
+        # Copy Bronze (and everything) into scratch, rebuild Silver there, and
+        # read it back. All writes land in scratch; the origin catalog is only
+        # ever read.
+        connection.execute(f'COPY FROM DATABASE "{origin}" TO {scratch}')
+        connection.execute(f"USE {scratch}")
+        try:
+            normalize_silver(connection)
+            rebuilt = {
+                t: _fetch(connection, f"SELECT * FROM silver.{t} ORDER BY ALL")
+                for t in _SILVER_TABLES
+            }
+        finally:
+            connection.execute(f'USE "{origin}"')
     except Exception as error:  # normalization contract violation is itself a finding
         return fail(
             "bronze.processing_determinism", "P1", f"silver rebuild failed: {error}"
         )
-    diverged = [t for t in tables if first[t] != second[t]]
+    finally:
+        try:
+            connection.execute(f"DETACH DATABASE {scratch}")
+        except Exception:  # pragma: no cover - best-effort cleanup
+            pass
+
+    diverged = [t for t in _SILVER_TABLES if committed[t] != rebuilt[t]]
     return finding(
-        "bronze.processing_determinism", "P1", diverged, "silver tables that changed on rebuild"
+        "bronze.processing_determinism", "P1", diverged,
+        "silver tables not reproducible from Bronze",
     )
 
 

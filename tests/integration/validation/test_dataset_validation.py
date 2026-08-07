@@ -229,6 +229,64 @@ def test_tampered_raw_payload_blocks_certification(tmp_path: Path) -> None:
     assert "bronze.detail_payload_integrity" in summary["merge_blocking"]
 
 
+_SILVER_TABLES = (
+    "games",
+    "team_game_statistics",
+    "pitcher_appearances",
+    "pitcher_starters",
+    "odds_snapshots",
+    "odds_event_game_mapping",
+)
+
+
+def _silver_snapshot(connection) -> dict:
+    return {
+        t: connection.execute(f"SELECT * FROM silver.{t} ORDER BY ALL").fetchall()
+        for t in _SILVER_TABLES
+    }
+
+
+def test_certify_does_not_mutate_committed_silver(tmp_path: Path) -> None:
+    """Regression (DATA-006 P1): certify()/run_all() must be side-effect-free.
+
+    The determinism check previously called normalize_silver() on the live
+    connection, rewriting the certified Silver tables (and masking drift). It
+    must now rebuild in isolation and leave the committed dataset untouched.
+    """
+    root = tmp_path / "data"
+    database = _build_fixture(root)
+    with connect_database(database) as connection:
+        before = _silver_snapshot(connection)
+        certify(connection, storage_root=root)
+        run_all(connection, storage_root=root)
+        after = _silver_snapshot(connection)
+    assert before == after
+
+
+def test_processing_determinism_detects_committed_drift(tmp_path: Path) -> None:
+    """Regression (DATA-006 P1): drift between committed Silver and a Bronze
+    rebuild must be reported, not silently overwritten by the check itself."""
+    root = tmp_path / "data"
+    database = _build_fixture(root)
+    with connect_database(database) as connection:
+        # Corrupt the committed Silver so it no longer matches a Bronze rebuild.
+        connection.execute(
+            "UPDATE silver.team_game_statistics SET score = score + 99 "
+            "WHERE game_pk = 100 AND side = 'home'"
+        )
+        results = run_all(connection, storage_root=root)
+        # The tamper must remain visible afterwards (check did not rewrite it).
+        tampered = connection.execute(
+            "SELECT score FROM silver.team_game_statistics "
+            "WHERE game_pk = 100 AND side = 'home'"
+        ).fetchone()[0]
+    determinism = _results_by_check(results)["bronze.processing_determinism"]
+    assert determinism.status == "FAIL"
+    assert determinism.blocking is True
+    assert "team_game_statistics" in determinism.failing
+    assert tampered >= 99
+
+
 def test_inconsistent_home_win_is_detected(tmp_path: Path) -> None:
     root = tmp_path / "data"
     database = _build_fixture(root)
