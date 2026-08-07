@@ -13,6 +13,7 @@ This file records concise durable project milestones, not every code edit.
 - Initial architecture decision records.
 - Repository-level Git policy for task-prefixed candidate commits and Orchestrator-owned integration.
 - Idempotent local storage foundation with immutable raw writes and DuckDB Bronze/Silver/Gold schemas.
+- Immutable MLB schedule ingestion with canonical `game_pk`, preserved status history, and deterministic temporal lineage.
 - Append-only timestamped moneyline ingestion with transaction safety and timezone-aware instants.
 
 ### Decisions

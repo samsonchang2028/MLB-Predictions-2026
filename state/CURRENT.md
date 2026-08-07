@@ -24,6 +24,7 @@ V1 data ingestion.
   - Tester.
 - META-001 — repository/agent foundation completed.
 - DATA-001 — local DuckDB/Parquet storage foundation completed.
+- DATA-002 — immutable, idempotent MLB schedule ingestion completed.
 - DATA-003 — timestamped, append-only moneyline odds ingestion completed.
 
 ## In progress
@@ -32,7 +33,7 @@ V1 data ingestion.
 
 ## In review
 
-- DATA-002 — MLB historical ingestion candidate.
+- None.
 
 ## Blocked
 
@@ -54,7 +55,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-002 is in repeat review/testing. DATA-004 unlocks after DATA-002 passes and merges; DATA-003 is complete.
+- DATA-004 — build normalized datasets from the completed MLB and odds ingestion outputs.
 
 ## Deferred follow-ups
 
