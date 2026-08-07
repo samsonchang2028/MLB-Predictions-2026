@@ -503,6 +503,70 @@ def test_live_partial_scores_both_losers_excluded_from_history() -> None:
     assert features[(1, 20)]["games_played_before"] == 0
 
 
+def test_final_pair_same_scores_as_live_enters_later_features() -> None:
+    """Coherent Final 2–0 (exactly one winner) must update the nightcap — contrast Live."""
+    rows = (
+        _game_pair(
+            1,
+            "2024-04-01T13:05:00",
+            home_id=10,
+            away_id=20,
+            home_score=2,
+            away_score=0,
+            home_won=True,
+            away_won=False,
+        )
+        + _game_pair(
+            2,
+            "2024-04-01T19:05:00",
+            home_id=10,
+            away_id=30,
+            home_score=None,
+            away_score=None,
+            home_won=None,
+            away_won=None,
+        )
+    )
+    nightcap = _by_key(build_team_features(rows))[(2, 10)]
+    assert nightcap["games_played_before"] == 1
+    assert nightcap["wins_before"] == 1
+    assert nightcap["win_pct_before"] == 1.0
+    assert nightcap["runs_scored_total_before"] == 2
+    assert nightcap["runs_allowed_total_before"] == 0
+    assert nightcap["run_diff_total_before"] == 2
+    assert nightcap["games_L7"] == 1
+    assert nightcap["win_pct_L7"] == 1.0
+    assert nightcap["runs_scored_avg_L7"] == 2.0
+
+
+def test_unpaired_game_row_excluded_from_history() -> None:
+    """A lone team row for a game_pk is not a coherent Final pair."""
+    when1 = _dt("2024-04-01T19:00:00")
+    rows = [
+        {
+            "game_pk": 1,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when1,
+            "season": "2024",
+            "score": 5,
+            "is_winner": True,
+        },
+    ] + _game_pair(
+        2,
+        "2024-04-02T19:00:00",
+        home_id=10,
+        away_id=30,
+        home_score=None,
+        away_score=None,
+        home_won=None,
+        away_won=None,
+    )
+    second = _by_key(build_team_features(rows))[(2, 10)]
+    assert second["games_played_before"] == 0
+    assert second["games_L7"] == 0
+
+
 def test_duplicate_game_pk_team_id_raises() -> None:
     when = _dt("2024-04-01T19:00:00")
     rows = [
@@ -565,6 +629,56 @@ def test_both_teams_marked_winner_raises() -> None:
         away_won=True,
     )
     with pytest.raises(ValueError, match="both teams marked is_winner=True"):
+        build_team_features(rows)
+
+
+def test_equal_scores_with_declared_winner_raises() -> None:
+    rows = _game_pair(
+        1,
+        "2024-04-01T19:00:00",
+        home_id=10,
+        away_id=20,
+        home_score=3,
+        away_score=3,
+        home_won=True,
+        away_won=False,
+    )
+    with pytest.raises(ValueError, match="equal scores"):
+        build_team_features(rows)
+
+
+def test_more_than_two_team_rows_for_game_raises() -> None:
+    when = _dt("2024-04-01T19:00:00")
+    rows = [
+        {
+            "game_pk": 1,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when,
+            "season": "2024",
+            "score": 5,
+            "is_winner": True,
+        },
+        {
+            "game_pk": 1,
+            "team_id": 20,
+            "side": "away",
+            "game_date": when,
+            "season": "2024",
+            "score": 3,
+            "is_winner": False,
+        },
+        {
+            "game_pk": 1,
+            "team_id": 30,
+            "side": "away",
+            "game_date": when,
+            "season": "2024",
+            "score": 1,
+            "is_winner": False,
+        },
+    ]
+    with pytest.raises(ValueError, match="3 team rows; expected 2"):
         build_team_features(rows)
 
 

@@ -186,3 +186,29 @@ def test_live_midgame_scores_do_not_leak_into_later_features() -> None:
     assert with_features[(2, 10)]["games_played_before"] == 0
     assert with_features[(2, 10)]["games_L7"] == 0
     assert with_features[(3, 10)]["games_played_before"] == 0
+
+
+def test_resolving_live_to_final_does_change_later_features() -> None:
+    """Harness sensitivity: promoting Live both-False to a coherent Final must move later rows."""
+    live_afternoon = _pair(1, 1, 10, 20, 2, 0, None)
+    for row in live_afternoon:
+        row["is_winner"] = False
+
+    schedule = live_afternoon + _pair(2, 1, 10, 30, None, None, None)
+    original = _feature_map(schedule)
+
+    finalized = deepcopy(schedule)
+    for row in finalized:
+        if row["game_pk"] == 1:
+            if row["team_id"] == 10:
+                row["is_winner"] = True
+            else:
+                row["is_winner"] = False
+
+    after = _feature_map(finalized)
+    assert after[(1, 10)] == original[(1, 10)]  # current game still excluded
+    assert after[(2, 10)] != original[(2, 10)]
+    assert after[(2, 10)]["games_played_before"] == 1
+    assert after[(2, 10)]["wins_before"] == 1
+    assert after[(2, 10)]["runs_scored_total_before"] == 2
+    assert after[(2, 30)] == original[(2, 30)]  # opponent never played game 1
