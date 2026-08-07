@@ -1,0 +1,36 @@
+[
+  {
+    "id": "event-101",
+    "commence_time": "2026-04-01T20:10:00Z",
+    "home_team": "San Francisco Giants",
+    "away_team": "Los Angeles Dodgers",
+    "bookmakers": [
+      {
+        "key": "book_a",
+        "last_update": "2026-04-01T18:00:00Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "outcomes": [
+              {"name": "San Francisco Giants", "price": 125},
+              {"name": "Los Angeles Dodgers", "price": -145}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "book_b",
+        "last_update": "2026-04-01T11:05:00-07:00",
+        "markets": [
+          {
+            "key": "h2h",
+            "outcomes": [
+              {"name": "Los Angeles Dodgers", "price": -140},
+              {"name": "San Francisco Giants", "price": 120}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
