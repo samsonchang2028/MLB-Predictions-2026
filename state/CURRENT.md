@@ -56,11 +56,11 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- FEAT-001 is ready once execution-contract metadata is completed at dispatch. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data. FEAT-001/002/003 may run in parallel only when all three are ready and file surfaces remain disjoint.
+- FEAT-001 is ready for dispatch. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data.
 
 ## Deferred follow-ups
 
-- Complete missing execution-contract metadata in FEAT-001 (and later FEAT-002/003) before dispatch.
+- Complete missing execution-contract metadata in FEAT-002/003 before they become executable.
 - Add appearance-capable ingestion (or populate `pitcher_appearances` from richer boxscore/feed data) before FEAT-002/003.
 - Optional P2: document/backfill legacy bronze odds rows with NULL team names; optional team-name alias table.
 - Clarify the non-authoritative archival status of `old/docs/codex_workflow.md` in a separately authorized task.

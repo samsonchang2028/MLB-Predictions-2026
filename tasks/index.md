@@ -11,7 +11,7 @@ This index lists task state and dependency relationships in a human-readable for
 | DATA-002 | done | DATA-001 | completed |
 | DATA-003 | done | DATA-001 | completed |
 | DATA-004 | done | DATA-002, DATA-003 | completed |
-| FEAT-001 | ready | DATA-004 | parallel with FEAT-002/003 after metadata |
+| FEAT-001 | ready | DATA-004 | sole ready FEAT task |
 | FEAT-002 | blocked | DATA-004 | needs pitcher appearance data |
 | FEAT-003 | blocked | DATA-004 | needs pitcher appearance data |
 | FEAT-004 | blocked | FEAT-001/002/003 | integration |
