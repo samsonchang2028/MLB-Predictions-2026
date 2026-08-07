@@ -27,11 +27,12 @@ V1 data ingestion.
 
 ## In progress
 
-- DATA-003 — timestamped odds ingestion.
+- None.
 
 ## In review
 
 - DATA-002 — MLB historical ingestion candidate.
+- DATA-003 — timestamped odds ingestion candidate.
 
 ## Blocked
 
