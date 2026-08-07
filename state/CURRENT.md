@@ -29,11 +29,11 @@ V1 data ingestion.
 
 ## In progress
 
-- DATA-004 — normalized Silver datasets and MLB/odds mapping contract.
+- None.
 
 ## In review
 
-- None.
+- DATA-004 — normalized Silver datasets and MLB/odds mapping contract candidate.
 
 ## Blocked
 
@@ -55,7 +55,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-004 is implementing. FEAT-001, FEAT-002, and FEAT-003 unlock after it passes review/testing and merges.
+- DATA-004 is in review/testing. FEAT-001, FEAT-002, and FEAT-003 unlock after it passes gates and merges.
 
 ## Deferred follow-ups
 
