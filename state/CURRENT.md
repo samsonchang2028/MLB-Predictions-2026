@@ -23,13 +23,13 @@ Agent/harness planning and repository foundation.
   - Reviewer,
   - Tester.
 
-## In progress
+## In review
 
-- META-001 — repository/agent foundation.
+- META-001 — repository/agent foundation candidate awaiting approval and merge.
 
 ## Blocked
 
-None.
+- DATA-001 — waiting for META-001 approval and merge.
 
 ## Current architecture decisions
 
@@ -45,10 +45,9 @@ None.
 - Betting-style ROI is secondary evaluation.
 - Fliff is not part of the core system.
 
-## Next ready tasks
+## Next implementation task
 
-1. META-001 — commit agent/harness files and base repository conventions.
-2. DATA-001 — create storage foundation after META-001.
+- DATA-001 — create the storage foundation after META-001 is approved and merged. It remains blocked until then.
 
 ## Notes for the next harness
 

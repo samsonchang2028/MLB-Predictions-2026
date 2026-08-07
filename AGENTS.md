@@ -164,3 +164,26 @@ At the end of work, report:
 - whether an ADR or project-state update is needed.
 
 Keep handoffs factual and concise.
+
+## Git policy
+
+Implementers may commit changes inside their assigned task branch/worktree.
+
+Commit only when:
+
+- the task is in a coherent candidate state,
+- relevant tests have been run,
+- unrelated changes are excluded.
+
+Use task-prefixed commit messages:
+
+DATA-001: initialize DuckDB storage
+FEAT-002: add point-in-time starter features
+ML-004: add walk-forward split framework
+
+Reviewer agents should not commit production fixes.
+Tester agents may commit test-only changes when operating on a dedicated test branch/worktree.
+
+The Orchestrator owns merging to the integration branch.
+Workers must never push directly to main.
+Workers must not force-push, reset shared branches, or rewrite unrelated history.

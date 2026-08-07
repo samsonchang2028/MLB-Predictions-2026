@@ -6,7 +6,7 @@ This index lists task state and dependency relationships in a human-readable for
 
 | Task | Status | Depends on | Parallel notes |
 |---|---|---|---|
-| META-001 | ready | — | first |
+| META-001 | candidate | — | in review |
 | DATA-001 | blocked | META-001 | foundation |
 | DATA-002 | blocked | DATA-001 | parallel with DATA-003 |
 | DATA-003 | blocked | DATA-001 | parallel with DATA-002 |
