@@ -18,7 +18,7 @@ format.
 | DATA-008 | done | DATA-001 | merged 479af32; checksum-verified historical odds archive ingestion |
 | DATA-009 | done | DATA-004, DATA-008 | merged; odds->game_pk mapping audit + odds validation + coverage report (`src/validation/odds_mapping.py`) |
 | DATA-010 | done | DATA-005 | merged a87ef2b; MLB backfill restart resilience (reused run_id upsert + per-game integrity isolation) |
-| DATA-011 | in-progress | DATA-005/006/007/008/009 | real 2021-2025 build + certification runner (MLB-StatsAPI wrapper). Code gated in-repo; real pull operator-run |
+| DATA-011 | done | DATA-005/006/007/008/009 | merged; MLB-StatsAPI fetchers + `pipelines/certify_historical.py` runner. Real multi-hour build is operator-run |
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | blocked | DATA-007 | needs certified pitcher appearance data |
 | FEAT-003 | blocked | DATA-007 | needs certified pitcher appearance data |

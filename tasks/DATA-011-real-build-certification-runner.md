@@ -2,7 +2,7 @@
 
 ## Status
 
-ready
+done (merged) — runner in-repo; real multi-hour build is operator-run
 
 ## Dependencies
 

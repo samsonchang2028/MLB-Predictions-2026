@@ -34,6 +34,10 @@ V1 historical data completion and certification planning.
 - DATA-010 - MLB game-detail backfill restart resilience (reused-run_id upsert + per-game integrity isolation) completed (merged a87ef2b).
 - DATA-007 - historical MLB data certification gate: versioned PASS/FAIL artifact layer (`src/validation/certification.py`, `state/data-certifications/`) consuming the DATA-006 runner. Completed (merged).
 - DATA-009 - historical odds archive validation + auditable odds->`game_pk` mapping (MATCHED/UNMATCHED/AMBIGUOUS) with season/date/sportsbook coverage report (`src/validation/odds_mapping.py`). Completed (merged).
+- DATA-011 - real-build certification runner: MLB-StatsAPI (toddrob99) fetcher
+  adapters (`src/ingestion/mlb/statsapi_fetchers.py`) + `src/pipelines/certify_historical.py`
+  sequencing the full build->certify flow. Completed (merged). The runner is
+  in-repo and gated; the actual multi-hour 2021-2025 live pull is operator-run.
 - ADR-004 accepted:
   - MLB Stats API remains the historical baseball source,
   - 2021-2025 are the V1 historical development seasons,
@@ -58,23 +62,24 @@ V1 historical data completion and certification planning.
 
 ## Next required action (gating the whole downstream graph)
 
-The certification LAYER exists, but no real 2021-2025 certified dataset has been
-produced. FEAT-002 / FEAT-003 (and everything downstream) require a PASS
-certification artifact from an actual build, not just the tooling. The next step
-is an operational/data build task:
+The certification LAYER and the build RUNNER (DATA-011) are merged, but no real
+2021-2025 certified dataset has been produced yet. FEAT-002 / FEAT-003 (and
+everything downstream) require a PASS certification artifact from an actual
+build. The operator step is a single multi-hour live pull:
 
-1. Run the real MLB game-detail backfill (DATA-005 machinery) + Silver
-   normalization over 2021-2025.
-2. Run DATA-008 real historical odds archive ingestion (verify published
-   SHA-256) and DATA-009 mapping/coverage over it.
-3. Run `validation.certify_and_write` to emit a durable
-   `state/data-certifications/certification-<STATUS>-*.json`.
-4. Only if the artifact is PASS (no P0/P1 or leakage failures) do FEAT-002 /
-   FEAT-003 become ready.
+```
+# from repo root, with outbound access to statsapi.mlb.com and the archive present
+set PYTHONPATH=src
+python -m pipelines.certify_historical --storage-root data \
+    --odds-archive mlb_odds_dataset.json --run-id historical-2021-2025
+```
 
-Recommend the Orchestrator open a new task (e.g. DATA-011) to execute and commit
-this real-build certification, since it involves live API/data pulls rather than
-code changes. Flagged to the user for direction (network/data access needed).
+This ingests 2021-2025 schedules + game details (MLB-StatsAPI), normalizes
+Silver, ingests the published odds archive (SHA-256 verified), maps odds->game_pk
+(DATA-009), and writes `state/data-certifications/certification-<STATUS>-*.json`.
+It is idempotent/restartable (stable run_id); re-run to resume after any
+interruption. Commit the artifact once it reports PASS. FEAT-002 / FEAT-003
+become ready only when that artifact is PASS (no P0/P1 or leakage failures).
 
 ## Safe parallel
 
