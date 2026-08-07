@@ -380,8 +380,10 @@ def test_schedule_without_statistics_leaves_explicit_stat_contracts_empty() -> N
 
     assert result["team_game_statistics"] == 0
     assert result["pitcher_appearances"] == 0
+    assert result["pitcher_starters"] == 0
     assert connection.execute("SELECT * FROM silver.team_game_statistics").fetchall() == []
     assert connection.execute("SELECT * FROM silver.pitcher_appearances").fetchall() == []
+    assert connection.execute("SELECT * FROM silver.pitcher_starters").fetchall() == []
 
 
 def test_documented_silver_keys_are_database_enforced() -> None:
@@ -407,15 +409,27 @@ def test_documented_silver_keys_are_database_enforced() -> None:
 
     connection.execute(
         """
-        INSERT INTO silver.pitcher_appearances
-        VALUES (450, 137, 99, 1, '5.0', 'payload-hash', '2026-03-31 12:00:00')
+        INSERT INTO silver.pitcher_appearances (
+            game_pk, team_id, side, pitcher_id, appearance_order,
+            is_actual_starter, innings_pitched, source_payload_sha256,
+            source_retrieved_at
+        ) VALUES (
+            450, 137, 'home', 99, 1, true, '5.0',
+            'payload-hash', '2026-03-31 12:00:00'
+        )
         """
     )
     with pytest.raises(duckdb.ConstraintException):
         connection.execute(
             """
-            INSERT INTO silver.pitcher_appearances
-            VALUES (450, 137, 99, 1, '5.0', 'payload-hash', '2026-03-31 12:00:00')
+            INSERT INTO silver.pitcher_appearances (
+                game_pk, team_id, side, pitcher_id, appearance_order,
+                is_actual_starter, innings_pitched, source_payload_sha256,
+                source_retrieved_at
+            ) VALUES (
+                450, 137, 'home', 99, 1, true, '5.0',
+                'payload-hash', '2026-03-31 12:00:00'
+            )
             """
         )
 
@@ -465,6 +479,7 @@ def test_repeated_normalization_is_deterministic_despite_bronze_insert_order() -
             "games",
             "team_game_statistics",
             "pitcher_appearances",
+            "pitcher_starters",
             "odds_snapshots",
             "odds_event_game_mapping",
         )
@@ -735,6 +750,7 @@ def test_empty_bronze_still_materializes_empty_silver_contracts() -> None:
         "games": 0,
         "team_game_statistics": 0,
         "pitcher_appearances": 0,
+        "pitcher_starters": 0,
         "odds_snapshots": 0,
         "odds_event_game_mapping": 0,
     }
