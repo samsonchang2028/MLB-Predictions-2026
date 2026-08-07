@@ -1,0 +1,43 @@
+{
+  "2021-04-01": [
+    {
+      "gameView": {
+        "startDate": "2021-04-01T17:05:00+00:00",
+        "awayTeam": {
+          "fullName": "Toronto Blue Jays",
+          "shortName": "TOR"
+        },
+        "homeTeam": {
+          "fullName": "New York Yankees",
+          "shortName": "NYY"
+        }
+      },
+      "odds": {
+        "moneyline": [
+          {
+            "sportsbook": "fanduel",
+            "openingLine": {
+              "homeOdds": -188,
+              "awayOdds": 155
+            },
+            "currentLine": {
+              "homeOdds": -200,
+              "awayOdds": 168
+            }
+          },
+          {
+            "sportsbook": "caesars",
+            "openingLine": {
+              "homeOdds": -162,
+              "awayOdds": 0
+            },
+            "currentLine": {
+              "homeOdds": 0,
+              "awayOdds": 170
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
