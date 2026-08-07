@@ -71,7 +71,17 @@ def test_incomplete_moneyline_market_is_rejected() -> None:
         parse_the_odds_api_moneylines(payload)
 
 
-@pytest.mark.parametrize("price", [None, 0, 99, -110.5, True])
+def test_event_without_moneyline_market_returns_no_snapshots() -> None:
+    payload = load_fixture()
+    for bookmaker in payload[0]["bookmakers"]:
+        bookmaker["markets"][0]["key"] = "spreads"
+
+    assert parse_the_odds_api_moneylines(payload) == []
+
+
+@pytest.mark.parametrize(
+    "price", [None, 0, 99, -(2**31) - 1, 2**31, -110.5, True]
+)
 def test_invalid_american_prices_are_rejected(price: object) -> None:
     payload = load_fixture()
     payload[0]["bookmakers"][0]["markets"][0]["outcomes"][0]["price"] = price

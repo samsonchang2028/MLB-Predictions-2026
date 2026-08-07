@@ -5,6 +5,9 @@ from typing import Any
 
 import duckdb
 
+MIN_INTEGER = -(2**31)
+MAX_INTEGER = 2**31 - 1
+
 
 class OddsDataError(ValueError):
     """Raised when an odds payload cannot form a trustworthy snapshot."""
@@ -93,9 +96,10 @@ def parse_the_odds_api_moneylines(
                         isinstance(price, bool)
                         or not isinstance(price, int)
                         or abs(price) < 100
+                        or not MIN_INTEGER <= price <= MAX_INTEGER
                     ):
                         raise OddsDataError(
-                            f"{outcome_prefix}.price must be a valid American integer price"
+                            f"{outcome_prefix}.price must be a valid 32-bit American integer price"
                         )
 
                     snapshots.append(
@@ -125,85 +129,91 @@ def ingest_the_odds_api_moneylines(
 ) -> int:
     """Append new canonical observations and return the number inserted."""
     snapshots = parse_the_odds_api_moneylines(payload, source=source)
-    connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS bronze.odds_moneyline_snapshots (
-            source VARCHAR NOT NULL,
-            source_event_id VARCHAR NOT NULL,
-            bookmaker VARCHAR NOT NULL,
-            outcome VARCHAR NOT NULL CHECK (outcome IN ('home', 'away')),
-            american_price INTEGER NOT NULL CHECK (abs(american_price) >= 100),
-            snapshot_timestamp TIMESTAMP NOT NULL,
-            commence_time TIMESTAMP NOT NULL,
-            PRIMARY KEY (
-                source,
-                source_event_id,
-                bookmaker,
-                outcome,
-                snapshot_timestamp
-            )
-        )
-        """
-    )
-
     unique_snapshots: dict[tuple[object, ...], dict[str, Any]] = {}
     for snapshot in snapshots:
-        snapshot_timestamp = snapshot["snapshot_timestamp"].replace(tzinfo=None)
-        commence_time = snapshot["commence_time"].replace(tzinfo=None)
         key = (
             snapshot["source"],
             snapshot["source_event_id"],
             snapshot["bookmaker"],
             snapshot["outcome"],
-            snapshot_timestamp,
+            snapshot["snapshot_timestamp"],
         )
         previous = unique_snapshots.get(key)
         if previous is not None and (
             previous["american_price"] != snapshot["american_price"]
-            or previous["commence_time"].replace(tzinfo=None) != commence_time
+            or previous["commence_time"] != snapshot["commence_time"]
         ):
             raise OddsDataError(
                 "payload contains conflicting values for the same odds snapshot"
             )
         unique_snapshots[key] = snapshot
 
-    for key, snapshot in unique_snapshots.items():
-        existing = connection.execute(
+    connection.execute("BEGIN TRANSACTION")
+    try:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
+        connection.execute(
             """
-            SELECT american_price, commence_time
-            FROM bronze.odds_moneyline_snapshots
-            WHERE source = ? AND source_event_id = ? AND bookmaker = ?
-                AND outcome = ? AND snapshot_timestamp = ?
-            """,
-            list(key),
-        ).fetchone()
-        if existing is not None and (
-            existing[0] != snapshot["american_price"]
-            or existing[1] != snapshot["commence_time"].replace(tzinfo=None)
-        ):
-            raise OddsDataError(
-                "stored snapshot conflicts with the immutable incoming observation"
+            CREATE TABLE IF NOT EXISTS bronze.odds_moneyline_snapshots (
+                source VARCHAR NOT NULL,
+                source_event_id VARCHAR NOT NULL,
+                bookmaker VARCHAR NOT NULL,
+                outcome VARCHAR NOT NULL CHECK (outcome IN ('home', 'away')),
+                american_price INTEGER NOT NULL CHECK (
+                    american_price <= -100 OR american_price >= 100
+                ),
+                snapshot_timestamp TIMESTAMPTZ NOT NULL,
+                commence_time TIMESTAMPTZ NOT NULL,
+                PRIMARY KEY (
+                    source,
+                    source_event_id,
+                    bookmaker,
+                    outcome,
+                    snapshot_timestamp
+                )
             )
-
-    inserted = 0
-    for snapshot in unique_snapshots.values():
-        row = connection.execute(
-            """
-            INSERT INTO bronze.odds_moneyline_snapshots
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT DO NOTHING
-            RETURNING 1
             """,
-            [
-                snapshot["source"],
-                snapshot["source_event_id"],
-                snapshot["bookmaker"],
-                snapshot["outcome"],
-                snapshot["american_price"],
-                snapshot["snapshot_timestamp"].replace(tzinfo=None),
-                snapshot["commence_time"].replace(tzinfo=None),
-            ],
-        ).fetchone()
-        inserted += row is not None
+        )
+
+        for key, snapshot in unique_snapshots.items():
+            existing = connection.execute(
+                """
+                SELECT american_price, commence_time
+                FROM bronze.odds_moneyline_snapshots
+                WHERE source = ? AND source_event_id = ? AND bookmaker = ?
+                    AND outcome = ? AND snapshot_timestamp = ?
+                """,
+                list(key),
+            ).fetchone()
+            if existing is not None and (
+                existing[0] != snapshot["american_price"]
+                or existing[1] != snapshot["commence_time"]
+            ):
+                raise OddsDataError(
+                    "stored snapshot conflicts with the immutable incoming observation"
+                )
+
+        inserted = 0
+        for snapshot in unique_snapshots.values():
+            row = connection.execute(
+                """
+                INSERT INTO bronze.odds_moneyline_snapshots
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                RETURNING 1
+                """,
+                [
+                    snapshot["source"],
+                    snapshot["source_event_id"],
+                    snapshot["bookmaker"],
+                    snapshot["outcome"],
+                    snapshot["american_price"],
+                    snapshot["snapshot_timestamp"],
+                    snapshot["commence_time"],
+                ],
+            ).fetchone()
+            inserted += row is not None
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
     return inserted
