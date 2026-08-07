@@ -24,9 +24,9 @@ Agent/harness planning and repository foundation.
   - Tester.
 - META-001 — repository/agent foundation completed.
 
-## In progress
+## In review
 
-- DATA-001 — storage foundation implementation.
+- DATA-001 — storage foundation candidate under independent review and testing.
 
 ## Blocked
 
@@ -48,7 +48,7 @@ Agent/harness planning and repository foundation.
 
 ## Next implementation task
 
-- DATA-001 is currently implementing. DATA-002 and DATA-003 unlock after it passes review/testing and merges.
+- DATA-002 and DATA-003 unlock after DATA-001 passes review/testing and merges.
 
 ## Deferred follow-ups
 
