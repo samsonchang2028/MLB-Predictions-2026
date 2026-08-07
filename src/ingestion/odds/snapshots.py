@@ -111,6 +111,8 @@ def parse_the_odds_api_moneylines(
                             "american_price": price,
                             "snapshot_timestamp": snapshot_timestamp,
                             "commence_time": commence_time,
+                            "home_team": home_team,
+                            "away_team": away_team,
                         }
                     )
                 if seen_sides != {"home", "away"}:
@@ -142,6 +144,8 @@ def ingest_the_odds_api_moneylines(
         if previous is not None and (
             previous["american_price"] != snapshot["american_price"]
             or previous["commence_time"] != snapshot["commence_time"]
+            or previous["home_team"] != snapshot["home_team"]
+            or previous["away_team"] != snapshot["away_team"]
         ):
             raise OddsDataError(
                 "payload contains conflicting values for the same odds snapshot"
@@ -151,33 +155,12 @@ def ingest_the_odds_api_moneylines(
     connection.execute("BEGIN TRANSACTION")
     try:
         connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS bronze.odds_moneyline_snapshots (
-                source VARCHAR NOT NULL,
-                source_event_id VARCHAR NOT NULL,
-                bookmaker VARCHAR NOT NULL,
-                outcome VARCHAR NOT NULL CHECK (outcome IN ('home', 'away')),
-                american_price INTEGER NOT NULL CHECK (
-                    american_price <= -100 OR american_price >= 100
-                ),
-                snapshot_timestamp TIMESTAMPTZ NOT NULL,
-                commence_time TIMESTAMPTZ NOT NULL,
-                PRIMARY KEY (
-                    source,
-                    source_event_id,
-                    bookmaker,
-                    outcome,
-                    snapshot_timestamp
-                )
-            )
-            """,
-        )
+        _ensure_odds_moneyline_table(connection)
 
         for key, snapshot in unique_snapshots.items():
             existing = connection.execute(
                 """
-                SELECT american_price, commence_time
+                SELECT american_price, commence_time, home_team, away_team
                 FROM bronze.odds_moneyline_snapshots
                 WHERE source = ? AND source_event_id = ? AND bookmaker = ?
                     AND outcome = ? AND snapshot_timestamp = ?
@@ -187,6 +170,14 @@ def ingest_the_odds_api_moneylines(
             if existing is not None and (
                 existing[0] != snapshot["american_price"]
                 or existing[1] != snapshot["commence_time"]
+                or (
+                    existing[2] is not None
+                    and existing[2] != snapshot["home_team"]
+                )
+                or (
+                    existing[3] is not None
+                    and existing[3] != snapshot["away_team"]
+                )
             ):
                 raise OddsDataError(
                     "stored snapshot conflicts with the immutable incoming observation"
@@ -197,7 +188,7 @@ def ingest_the_odds_api_moneylines(
             row = connection.execute(
                 """
                 INSERT INTO bronze.odds_moneyline_snapshots
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT DO NOTHING
                 RETURNING 1
                 """,
@@ -209,6 +200,8 @@ def ingest_the_odds_api_moneylines(
                     snapshot["american_price"],
                     snapshot["snapshot_timestamp"],
                     snapshot["commence_time"],
+                    snapshot["home_team"],
+                    snapshot["away_team"],
                 ],
             ).fetchone()
             inserted += row is not None
@@ -217,3 +210,52 @@ def ingest_the_odds_api_moneylines(
         connection.execute("ROLLBACK")
         raise
     return inserted
+
+
+def _ensure_odds_moneyline_table(connection: duckdb.DuckDBPyConnection) -> None:
+    """Create or migrate bronze odds snapshots; PK unchanged, team names retained."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bronze.odds_moneyline_snapshots (
+            source VARCHAR NOT NULL,
+            source_event_id VARCHAR NOT NULL,
+            bookmaker VARCHAR NOT NULL,
+            outcome VARCHAR NOT NULL CHECK (outcome IN ('home', 'away')),
+            american_price INTEGER NOT NULL CHECK (
+                american_price <= -100 OR american_price >= 100
+            ),
+            snapshot_timestamp TIMESTAMPTZ NOT NULL,
+            commence_time TIMESTAMPTZ NOT NULL,
+            home_team VARCHAR NOT NULL,
+            away_team VARCHAR NOT NULL,
+            PRIMARY KEY (
+                source,
+                source_event_id,
+                bookmaker,
+                outcome,
+                snapshot_timestamp
+            )
+        )
+        """
+    )
+    columns = {
+        row[0]
+        for row in connection.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema = 'bronze'
+                AND table_name = 'odds_moneyline_snapshots'
+            """
+        ).fetchall()
+    }
+    # Legacy tables created before team retention: add nullable columns; new
+    # ingestions always write names. Existing NULL names stay unmapped in Silver.
+    if "home_team" not in columns:
+        connection.execute(
+            "ALTER TABLE bronze.odds_moneyline_snapshots ADD COLUMN home_team VARCHAR"
+        )
+    if "away_team" not in columns:
+        connection.execute(
+            "ALTER TABLE bronze.odds_moneyline_snapshots ADD COLUMN away_team VARCHAR"
+        )

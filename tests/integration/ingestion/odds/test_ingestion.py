@@ -52,7 +52,8 @@ def test_multiple_books_times_and_prices_coexist_without_overwrite(
         assert ingest_the_odds_api_moneylines(connection, later) == 2
         rows = connection.execute(
             """
-            SELECT bookmaker, outcome, american_price, snapshot_timestamp, commence_time
+            SELECT bookmaker, outcome, american_price, snapshot_timestamp, commence_time,
+                   home_team, away_team
             FROM bronze.odds_moneyline_snapshots
             ORDER BY bookmaker, snapshot_timestamp, outcome
             """
@@ -71,6 +72,8 @@ def test_multiple_books_times_and_prices_coexist_without_overwrite(
     assert {row[4] for row in rows} == {
         datetime(2026, 4, 1, 20, 10, tzinfo=timezone.utc)
     }
+    assert {row[5] for row in rows} == {"San Francisco Giants"}
+    assert {row[6] for row in rows} == {"Los Angeles Dodgers"}
 
 
 def test_same_snapshot_identity_cannot_replace_an_existing_price(

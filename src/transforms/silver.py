@@ -11,10 +11,21 @@ an intentionally empty, stable contract rather than inferred data.
 ``silver.odds_snapshots`` retains the Bronze key ``(source, source_event_id,
 bookmaker, outcome, snapshot_timestamp)``. ``silver.odds_event_game_mapping``
 has one row per ``(source, source_event_id)`` and at most one ``game_pk``.
-Because Bronze odds do not retain provider team names, an event is mapped only
-when its exact commence instant has exactly one MLB game candidate. No match is
-``unmapped`` and multiple matches are ``ambiguous``; neither is attached to a
-game. This is deliberately stricter than identifying a game by team/date.
+An odds event is ``mapped`` only when exactly one MLB game matches both its
+exact commence instant and provider home/away team names (case-insensitive)
+against ``game_json`` team names. Commence-time uniqueness alone never
+attaches. Zero matches are ``unmapped``; multiple matches are ``ambiguous``.
+Neither attaches a ``game_pk``. This is deliberately stricter than identifying
+a game by team/date.
+
+Post-game / not-pregame fields (ADR-002)
+----------------------------------------
+``silver.team_game_statistics.score``, ``is_winner``, and the Final-row
+``league_wins`` / ``league_losses`` / ``league_pct`` values are post-game
+outcome and standings fields copied from the schedule payload. They must not
+be used as pregame predictive features. They exist for post-hoc labeling and
+evaluation only. Pregame feature builders belong in later FEAT tasks and must
+use point-in-time-safe inputs.
 """
 
 from __future__ import annotations
@@ -71,6 +82,7 @@ def normalize_silver(connection: Any) -> dict[str, int]:
                 mappings,
             )
         _assert_silver_cardinality(connection, len(games), len(team_statistics), len(odds), len(mappings))
+        _assert_mapped_odds_join_cardinality(connection)
         connection.execute("COMMIT")
     except Exception:
         connection.execute("ROLLBACK")
@@ -112,7 +124,15 @@ def _load_games(connection: Any) -> list[dict[str, Any]]:
             raise NormalizationError(f"game_pk {game_pk} has invalid game_json") from error
         if not isinstance(payload, dict):
             raise NormalizationError(f"game_pk {game_pk} game_json must be an object")
-        result.append({"values": row, "payload": payload})
+        home_name, away_name = _payload_team_names(payload, game_pk)
+        result.append(
+            {
+                "values": row,
+                "payload": payload,
+                "home_team_name": home_name,
+                "away_team_name": away_name,
+            }
+        )
     return result
 
 
@@ -120,7 +140,7 @@ def _load_odds(connection: Any) -> list[dict[str, Any]]:
     rows = connection.execute(
         """
         SELECT source, source_event_id, bookmaker, outcome, american_price,
-               snapshot_timestamp, commence_time
+               snapshot_timestamp, commence_time, home_team, away_team
         FROM bronze.odds_moneyline_snapshots
         ORDER BY source, source_event_id, bookmaker, outcome, snapshot_timestamp
         """
@@ -132,7 +152,14 @@ def _load_odds(connection: Any) -> list[dict[str, Any]]:
         if key in seen:
             raise NormalizationError(f"bronze odds violates snapshot key {key!r}")
         seen.add(key)
-        result.append({"values": row, "event_key": (row[0], row[1])})
+        result.append(
+            {
+                "values": row[:7],
+                "event_key": (row[0], row[1]),
+                "home_team": row[7],
+                "away_team": row[8],
+            }
+        )
     return result
 
 
@@ -149,6 +176,7 @@ def _team_statistics(games: list[dict[str, Any]]) -> list[tuple[object, ...]]:
             source_team = payload_teams.get(side)
             if not isinstance(source_team, dict):
                 continue
+            _assert_payload_team_id(source_team, team_id, game_pk, side)
             record = source_team.get("leagueRecord")
             record = record if isinstance(record, dict) else {}
             supported = any(
@@ -160,6 +188,7 @@ def _team_statistics(games: list[dict[str, Any]]) -> list[tuple[object, ...]]:
             if key in seen:
                 raise NormalizationError(f"duplicate team-game statistics key {key!r}")
             seen.add(key)
+            # score / is_winner / league_* are post-game fields (ADR-002), not pregame features.
             rows.append(
                 (
                     game_pk,
@@ -181,34 +210,142 @@ def _team_statistics(games: list[dict[str, Any]]) -> list[tuple[object, ...]]:
 def _event_mappings(
     games: list[dict[str, Any]], odds: list[dict[str, Any]]
 ) -> list[tuple[object, ...]]:
-    games_by_time: dict[datetime, list[int]] = {}
+    games_by_time: dict[datetime, list[dict[str, Any]]] = {}
     for game in games:
         game_time = game["values"][3]
         if game_time is not None:
-            games_by_time.setdefault(_utc_instant(game_time), []).append(game["values"][0])
+            games_by_time.setdefault(_utc_instant(game_time), []).append(game)
 
-    event_times: dict[tuple[str, str], set[datetime]] = {}
+    event_meta: dict[tuple[str, str], dict[str, Any]] = {}
     for row in odds:
-        event_times.setdefault(row["event_key"], set()).add(_utc_instant(row["values"][6]))
+        event_key = row["event_key"]
+        commence = _utc_instant(row["values"][6])
+        home_team = row["home_team"]
+        away_team = row["away_team"]
+        meta = event_meta.get(event_key)
+        if meta is None:
+            event_meta[event_key] = {
+                "commence_times": {commence},
+                "home_teams": {home_team},
+                "away_teams": {away_team},
+            }
+            continue
+        meta["commence_times"].add(commence)
+        meta["home_teams"].add(home_team)
+        meta["away_teams"].add(away_team)
 
     mappings: list[tuple[object, ...]] = []
-    for (source, event_id), commence_times in sorted(event_times.items()):
-        if len(commence_times) != 1:
+    for (source, event_id), meta in sorted(event_meta.items()):
+        if len(meta["commence_times"]) != 1:
             raise NormalizationError(
                 f"odds event {(source, event_id)!r} has multiple commence times"
             )
-        commence_time = next(iter(commence_times))
-        candidates = sorted(games_by_time.get(commence_time, []))
+        if len(meta["home_teams"]) != 1 or len(meta["away_teams"]) != 1:
+            raise NormalizationError(
+                f"odds event {(source, event_id)!r} has conflicting provider team names"
+            )
+        commence_time = next(iter(meta["commence_times"]))
+        home_team = next(iter(meta["home_teams"]))
+        away_team = next(iter(meta["away_teams"]))
+
+        if not _usable_team_name(home_team) or not _usable_team_name(away_team):
+            mappings.append(
+                (
+                    source,
+                    event_id,
+                    commence_time,
+                    "unmapped",
+                    "missing_provider_team_names",
+                    None,
+                    0,
+                )
+            )
+            continue
+
+        home_key = _normalize_team_name(home_team)
+        away_key = _normalize_team_name(away_team)
+        candidates = sorted(
+            game["values"][0]
+            for game in games_by_time.get(commence_time, [])
+            if game["home_team_name"] == home_key and game["away_team_name"] == away_key
+        )
         if len(candidates) == 1:
-            status, reason, game_pk = "mapped", "unique_exact_commence_time", candidates[0]
+            status, reason, game_pk = (
+                "mapped",
+                "unique_exact_commence_and_team_match",
+                candidates[0],
+            )
         elif not candidates:
-            status, reason, game_pk = "unmapped", "no_exact_commence_time_match", None
+            status, reason, game_pk = (
+                "unmapped",
+                "no_exact_commence_and_team_match",
+                None,
+            )
         else:
-            status, reason, game_pk = "ambiguous", "multiple_exact_commence_time_matches", None
+            status, reason, game_pk = (
+                "ambiguous",
+                "multiple_exact_commence_and_team_matches",
+                None,
+            )
         mappings.append(
             (source, event_id, commence_time, status, reason, game_pk, len(candidates))
         )
     return mappings
+
+
+def _payload_team_names(
+    payload: dict[str, Any], game_pk: int
+) -> tuple[str | None, str | None]:
+    teams = payload.get("teams")
+    if not isinstance(teams, dict):
+        return None, None
+    return (
+        _side_team_name(teams.get("home"), game_pk, "home"),
+        _side_team_name(teams.get("away"), game_pk, "away"),
+    )
+
+
+def _side_team_name(side_obj: object, game_pk: int, side: str) -> str | None:
+    if not isinstance(side_obj, dict):
+        return None
+    team = side_obj.get("team")
+    if not isinstance(team, dict):
+        return None
+    name = team.get("name")
+    if name is None:
+        return None
+    if not isinstance(name, str):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} team.name must be text when present"
+        )
+    if not name.strip():
+        return None
+    return _normalize_team_name(name)
+
+
+def _assert_payload_team_id(
+    source_team: dict[str, Any], team_id: int, game_pk: int, side: str
+) -> None:
+    team = source_team.get("team")
+    if not isinstance(team, dict) or "id" not in team:
+        return
+    payload_id = team.get("id")
+    if isinstance(payload_id, bool) or not isinstance(payload_id, int):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} team.id must be an integer when present"
+        )
+    if payload_id != team_id:
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} team.id {payload_id} != bronze team_id {team_id}"
+        )
+
+
+def _usable_team_name(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _normalize_team_name(name: str) -> str:
+    return name.strip().casefold()
 
 
 def _optional_int(value: object, field: str) -> int | None:
@@ -271,8 +408,11 @@ def _create_tables(connection: Any) -> None:
             game_pk BIGINT NOT NULL,
             team_id BIGINT NOT NULL,
             side VARCHAR NOT NULL CHECK (side IN ('home', 'away')),
+            -- post-game outcome; not a pregame feature (ADR-002)
             score INTEGER,
+            -- post-game outcome; not a pregame feature (ADR-002)
             is_winner BOOLEAN,
+            -- Final-row league record; not a pregame feature (ADR-002)
             league_wins INTEGER,
             league_losses INTEGER,
             league_pct VARCHAR,
@@ -333,3 +473,33 @@ def _assert_silver_cardinality(
             raise NormalizationError(
                 f"silver.{table} cardinality mismatch: expected {count}, found {actual}"
             )
+
+
+def _assert_mapped_odds_join_cardinality(connection: Any) -> None:
+    """Mapped events join games 1:1 on game_pk; never expand to many games."""
+    bad = connection.execute(
+        """
+        SELECT m.source, m.source_event_id, count(*) AS game_matches
+        FROM silver.odds_event_game_mapping m
+        INNER JOIN silver.games g ON g.game_pk = m.game_pk
+        WHERE m.mapping_status = 'mapped'
+        GROUP BY m.source, m.source_event_id
+        HAVING count(*) <> 1
+        """
+    ).fetchall()
+    if bad:
+        raise NormalizationError(
+            f"mapped odds→games join is not 1:1 for events {bad!r}"
+        )
+    dangling = connection.execute(
+        """
+        SELECT source, source_event_id, game_pk
+        FROM silver.odds_event_game_mapping
+        WHERE mapping_status = 'mapped'
+            AND game_pk NOT IN (SELECT game_pk FROM silver.games)
+        """
+    ).fetchall()
+    if dangling:
+        raise NormalizationError(
+            f"mapped odds reference missing games {dangling!r}"
+        )

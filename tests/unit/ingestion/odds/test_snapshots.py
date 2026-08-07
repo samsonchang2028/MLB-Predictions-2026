@@ -26,6 +26,8 @@ def test_maps_provider_events_books_and_teams_to_canonical_snapshots() -> None:
         "american_price": 125,
         "snapshot_timestamp": datetime(2026, 4, 1, 18, tzinfo=timezone.utc),
         "commence_time": datetime(2026, 4, 1, 20, 10, tzinfo=timezone.utc),
+        "home_team": "San Francisco Giants",
+        "away_team": "Los Angeles Dodgers",
     }
     assert snapshots[2]["outcome"] == "away"
     assert snapshots[2]["snapshot_timestamp"] == datetime(

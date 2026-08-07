@@ -22,10 +22,22 @@ def _bronze(connection: duckdb.DuckDBPyConnection) -> None:
         CREATE TABLE bronze.odds_moneyline_snapshots (
             source VARCHAR, source_event_id VARCHAR, bookmaker VARCHAR,
             outcome VARCHAR, american_price INTEGER, snapshot_timestamp TIMESTAMPTZ,
-            commence_time TIMESTAMPTZ
+            commence_time TIMESTAMPTZ, home_team VARCHAR, away_team VARCHAR
         )
         """
     )
+
+
+def _team_name(team_id: int, explicit: str | None = None) -> str:
+    if explicit is not None:
+        return explicit
+    defaults = {
+        137: "San Francisco Giants",
+        119: "Los Angeles Dodgers",
+        147: "New York Yankees",
+        111: "Boston Red Sox",
+    }
+    return defaults.get(team_id, f"Team {team_id}")
 
 
 def _game(
@@ -35,15 +47,22 @@ def _game(
     *,
     home_id: int = 137,
     away_id: int = 119,
+    home_name: str | None = None,
+    away_name: str | None = None,
     payload_teams: dict[str, object] | None = None,
 ) -> None:
+    if payload_teams is None:
+        payload_teams = {
+            "home": {
+                "team": {"id": home_id, "name": _team_name(home_id, home_name)},
+            },
+            "away": {
+                "team": {"id": away_id, "name": _team_name(away_id, away_name)},
+            },
+        }
     payload = {
         "gamePk": game_pk,
-        "teams": payload_teams
-        or {
-            "home": {"team": {"id": home_id}},
-            "away": {"team": {"id": away_id}},
-        },
+        "teams": payload_teams,
     }
     connection.execute(
         """
@@ -64,10 +83,12 @@ def _odds(
     *,
     snapshot_time: str = "2026-04-01T16:00:00Z",
     bookmaker: str = "book",
+    home_team: str = "San Francisco Giants",
+    away_team: str = "Los Angeles Dodgers",
 ) -> None:
     for outcome, price in (("home", -120), ("away", 110)):
         connection.execute(
-            "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 "provider",
                 event_id,
@@ -76,6 +97,8 @@ def _odds(
                 price,
                 datetime.fromisoformat(snapshot_time.replace("Z", "+00:00")),
                 datetime.fromisoformat(commence_time.replace("Z", "+00:00")),
+                home_team,
+                away_team,
             ],
         )
 
@@ -105,8 +128,31 @@ def test_unmapped_and_ambiguous_events_are_surfaced_without_game_pk() -> None:
     _bronze(connection)
     _game(connection, 201, "2026-04-01 20:10:00", home_id=1, away_id=2)
     _game(connection, 202, "2026-04-01 20:10:00", home_id=3, away_id=4)
-    _odds(connection, "ambiguous", "2026-04-01T20:10:00Z")
-    _odds(connection, "missing", "2026-04-02T20:10:00Z")
+    # Same commence + same club names on two game_pks → ambiguous under team match.
+    _game(connection, 203, "2026-04-01 21:10:00", home_id=10, away_id=20)
+    _game(connection, 204, "2026-04-01 21:10:00", home_id=10, away_id=20)
+    _odds(
+        connection,
+        "ambiguous",
+        "2026-04-01T21:10:00Z",
+        home_team="Team 10",
+        away_team="Team 20",
+    )
+    _odds(
+        connection,
+        "missing",
+        "2026-04-02T20:10:00Z",
+        home_team="Team 1",
+        away_team="Team 2",
+    )
+    # Concurrent slate present, but odds teams match neither loaded game.
+    _odds(
+        connection,
+        "wrong-teams",
+        "2026-04-01T20:10:00Z",
+        home_team="Team 99",
+        away_team="Team 98",
+    )
 
     normalize_silver(connection)
     mappings = connection.execute(
@@ -117,9 +163,49 @@ def test_unmapped_and_ambiguous_events_are_surfaced_without_game_pk() -> None:
     ).fetchall()
 
     assert mappings == [
-        ("ambiguous", "ambiguous", "multiple_exact_commence_time_matches", None, 2),
-        ("missing", "unmapped", "no_exact_commence_time_match", None, 0),
+        (
+            "ambiguous",
+            "ambiguous",
+            "multiple_exact_commence_and_team_matches",
+            None,
+            2,
+        ),
+        ("missing", "unmapped", "no_exact_commence_and_team_match", None, 0),
+        ("wrong-teams", "unmapped", "no_exact_commence_and_team_match", None, 0),
     ]
+
+
+def test_incomplete_concurrent_slate_does_not_attach_unrelated_odds() -> None:
+    """Odds for NYY@BOS must not attach to the only loaded SF@LAD at same commence."""
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(
+        connection,
+        5010,
+        "2026-04-01 20:10:00",
+        home_id=137,
+        away_id=119,
+        home_name="San Francisco Giants",
+        away_name="Los Angeles Dodgers",
+    )
+    _odds(
+        connection,
+        "nyy-bos",
+        "2026-04-01T20:10:00Z",
+        home_team="New York Yankees",
+        away_team="Boston Red Sox",
+    )
+
+    normalize_silver(connection)
+    mapping = connection.execute(
+        """
+        SELECT mapping_status, mapping_reason, game_pk, candidate_count
+        FROM silver.odds_event_game_mapping
+        WHERE source_event_id = 'nyy-bos'
+        """
+    ).fetchone()
+
+    assert mapping == ("unmapped", "no_exact_commence_and_team_match", None, 0)
 
 
 def test_team_statistics_extract_only_supported_schedule_fields() -> None:
@@ -127,13 +213,13 @@ def test_team_statistics_extract_only_supported_schedule_fields() -> None:
     _bronze(connection)
     teams = {
         "home": {
-            "team": {"id": 137},
+            "team": {"id": 137, "name": "San Francisco Giants"},
             "score": 5,
             "isWinner": True,
             "leagueRecord": {"wins": 3, "losses": 1, "pct": ".750"},
         },
         "away": {
-            "team": {"id": 119},
+            "team": {"id": 119, "name": "Los Angeles Dodgers"},
             "score": 2,
             "isWinner": False,
             "leagueRecord": {"wins": 2, "losses": 2, "pct": ".500"},
@@ -149,10 +235,24 @@ def test_team_statistics_extract_only_supported_schedule_fields() -> None:
         """
     ).fetchall()
 
+    # Contract: score / is_winner / league_* are post-game fields (ADR-002), not pregame features.
     assert statistics == [
         (119, "away", 2, False, 2, 2, ".500"),
         (137, "home", 5, True, 3, 1, ".750"),
     ]
+
+
+def test_payload_team_id_must_match_bronze_team_id() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    teams = {
+        "home": {"team": {"id": 999, "name": "San Francisco Giants"}, "score": 1},
+        "away": {"team": {"id": 119, "name": "Los Angeles Dodgers"}, "score": 0},
+    }
+    _game(connection, 305, "2026-04-01 20:10:00", payload_teams=teams)
+
+    with pytest.raises(NormalizationError, match="team.id 999 != bronze team_id 137"):
+        normalize_silver(connection)
 
 
 def test_schedule_without_statistics_leaves_explicit_stat_contracts_empty() -> None:
@@ -172,8 +272,8 @@ def test_documented_silver_keys_are_database_enforced() -> None:
     connection = duckdb.connect()
     _bronze(connection)
     teams = {
-        "home": {"team": {"id": 137}, "score": 1},
-        "away": {"team": {"id": 119}, "score": 0},
+        "home": {"team": {"id": 137, "name": "San Francisco Giants"}, "score": 1},
+        "away": {"team": {"id": 119, "name": "Los Angeles Dodgers"}, "score": 0},
     }
     _game(connection, 450, "2026-04-01 20:10:00", payload_teams=teams)
     _odds(connection, "keyed", "2026-04-01T20:10:00Z")
@@ -271,10 +371,36 @@ def test_mapped_events_join_games_one_to_one_and_never_many_to_many() -> None:
     _game(connection, 601, "2026-04-01 19:10:00", home_id=10, away_id=20)
     _game(connection, 602, "2026-04-01 19:10:00", home_id=30, away_id=40)
     _game(connection, 603, "2026-04-01 22:10:00", home_id=50, away_id=60)
-    _odds(connection, "solo-a", "2026-04-01T22:10:00Z")
-    _odds(connection, "solo-b", "2026-04-01T22:10:00Z", bookmaker="other")
-    _odds(connection, "clash", "2026-04-01T19:10:00Z")
-    _odds(connection, "orphan", "2026-04-02T19:10:00Z")
+    _odds(
+        connection,
+        "solo-a",
+        "2026-04-01T22:10:00Z",
+        home_team="Team 50",
+        away_team="Team 60",
+    )
+    _odds(
+        connection,
+        "solo-b",
+        "2026-04-01T22:10:00Z",
+        bookmaker="other",
+        home_team="Team 50",
+        away_team="Team 60",
+    )
+    # Concurrent slate: team identity selects the correct game (not commence-only).
+    _odds(
+        connection,
+        "match-a",
+        "2026-04-01T19:10:00Z",
+        home_team="Team 10",
+        away_team="Team 20",
+    )
+    _odds(
+        connection,
+        "orphan",
+        "2026-04-02T19:10:00Z",
+        home_team="Team 10",
+        away_team="Team 20",
+    )
 
     normalize_silver(connection)
 
@@ -313,15 +439,16 @@ def test_mapped_events_join_games_one_to_one_and_never_many_to_many() -> None:
         """
     ).fetchall()
 
-    assert mapped_rows == [("solo-a", 603, 1), ("solo-b", 603, 1)]
-    assert mapped_join == [("solo-a", 603), ("solo-b", 603)]
-    assert len(mapped_join) == len(mapped_rows)
-    assert unresolved == [
-        ("clash", "ambiguous", None),
-        ("orphan", "unmapped", None),
+    assert mapped_rows == [
+        ("match-a", 601, 1),
+        ("solo-a", 603, 1),
+        ("solo-b", 603, 1),
     ]
+    assert mapped_join == [("match-a", 601), ("solo-a", 603), ("solo-b", 603)]
+    assert len(mapped_join) == len(mapped_rows)
+    assert unresolved == [("orphan", "unmapped", None)]
     # Many events may share one game; one event never expands to many games.
-    assert events_per_mapped_game == [(603, 2)]
+    assert events_per_mapped_game == [(601, 1), (603, 2)]
 
 
 def test_same_team_date_doubleheader_is_not_identified_by_team_date_alone() -> None:
@@ -375,7 +502,7 @@ def test_identical_commence_doubleheader_stays_ambiguous_not_silently_attached()
 
     assert mapping == (
         "ambiguous",
-        "multiple_exact_commence_time_matches",
+        "multiple_exact_commence_and_team_matches",
         None,
         2,
     )
@@ -385,8 +512,16 @@ def test_source_timestamps_are_preserved_on_games_stats_and_odds() -> None:
     connection = duckdb.connect()
     _bronze(connection)
     teams = {
-        "home": {"team": {"id": 137}, "score": 4, "isWinner": True},
-        "away": {"team": {"id": 119}, "score": 1, "isWinner": False},
+        "home": {
+            "team": {"id": 137, "name": "San Francisco Giants"},
+            "score": 4,
+            "isWinner": True,
+        },
+        "away": {
+            "team": {"id": 119, "name": "Los Angeles Dodgers"},
+            "score": 1,
+            "isWinner": False,
+        },
     }
     observed = datetime(2026, 3, 31, 12, 0, 0)
     connection.execute(
@@ -403,12 +538,32 @@ def test_source_timestamps_are_preserved_on_games_stats_and_odds() -> None:
     # Non-UTC offset that is the same instant as 20:10Z.
     commence = datetime.fromisoformat("2026-04-01T13:10:00-07:00")
     connection.execute(
-        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ["provider", "evt-901", "book", "home", -105, snapshot, commence],
+        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            "provider",
+            "evt-901",
+            "book",
+            "home",
+            -105,
+            snapshot,
+            commence,
+            "San Francisco Giants",
+            "Los Angeles Dodgers",
+        ],
     )
     connection.execute(
-        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
-        ["provider", "evt-901", "book", "away",  -115, snapshot, commence],
+        "INSERT INTO bronze.odds_moneyline_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            "provider",
+            "evt-901",
+            "book",
+            "away",
+            -115,
+            snapshot,
+            commence,
+            "San Francisco Giants",
+            "Los Angeles Dodgers",
+        ],
     )
 
     normalize_silver(connection)

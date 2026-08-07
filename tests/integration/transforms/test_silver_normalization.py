@@ -28,12 +28,12 @@ def _schedule_payload() -> bytes:
         "officialDate": "2026-04-01",
         "teams": {
             "away": {
-                "team": {"id": 119},
+                "team": {"id": 119, "name": "Los Angeles Dodgers"},
                 "score": 3,
                 "isWinner": False,
             },
             "home": {
-                "team": {"id": 137},
+                "team": {"id": 137, "name": "San Francisco Giants"},
                 "score": 4,
                 "isWinner": True,
             },
