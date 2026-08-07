@@ -245,23 +245,29 @@ _CANONICAL_UPSERT = f"""
         resume_date = excluded.resume_date,
         status_json = excluded.status_json,
         game_json = excluded.game_json
+    -- Equal-time game_json equality is established before this statement.
     WHERE excluded.observed_at > mlb_games.observed_at
+       OR (excluded.observed_at = mlb_games.observed_at
+           AND excluded.payload_sha256 < mlb_games.payload_sha256)
 """
 
 
 def _reject_equal_time_conflict(connection: Any, values: list[object]) -> None:
-    existing = connection.execute(
+    existing_observations = connection.execute(
         """
         SELECT game_json
-        FROM bronze.mlb_games
+        FROM bronze.mlb_game_observations
         WHERE game_pk = ? AND observed_at = ?
         """,
         [values[0], values[2]],
-    ).fetchone()
-    if existing is not None and json.loads(existing[0]) != json.loads(values[-1]):
-        raise ValueError(
-            f"conflicting observations for gamePk {values[0]} at {values[2].isoformat()}Z"
-        )
+    ).fetchall()
+    incoming_game = json.loads(values[-1])
+    for (existing_game_json,) in existing_observations:
+        if json.loads(existing_game_json) != incoming_game:
+            raise ValueError(
+                f"conflicting observations for gamePk {values[0]} "
+                f"at {values[2].isoformat()}Z"
+            )
 
 
 def _game_values(

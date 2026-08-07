@@ -65,6 +65,20 @@ def test_date_range_ingestion_accepts_dates_and_iso_strings(tmp_path: Path) -> N
     ]
 
 
+@pytest.mark.parametrize("season", [1876, datetime.now(timezone.utc).year])
+def test_valid_season_boundaries_are_accepted(tmp_path: Path, season: int) -> None:
+    requests: list[object] = []
+
+    ingest_schedule(
+        tmp_path,
+        lambda parameters: requests.append(parameters) or b'{"dates": []}',
+        season=season,
+        fetched_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert requests == [{"sportId": 1, "season": season}]
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [

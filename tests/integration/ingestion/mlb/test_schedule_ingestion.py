@@ -199,6 +199,103 @@ def test_equal_time_conflict_fails_without_partial_database_lineage(tmp_path: Pa
     assert counts == (1, 1, 1)
 
 
+def test_historical_equal_time_conflict_rolls_back_after_canonical_advances(
+    tmp_path: Path,
+) -> None:
+    first_time = datetime(2025, 4, 1, 12, tzinfo=timezone.utc)
+    later_time = datetime(2025, 4, 2, 12, tzinfo=timezone.utc)
+    scheduled = _payload(_game(4501, detail="Scheduled"))
+    final = _payload(_game(4501, detail="Final"))
+    postponed = _payload(_game(4501, detail="Postponed"))
+
+    ingest_schedule(tmp_path, lambda _: scheduled, season=2025, fetched_at=first_time)
+    ingest_schedule(tmp_path, lambda _: final, season=2025, fetched_at=later_time)
+
+    try:
+        rejected = ingest_schedule(
+            tmp_path, lambda _: postponed, season=2025, fetched_at=first_time
+        )
+    except ValueError as error:
+        assert "conflicting observations for gamePk 4501" in str(error)
+    else:
+        raise AssertionError(f"historical equal-time conflict was accepted: {rejected}")
+
+    with connect_database(storage_paths(tmp_path)["database"]) as connection:
+        canonical = connection.execute(
+            """
+            SELECT detailed_state, observed_at
+            FROM bronze.mlb_games WHERE game_pk = 4501
+            """
+        ).fetchone()
+        history = connection.execute(
+            """
+            SELECT detailed_state, observed_at
+            FROM bronze.mlb_game_observations
+            WHERE game_pk = 4501 ORDER BY observed_at
+            """
+        ).fetchall()
+        counts = connection.execute(
+            """
+            SELECT
+                (SELECT count(*) FROM bronze.mlb_schedule_payloads),
+                (SELECT count(*) FROM bronze.mlb_schedule_fetches),
+                (SELECT count(*) FROM bronze.mlb_game_observations),
+                (SELECT count(*) FROM bronze.mlb_games)
+            """
+        ).fetchone()
+
+    assert canonical == ("Final", later_time.replace(tzinfo=None))
+    assert history == [
+        ("Scheduled", first_time.replace(tzinfo=None)),
+        ("Final", later_time.replace(tzinfo=None)),
+    ]
+    assert counts == (2, 2, 2, 1)
+    assert len(list((tmp_path / "raw" / "mlb" / "schedules").rglob("*.json"))) == 3
+
+
+def test_equal_time_identical_games_choose_payload_lineage_independent_of_order(
+    tmp_path: Path,
+) -> None:
+    game = _game(4751)
+    first_payload = json.dumps({"source": "a", "dates": [{"games": [game]}]}).encode()
+    second_payload = json.dumps({"source": "b", "dates": [{"games": [game]}]}).encode()
+    timestamp = datetime(2025, 4, 1, 12, tzinfo=timezone.utc)
+    canonical_results = []
+
+    for root, payloads in (
+        (tmp_path / "forward", (first_payload, second_payload)),
+        (tmp_path / "reverse", (second_payload, first_payload)),
+    ):
+        hashes = []
+        for payload in payloads:
+            result = ingest_schedule(
+                root, lambda _, content=payload: content, season=2025, fetched_at=timestamp
+            )
+            hashes.append(result["payload_sha256"])
+
+        with connect_database(storage_paths(root)["database"]) as connection:
+            canonical = connection.execute(
+                """
+                SELECT payload_sha256, detailed_state, observed_at
+                FROM bronze.mlb_games WHERE game_pk = 4751
+                """
+            ).fetchone()
+            counts = connection.execute(
+                """
+                SELECT
+                    (SELECT count(*) FROM bronze.mlb_schedule_payloads),
+                    (SELECT count(*) FROM bronze.mlb_schedule_fetches),
+                    (SELECT count(*) FROM bronze.mlb_game_observations)
+                """
+            ).fetchone()
+
+        assert canonical[0] == min(hashes)
+        assert counts == (2, 2, 2)
+        canonical_results.append(canonical)
+
+    assert canonical_results[0] == canonical_results[1]
+
+
 def test_identical_content_preserves_each_fetch_time_and_latest_canonical_time(
     tmp_path: Path,
 ) -> None:
