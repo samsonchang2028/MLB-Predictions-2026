@@ -2,7 +2,7 @@
 
 ## Status
 
-blocked
+done (merged 1d9b83b)
 
 ## Dependencies
 
