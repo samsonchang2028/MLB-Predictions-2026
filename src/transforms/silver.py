@@ -26,6 +26,12 @@ outcome and standings fields copied from the schedule payload. They must not
 be used as pregame predictive features. They exist for post-hoc labeling and
 evaluation only. Pregame feature builders belong in later FEAT tasks and must
 use point-in-time-safe inputs.
+
+The ``silver.pitcher_appearances`` this-game pitching-line columns
+(``innings_pitched`` through ``home_runs_allowed``) are likewise post-game
+outcome facts, not pregame features (ADR-002). The consuming FEAT-002/FEAT-003
+builders must shift-before-rolling and must never read a pitcher's current-game
+line as a pregame input.
 """
 
 from __future__ import annotations
@@ -703,6 +709,8 @@ def _create_tables(connection: Any) -> None:
             pitcher_id BIGINT NOT NULL,
             appearance_order INTEGER NOT NULL,
             is_actual_starter BOOLEAN NOT NULL,
+            -- this-game pitching line: post-game outcome, not a pregame feature
+            -- (ADR-002); must be shifted-before-rolling by the consuming FEAT task
             innings_pitched VARCHAR,
             outs_recorded INTEGER,
             batters_faced INTEGER,

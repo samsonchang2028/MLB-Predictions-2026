@@ -152,6 +152,47 @@ def test_extracts_actual_starter_change_missing_probable_and_bullpen_order() -> 
     ]
 
 
+def test_field_filtered_style_dynamic_id_keyed_players_extracts_stats() -> None:
+    # Mirrors a feed/live?fields=... response after DATA-005 stopped filtering the
+    # dynamically ID-keyed ``players`` object: only whitelisted structural keys
+    # survive, but the full players map (keys like "ID660271") is returned and
+    # must still yield pitcher stats.
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 8001)
+    payload = {
+        "gamePk": 8001,
+        "gameData": {"probablePitchers": {}},
+        "liveData": {"boxscore": {"teams": {
+            "home": {
+                "team": {"id": 137},
+                "pitchers": [660271],
+                "players": {"ID660271": _player(660271, "6.0", 95)},
+            },
+            "away": {
+                "team": {"id": 110},
+                "pitchers": [592789],
+                "players": {"ID592789": _player(592789, "5.1", 88)},
+            },
+        }}},
+    }
+    connection.execute(
+        "INSERT INTO bronze.mlb_game_detail_payloads VALUES (8001, 'sha-8001', ?, ?)",
+        [datetime(2025, 4, 2, 13), json.dumps(payload)],
+    )
+
+    counts = normalize_silver(connection)
+
+    assert counts["pitcher_appearances"] == 2
+    assert connection.execute(
+        """SELECT pitcher_id, innings_pitched, pitches_thrown, earned_runs
+           FROM silver.pitcher_appearances WHERE game_pk = 8001 ORDER BY side"""
+    ).fetchall() == [
+        (592789, "5.1", 88, 1),
+        (660271, "6.0", 95, 1),
+    ]
+
+
 def test_same_day_doubleheader_appearance_rows_remain_distinct_by_game_pk() -> None:
     connection = duckdb.connect()
     _bronze(connection)

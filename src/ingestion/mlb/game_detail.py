@@ -20,14 +20,15 @@ DEFAULT_SEASONS = (2021, 2022, 2023, 2024, 2025)
 BUILD_ID = "DATA-005"
 
 # One filtered live-feed request provides probable starters and boxscore data
-# without retaining play-by-play or pitch-level content.
+# without retaining play-by-play or pitch-level content. The boxscore ``players``
+# object is keyed by dynamic ids (e.g. "ID660271") that cannot be enumerated in a
+# static allowlist; listing it makes the live feed return ``players`` empty, which
+# then breaks silver pitcher-stat extraction. So ``players`` and its sub-keys are
+# deliberately omitted here and the full players subtree is returned unfiltered.
 GAME_DETAIL_FIELDS = ",".join(
     (
         "gamePk", "gameData", "probablePitchers", "away", "home", "id",
-        "fullName", "liveData", "boxscore", "teams", "team", "players",
-        "person", "stats", "pitching", "pitchers", "inningsPitched", "outs",
-        "battersFaced", "numberOfPitches", "strikes", "balls", "hits", "runs",
-        "earnedRuns", "baseOnBalls", "strikeOuts", "homeRuns",
+        "fullName", "liveData", "boxscore", "teams", "team", "pitchers",
     )
 )
 
