@@ -124,3 +124,37 @@ def test_mutating_prior_game_does_change_later_features() -> None:
     assert after[(2, 10)] != original[(2, 10)]
     assert after[(2, 10)]["win_pct_before"] == 0.0
     assert after[(2, 10)]["run_diff_total_before"] == -10
+
+
+def test_appending_future_games_does_not_change_earlier_features() -> None:
+    """Stronger future-leak probe: brand-new later rows must not rewrite history."""
+    baseline = _baseline_schedule()
+    original = _feature_map(baseline)
+    earlier_keys = [
+        (1, 10),
+        (1, 20),
+        (2, 10),
+        (2, 30),
+        (3, 10),
+        (3, 40),
+        (4, 10),
+        (4, 50),
+    ]
+
+    extended = deepcopy(baseline) + _pair(5, 5, 10, 60, 8, 0, True) + _pair(
+        6, 6, 70, 10, 0, 12, False
+    )
+    after = _feature_map(extended)
+    for key in earlier_keys:
+        assert after[key] == original[key], key
+
+
+def test_unrelated_team_future_game_does_not_change_features() -> None:
+    baseline = _baseline_schedule()
+    original = _feature_map(baseline)
+    earlier_keys = list(original)
+
+    extended = deepcopy(baseline) + _pair(99, 10, 99, 98, 50, 0, True)
+    after = _feature_map(extended)
+    for key in earlier_keys:
+        assert after[key] == original[key], key

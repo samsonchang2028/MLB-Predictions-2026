@@ -352,6 +352,118 @@ def test_doubleheader_order_is_game_date_then_game_pk() -> None:
     assert late_home["runs_scored_total_before"] == 4
 
 
+def test_incomplete_intermediate_game_is_skipped_from_aggregates() -> None:
+    """Postponed/incomplete rows must not enter season or rolling history."""
+    rows = (
+        _game_pair(
+            1,
+            "2024-04-01T19:00:00",
+            home_id=10,
+            away_id=20,
+            home_score=5,
+            away_score=3,
+            home_won=True,
+            away_won=False,
+        )
+        + _game_pair(
+            2,
+            "2024-04-02T19:00:00",
+            home_id=10,
+            away_id=30,
+            home_score=None,
+            away_score=None,
+            home_won=None,
+            away_won=None,
+        )
+        + _game_pair(
+            3,
+            "2024-04-03T19:00:00",
+            home_id=10,
+            away_id=40,
+            home_score=None,
+            away_score=None,
+            home_won=None,
+            away_won=None,
+        )
+    )
+    features = _by_key(build_team_features(rows))
+
+    assert features[(2, 10)]["games_played_before"] == 1
+    assert features[(2, 10)]["runs_scored_total_before"] == 5
+    # Game 3 still sees only game 1; incomplete game 2 never entered history.
+    assert features[(3, 10)]["games_played_before"] == 1
+    assert features[(3, 10)]["wins_before"] == 1
+    assert features[(3, 10)]["games_L7"] == 1
+    assert features[(3, 10)]["win_pct_L7"] == 1.0
+
+
+def test_bool_and_missing_opponent_scores_are_excluded() -> None:
+    """bool is a subclass of int in Python; True/False must not count as runs."""
+    when1 = _dt("2024-04-01T19:00:00")
+    when2 = _dt("2024-04-02T19:00:00")
+    when3 = _dt("2024-04-03T19:00:00")
+    rows = [
+        {
+            "game_pk": 1,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when1,
+            "season": "2024",
+            "score": True,
+            "is_winner": True,
+        },
+        {
+            "game_pk": 1,
+            "team_id": 20,
+            "side": "away",
+            "game_date": when1,
+            "season": "2024",
+            "score": False,
+            "is_winner": False,
+        },
+        {
+            "game_pk": 2,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when2,
+            "season": "2024",
+            "score": 4,
+            "is_winner": True,
+        },
+        {
+            "game_pk": 2,
+            "team_id": 30,
+            "side": "away",
+            "game_date": when2,
+            "season": "2024",
+            "score": None,
+            "is_winner": False,
+        },
+        {
+            "game_pk": 3,
+            "team_id": 10,
+            "side": "away",
+            "game_date": when3,
+            "season": "2024",
+            "score": None,
+            "is_winner": None,
+        },
+        {
+            "game_pk": 3,
+            "team_id": 40,
+            "side": "home",
+            "game_date": when3,
+            "season": "2024",
+            "score": None,
+            "is_winner": None,
+        },
+    ]
+    third = _by_key(build_team_features(rows))[(3, 10)]
+    assert third["games_played_before"] == 0
+    assert third["win_pct_before"] is None
+    assert third["games_L7"] == 0
+
+
 def test_league_fields_are_never_required_or_read() -> None:
     # Rows may omit league_* entirely; builder must not depend on them.
     rows = [
