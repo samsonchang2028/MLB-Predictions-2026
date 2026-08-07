@@ -107,3 +107,36 @@ Do not merge when:
 - an architectural decision was made but no ADR was recorded.
 
 P2/P3 findings may be deferred if they are non-blocking and explicitly recorded.
+
+## Agent observability
+
+When delegating parallel tasks:
+
+- Maintain one status file per active task under `state/agents/`.
+- Record:
+  - task ID
+  - active role
+  - status
+  - branch/worktree
+  - current activity
+  - latest commit
+  - latest test result
+  - blocking issue
+- Update status at meaningful transitions, not after every command.
+  \*For example something like
+  READY
+  ↓
+  IMPLEMENTING
+  ↓
+  CANDIDATE
+  ├── REVIEWING
+  └── TESTING
+  ↓
+  FIXING
+  ↓
+  APPROVED
+  ↓
+  MERGED
+- Periodically report a compact active-agent summary to the user.
+- Do not interrupt workers merely to request status.
+- Delete/archive the active status file when the task is merged.
