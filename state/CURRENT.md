@@ -27,6 +27,7 @@ V1 data ingestion.
 - DATA-002 — immutable, idempotent MLB schedule ingestion completed.
 - DATA-003 — timestamped, append-only moneyline odds ingestion completed.
 - DATA-004 — normalized Silver datasets and MLB/odds mapping contract completed.
+- FEAT-001 — point-in-time team strength / recent-form features completed.
 
 ## In progress
 
@@ -56,7 +57,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- FEAT-001 is ready for dispatch. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data.
+- No parallel FEAT work is ready: FEAT-002/003 remain blocked on empty pitcher-appearance Silver data. Next unblock is appearance-capable ingestion (or an explicit interim ADR/task), then FEAT-002/003 in parallel, then FEAT-004.
 
 ## Deferred follow-ups
 

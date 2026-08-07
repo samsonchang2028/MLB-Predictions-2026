@@ -2,7 +2,7 @@
 
 ## Status
 
-ready
+done
 
 ## Dependencies
 
@@ -74,3 +74,10 @@ Initial V1 candidates:
 ## Handoff
 
 Document feature keys, prediction-time semantics, commands run, gate results, and any metrics omitted due to missing Silver fields.
+
+## Completion handoff
+
+- Added pure-Python `build_team_features()` with one pregame row per `(game_pk, team_id)`: season-to-date win% / runs / run differential plus L7/L14/L30 windows.
+- Shift-before-roll; current/future Finals excluded from that row’s features. Prior history requires a coherent Final pair (XOR `is_winner`, int scores, score matches winner). Live both-False scores do not pollute later features.
+- `python -m pytest`: 110 passed. Reviewer APPROVE; Tester PASS after one repair loop. Deferred P2: asymmetric soft-drop when XOR winner has non-int scores.
+- OPS/OBP/etc. omitted (not in Silver). No ADR change. FEAT-002/003 remain blocked on empty `pitcher_appearances`.
