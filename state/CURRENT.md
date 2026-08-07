@@ -27,7 +27,8 @@ V1 data ingestion.
 
 ## In progress
 
-- None.
+- DATA-002 — MLB historical ingestion.
+- DATA-003 — timestamped odds ingestion.
 
 ## Blocked
 
@@ -49,8 +50,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-002 — MLB ingestion.
-- DATA-003 — timestamped odds ingestion.
+- DATA-002 and DATA-003 are implementing in parallel. DATA-004 unlocks after both pass review/testing and merge.
 
 ## Deferred follow-ups
 
