@@ -16,6 +16,7 @@ This file records concise durable project milestones, not every code edit.
 - Immutable MLB schedule ingestion with canonical `game_pk`, preserved status history, and deterministic temporal lineage.
 - Append-only timestamped moneyline ingestion with transaction safety and timezone-aware instants.
 - Deterministic Silver normalization with explicit join cardinalities and commence+team odds↔`game_pk` mapping.
+- Point-in-time team features with shift-before-roll, Final-pair history gate, and leakage tests.
 
 ### Decisions
 
