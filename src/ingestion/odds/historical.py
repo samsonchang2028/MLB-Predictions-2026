@@ -67,7 +67,12 @@ def ingest_historical_odds_archive(
         coverage["game_count"],
         len(records),
     )
-    record_values = [_record_values(record, payload_sha256) for record in records]
+    # Sort to the same canonical order the SQL read uses so idempotent
+    # re-ingestion compares row-for-row even when archive date keys are unsorted.
+    record_values = sorted(
+        (_record_values(record, payload_sha256) for record in records),
+        key=lambda row: (row[1], row[2], row[3]),
+    )
 
     with connect_database(paths["database"]) as connection:
         _create_tables(connection)
@@ -264,8 +269,11 @@ def _team_identity(value: object, field: str) -> tuple[str, str]:
 
 
 def _american_odds(value: object, field: str) -> int | None:
-    # The published source uses zero as an unavailable-price sentinel.
-    if value is None or value == 0:
+    # The published source uses integer zero as an unavailable-price sentinel;
+    # reject JSON bool/float so False/0.0 is not silently swallowed as such.
+    if value is None or (
+        isinstance(value, int) and not isinstance(value, bool) and value == 0
+    ):
         return None
     if (
         isinstance(value, bool)

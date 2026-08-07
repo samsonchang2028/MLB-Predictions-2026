@@ -1,4 +1,5 @@
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -99,6 +100,27 @@ def test_retains_source_and_reingests_idempotently(
     ]
     assert "snapshot_timestamp" not in columns
     assert "observation_timestamp" not in columns
+
+
+def test_reingests_idempotently_with_unsorted_date_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    game = json.loads(FIXTURE.read_text(encoding="utf-8"))["2021-04-01"][0]
+    # Date keys deliberately in NON-chronological order: parse order and the
+    # SQL ORDER BY read order disagree, so re-ingestion would falsely conflict
+    # unless both sides compare in the same canonical order.
+    payload = json.dumps({"2021-04-02": [game], "2021-04-01": [game]}).encode()
+    source = tmp_path / "unsorted_archive.json"
+    source.write_bytes(payload)
+    monkeypatch.setattr(
+        historical, "PUBLISHED_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+
+    first = historical.ingest_historical_odds_archive(tmp_path, source)
+    second = historical.ingest_historical_odds_archive(tmp_path, source)
+
+    assert first["records_inserted"] == 4
+    assert second["records_inserted"] == 0
 
 
 def test_checksum_mismatch_fails_before_retention(tmp_path: Path) -> None:
