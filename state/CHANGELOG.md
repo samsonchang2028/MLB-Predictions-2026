@@ -15,6 +15,7 @@ This file records concise durable project milestones, not every code edit.
 - Idempotent local storage foundation with immutable raw writes and DuckDB Bronze/Silver/Gold schemas.
 - Immutable MLB schedule ingestion with canonical `game_pk`, preserved status history, and deterministic temporal lineage.
 - Append-only timestamped moneyline ingestion with transaction safety and timezone-aware instants.
+- Deterministic Silver normalization with explicit join cardinalities and commence+team odds↔`game_pk` mapping.
 
 ### Decisions
 

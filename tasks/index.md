@@ -10,10 +10,10 @@ This index lists task state and dependency relationships in a human-readable for
 | DATA-001 | done | META-001 | completed |
 | DATA-002 | done | DATA-001 | completed |
 | DATA-003 | done | DATA-001 | completed |
-| DATA-004 | candidate | DATA-002, DATA-003 | re-review after mapping fix |
-| FEAT-001 | blocked | DATA-004 | parallel with FEAT-002/003 |
-| FEAT-002 | blocked | DATA-004 | parallel with FEAT-001/003 |
-| FEAT-003 | blocked | DATA-004 | parallel with FEAT-001/002 |
+| DATA-004 | done | DATA-002, DATA-003 | completed |
+| FEAT-001 | ready | DATA-004 | parallel with FEAT-002/003 after metadata |
+| FEAT-002 | blocked | DATA-004 | needs pitcher appearance data |
+| FEAT-003 | blocked | DATA-004 | needs pitcher appearance data |
 | FEAT-004 | blocked | FEAT-001/002/003 | integration |
 | ML-001 | blocked | FEAT-004 | parallel with ML-002/003 |
 | ML-002 | blocked | FEAT-004 | parallel with ML-001/003 |

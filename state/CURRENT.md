@@ -26,6 +26,7 @@ V1 data ingestion.
 - DATA-001 — local DuckDB/Parquet storage foundation completed.
 - DATA-002 — immutable, idempotent MLB schedule ingestion completed.
 - DATA-003 — timestamped, append-only moneyline odds ingestion completed.
+- DATA-004 — normalized Silver datasets and MLB/odds mapping contract completed.
 
 ## In progress
 
@@ -33,11 +34,11 @@ V1 data ingestion.
 
 ## In review
 
-- DATA-004 — Silver normalization candidate after team-identity mapping repair.
+- None.
 
 ## Blocked
 
-- None.
+- FEAT-002 / FEAT-003 — `silver.pitcher_appearances` is an empty contract until appearance-capable ingestion exists.
 
 ## Current architecture decisions
 
@@ -55,11 +56,13 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-004 is in re-review/testing after mapping-safety repair. FEAT-* unlock after gates pass and merge.
+- FEAT-001 is ready once execution-contract metadata is completed at dispatch. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data. FEAT-001/002/003 may run in parallel only when all three are ready and file surfaces remain disjoint.
 
 ## Deferred follow-ups
 
-- Complete missing execution-contract metadata in downstream task files before each becomes executable; DATA-004 metadata was completed at dispatch.
+- Complete missing execution-contract metadata in FEAT-001 (and later FEAT-002/003) before dispatch.
+- Add appearance-capable ingestion (or populate `pitcher_appearances` from richer boxscore/feed data) before FEAT-002/003.
+- Optional P2: document/backfill legacy bronze odds rows with NULL team names; optional team-name alias table.
 - Clarify the non-authoritative archival status of `old/docs/codex_workflow.md` in a separately authorized task.
 
 ## Notes for the next harness
