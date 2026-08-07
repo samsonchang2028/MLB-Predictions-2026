@@ -4,9 +4,9 @@ Table keys and mapping cardinalities
 ------------------------------------
 ``silver.games`` is keyed by ``game_pk``. ``silver.team_game_statistics`` is
 keyed by ``(game_pk, team_id)``. ``silver.pitcher_appearances`` is keyed by
-``(game_pk, team_id, pitcher_id, appearance_order)``. The current schedule
-ingestion does not contain pitcher appearance statistics, so that last table is
-an intentionally empty, stable contract rather than inferred data.
+``(game_pk, team_id, appearance_order)`` and preserves boxscore pitcher order.
+``silver.pitcher_starters`` is keyed by ``(game_pk, team_id)`` and keeps actual
+and probable starter identity in separate columns.
 
 ``silver.odds_snapshots`` retains the Bronze key ``(source, source_event_id,
 bookmaker, outcome, snapshot_timestamp)``. ``silver.odds_event_game_mapping``
@@ -26,6 +26,12 @@ outcome and standings fields copied from the schedule payload. They must not
 be used as pregame predictive features. They exist for post-hoc labeling and
 evaluation only. Pregame feature builders belong in later FEAT tasks and must
 use point-in-time-safe inputs.
+
+The ``silver.pitcher_appearances`` this-game pitching-line columns
+(``innings_pitched`` through ``home_runs_allowed``) are likewise post-game
+outcome facts, not pregame features (ADR-002). The consuming FEAT-002/FEAT-003
+builders must shift-before-rolling and must never read a pitcher's current-game
+line as a pregame input.
 """
 
 from __future__ import annotations
@@ -45,12 +51,15 @@ def normalize_silver(connection: Any) -> dict[str, int]:
     try:
         games = _load_games(connection)
         odds = _load_odds(connection)
+        details = _load_game_details(connection)
         team_statistics = _team_statistics(games)
+        pitcher_appearances, pitcher_starters = _pitcher_data(games, details)
         mappings = _event_mappings(games, odds)
         _create_tables(connection)
         for table in (
             "odds_event_game_mapping",
             "odds_snapshots",
+            "pitcher_starters",
             "pitcher_appearances",
             "team_game_statistics",
             "games",
@@ -71,6 +80,18 @@ def normalize_silver(connection: Any) -> dict[str, int]:
                 "INSERT INTO silver.team_game_statistics VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 team_statistics,
             )
+        if pitcher_appearances:
+            connection.executemany(
+                """INSERT INTO silver.pitcher_appearances VALUES (
+                       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                   )""",
+                pitcher_appearances,
+            )
+        if pitcher_starters:
+            connection.executemany(
+                "INSERT INTO silver.pitcher_starters VALUES (?, ?, ?, ?, ?, ?, ?)",
+                pitcher_starters,
+            )
         if odds:
             connection.executemany(
                 "INSERT INTO silver.odds_snapshots VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -81,7 +102,16 @@ def normalize_silver(connection: Any) -> dict[str, int]:
                 "INSERT INTO silver.odds_event_game_mapping VALUES (?, ?, ?, ?, ?, ?, ?)",
                 mappings,
             )
-        _assert_silver_cardinality(connection, len(games), len(team_statistics), len(odds), len(mappings))
+        _assert_silver_cardinality(
+            connection,
+            len(games),
+            len(team_statistics),
+            len(pitcher_appearances),
+            len(pitcher_starters),
+            len(odds),
+            len(mappings),
+        )
+        _assert_pitcher_join_cardinality(connection)
         _assert_mapped_odds_join_cardinality(connection)
         connection.execute("COMMIT")
     except Exception:
@@ -91,7 +121,8 @@ def normalize_silver(connection: Any) -> dict[str, int]:
     return {
         "games": len(games),
         "team_game_statistics": len(team_statistics),
-        "pitcher_appearances": 0,
+        "pitcher_appearances": len(pitcher_appearances),
+        "pitcher_starters": len(pitcher_starters),
         "odds_snapshots": len(odds),
         "odds_event_game_mapping": len(mappings),
     }
@@ -161,6 +192,249 @@ def _load_odds(connection: Any) -> list[dict[str, Any]]:
             }
         )
     return result
+
+
+def _load_game_details(connection: Any) -> dict[int, dict[str, Any]]:
+    exists = connection.execute(
+        """SELECT count(*) FROM information_schema.tables
+           WHERE table_schema = 'bronze'
+             AND table_name = 'mlb_game_detail_payloads'"""
+    ).fetchone()[0]
+    if not exists:
+        return {}
+    rows = connection.execute(
+        """SELECT game_pk, payload_sha256, retrieved_at, payload_json
+           FROM bronze.mlb_game_detail_payloads ORDER BY game_pk"""
+    ).fetchall()
+    result: dict[int, dict[str, Any]] = {}
+    for game_pk, payload_sha, retrieved_at, payload_json in rows:
+        if game_pk in result:
+            raise NormalizationError(
+                f"bronze game details violate unique game_pk {game_pk}"
+            )
+        try:
+            payload = json.loads(payload_json)
+        except (TypeError, json.JSONDecodeError) as error:
+            raise NormalizationError(
+                f"game_pk {game_pk} has invalid detail payload_json"
+            ) from error
+        if not isinstance(payload, dict) or payload.get("gamePk") != game_pk:
+            raise NormalizationError(
+                f"game_pk {game_pk} detail payload has mismatched gamePk"
+            )
+        result[game_pk] = {
+            "payload": payload,
+            "payload_sha256": payload_sha,
+            "retrieved_at": retrieved_at,
+        }
+    return result
+
+
+_PITCHING_INT_FIELDS = (
+    "outs",
+    "battersFaced",
+    "numberOfPitches",
+    "strikes",
+    "balls",
+    "hits",
+    "runs",
+    "earnedRuns",
+    "baseOnBalls",
+    "strikeOuts",
+    "homeRuns",
+)
+
+
+def _pitcher_data(
+    games: list[dict[str, Any]], details: dict[int, dict[str, Any]]
+) -> tuple[list[tuple[object, ...]], list[tuple[object, ...]]]:
+    games_by_pk = {game["values"][0]: game for game in games}
+    appearances: list[tuple[object, ...]] = []
+    starters: list[tuple[object, ...]] = []
+    for game_pk, detail in sorted(details.items()):
+        game = games_by_pk.get(game_pk)
+        if game is None:
+            raise NormalizationError(
+                f"game-detail payload references missing bronze game_pk {game_pk}"
+            )
+        payload = detail["payload"]
+        probable_pitchers = _probable_pitchers(payload, game_pk)
+        boxscore_teams = _boxscore_teams(payload, game_pk)
+        values = game["values"]
+        for side, team_id in (("home", values[5]), ("away", values[6])):
+            side_boxscore = boxscore_teams.get(side)
+            actual_pitcher_id: int | None = None
+            if side_boxscore is not None:
+                if not isinstance(side_boxscore, dict):
+                    raise NormalizationError(
+                        f"game_pk {game_pk} {side} boxscore must be an object"
+                    )
+                _assert_detail_team_id(side_boxscore, team_id, game_pk, side)
+                pitcher_ids = _pitcher_ids(side_boxscore, game_pk, side)
+                actual_pitcher_id = pitcher_ids[0] if pitcher_ids else None
+                players = side_boxscore.get("players", {})
+                if pitcher_ids and not isinstance(players, dict):
+                    raise NormalizationError(
+                        f"game_pk {game_pk} {side} players must be an object"
+                    )
+                for order, pitcher_id in enumerate(pitcher_ids, start=1):
+                    pitching = _pitching_stats(players, pitcher_id, game_pk, side)
+                    field_context = f"game_pk {game_pk} pitcher {pitcher_id}"
+                    appearances.append(
+                        (
+                            game_pk,
+                            team_id,
+                            side,
+                            pitcher_id,
+                            order,
+                            order == 1,
+                            _optional_text(
+                                pitching.get("inningsPitched"),
+                                f"{field_context} inningsPitched",
+                            ),
+                            *(
+                                _optional_int(
+                                    pitching.get(field), f"{field_context} {field}"
+                                )
+                                for field in _PITCHING_INT_FIELDS
+                            ),
+                            detail["payload_sha256"],
+                            detail["retrieved_at"],
+                        )
+                    )
+
+            probable_pitcher_id = _probable_pitcher_id(
+                probable_pitchers.get(side), game_pk, side
+            )
+            if actual_pitcher_id is not None or probable_pitcher_id is not None:
+                starters.append(
+                    (
+                        game_pk,
+                        team_id,
+                        side,
+                        actual_pitcher_id,
+                        probable_pitcher_id,
+                        detail["payload_sha256"],
+                        detail["retrieved_at"],
+                    )
+                )
+    return appearances, starters
+
+
+def _probable_pitchers(payload: dict[str, Any], game_pk: int) -> dict[str, Any]:
+    game_data = payload.get("gameData", {})
+    if not isinstance(game_data, dict):
+        raise NormalizationError(f"game_pk {game_pk} gameData must be an object")
+    probable = game_data.get("probablePitchers", {})
+    if not isinstance(probable, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} probablePitchers must be an object"
+        )
+    return probable
+
+
+def _boxscore_teams(payload: dict[str, Any], game_pk: int) -> dict[str, Any]:
+    live_data = payload.get("liveData", {})
+    if not isinstance(live_data, dict):
+        raise NormalizationError(f"game_pk {game_pk} liveData must be an object")
+    boxscore = live_data.get("boxscore", {})
+    if not isinstance(boxscore, dict):
+        raise NormalizationError(f"game_pk {game_pk} boxscore must be an object")
+    teams = boxscore.get("teams", {})
+    if not isinstance(teams, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} boxscore teams must be an object"
+        )
+    return teams
+
+
+def _assert_detail_team_id(
+    side_boxscore: dict[str, Any], team_id: int, game_pk: int, side: str
+) -> None:
+    team = side_boxscore.get("team")
+    if not isinstance(team, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} boxscore is missing team identity"
+        )
+    detail_team_id = team.get("id")
+    if (
+        isinstance(detail_team_id, bool)
+        or not isinstance(detail_team_id, int)
+        or detail_team_id != team_id
+    ):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} detail team.id {detail_team_id!r} "
+            f"!= bronze team_id {team_id}"
+        )
+
+
+def _pitcher_ids(
+    side_boxscore: dict[str, Any], game_pk: int, side: str
+) -> list[int]:
+    values = side_boxscore.get("pitchers", [])
+    if not isinstance(values, list):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} pitchers must be a list"
+        )
+    result: list[int] = []
+    seen: set[int] = set()
+    for pitcher_id in values:
+        if (
+            isinstance(pitcher_id, bool)
+            or not isinstance(pitcher_id, int)
+            or pitcher_id <= 0
+        ):
+            raise NormalizationError(
+                f"game_pk {game_pk} {side} pitcher ids must be positive integers"
+            )
+        if pitcher_id in seen:
+            raise NormalizationError(
+                f"game_pk {game_pk} {side} repeats pitcher_id {pitcher_id}"
+            )
+        seen.add(pitcher_id)
+        result.append(pitcher_id)
+    return result
+
+
+def _pitching_stats(
+    players: dict[str, Any], pitcher_id: int, game_pk: int, side: str
+) -> dict[str, Any]:
+    player = players.get(f"ID{pitcher_id}")
+    if not isinstance(player, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} is missing player data for pitcher {pitcher_id}"
+        )
+    person = player.get("person")
+    if not isinstance(person, dict) or person.get("id") != pitcher_id:
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} pitcher {pitcher_id} has mismatched person.id"
+        )
+    stats = player.get("stats", {})
+    if not isinstance(stats, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} pitcher {pitcher_id} stats must be an object"
+        )
+    pitching = stats.get("pitching", {})
+    if not isinstance(pitching, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} pitcher {pitcher_id} pitching must be an object"
+        )
+    return pitching
+
+
+def _probable_pitcher_id(value: object, game_pk: int, side: str) -> int | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} probable pitcher must be an object"
+        )
+    pitcher_id = value.get("id")
+    if isinstance(pitcher_id, bool) or not isinstance(pitcher_id, int) or pitcher_id <= 0:
+        raise NormalizationError(
+            f"game_pk {game_pk} {side} probable pitcher id must be a positive integer"
+        )
+    return pitcher_id
 
 
 def _team_statistics(games: list[dict[str, Any]]) -> list[tuple[object, ...]]:
@@ -379,6 +653,13 @@ def _utc_instant(value: datetime) -> datetime:
 
 
 def _create_tables(connection: Any) -> None:
+    # Silver is a deterministic rebuild; recreate the evolved pitcher contract
+    # so databases created before DATA-005 migrate atomically.
+    connection.execute(
+        """CREATE SCHEMA IF NOT EXISTS silver;
+           DROP TABLE IF EXISTS silver.pitcher_starters;
+           DROP TABLE IF EXISTS silver.pitcher_appearances"""
+    )
     connection.execute(
         """
         CREATE SCHEMA IF NOT EXISTS silver;
@@ -424,12 +705,41 @@ def _create_tables(connection: Any) -> None:
         CREATE TABLE IF NOT EXISTS silver.pitcher_appearances (
             game_pk BIGINT NOT NULL,
             team_id BIGINT NOT NULL,
+            side VARCHAR NOT NULL CHECK (side IN ('home', 'away')),
             pitcher_id BIGINT NOT NULL,
             appearance_order INTEGER NOT NULL,
+            is_actual_starter BOOLEAN NOT NULL,
+            -- this-game pitching line: post-game outcome, not a pregame feature
+            -- (ADR-002); must be shifted-before-rolling by the consuming FEAT task
             innings_pitched VARCHAR,
+            outs_recorded INTEGER,
+            batters_faced INTEGER,
+            pitches_thrown INTEGER,
+            strikes INTEGER,
+            balls INTEGER,
+            hits_allowed INTEGER,
+            runs_allowed INTEGER,
+            earned_runs INTEGER,
+            walks INTEGER,
+            strikeouts INTEGER,
+            home_runs_allowed INTEGER,
             source_payload_sha256 VARCHAR NOT NULL,
-            source_observed_at TIMESTAMP NOT NULL,
-            PRIMARY KEY (game_pk, team_id, pitcher_id, appearance_order)
+            source_retrieved_at TIMESTAMP NOT NULL,
+            PRIMARY KEY (game_pk, team_id, appearance_order),
+            UNIQUE (game_pk, team_id, pitcher_id),
+            CHECK ((appearance_order = 1 AND is_actual_starter)
+                OR (appearance_order > 1 AND NOT is_actual_starter))
+        );
+        CREATE TABLE IF NOT EXISTS silver.pitcher_starters (
+            game_pk BIGINT NOT NULL,
+            team_id BIGINT NOT NULL,
+            side VARCHAR NOT NULL CHECK (side IN ('home', 'away')),
+            actual_pitcher_id BIGINT,
+            probable_pitcher_id BIGINT,
+            source_payload_sha256 VARCHAR NOT NULL,
+            source_retrieved_at TIMESTAMP NOT NULL,
+            PRIMARY KEY (game_pk, team_id),
+            CHECK (actual_pitcher_id IS NOT NULL OR probable_pitcher_id IS NOT NULL)
         );
         CREATE TABLE IF NOT EXISTS silver.odds_snapshots (
             source VARCHAR NOT NULL,
@@ -458,12 +768,19 @@ def _create_tables(connection: Any) -> None:
 
 
 def _assert_silver_cardinality(
-    connection: Any, games: int, team_stats: int, odds: int, mappings: int
+    connection: Any,
+    games: int,
+    team_stats: int,
+    pitcher_appearances: int,
+    pitcher_starters: int,
+    odds: int,
+    mappings: int,
 ) -> None:
     expected = {
         "games": games,
         "team_game_statistics": team_stats,
-        "pitcher_appearances": 0,
+        "pitcher_appearances": pitcher_appearances,
+        "pitcher_starters": pitcher_starters,
         "odds_snapshots": odds,
         "odds_event_game_mapping": mappings,
     }
@@ -472,6 +789,25 @@ def _assert_silver_cardinality(
         if actual != count:
             raise NormalizationError(
                 f"silver.{table} cardinality mismatch: expected {count}, found {actual}"
+            )
+
+
+def _assert_pitcher_join_cardinality(connection: Any) -> None:
+    for table in ("pitcher_appearances", "pitcher_starters"):
+        unmatched = connection.execute(
+            f"""
+            SELECT pitchers.game_pk, pitchers.team_id, pitchers.side
+            FROM silver.{table} AS pitchers
+            LEFT JOIN silver.games AS games
+              ON games.game_pk = pitchers.game_pk
+             AND ((pitchers.side = 'home' AND pitchers.team_id = games.home_team_id)
+               OR (pitchers.side = 'away' AND pitchers.team_id = games.away_team_id))
+            WHERE games.game_pk IS NULL
+            """
+        ).fetchall()
+        if unmatched:
+            raise NormalizationError(
+                f"silver.{table} has unmatched game/team identities {unmatched!r}"
             )
 
 
