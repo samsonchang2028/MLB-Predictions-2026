@@ -22,6 +22,16 @@ from validation.results import (
 )
 from validation.runner import certify, run_all
 
+# DATA-007: versioned PASS/FAIL certification artifact layer (append-only).
+from validation.certification import (
+    CERTIFICATION_VERSION,
+    DEFAULT_CERTIFICATIONS_DIR,
+    build_certification,
+    certification_status,
+    certify_and_write,
+    write_certification,
+)
+
 __all__ = [
     "CheckResult",
     "PASS",
@@ -37,4 +47,11 @@ __all__ = [
     "ALL_FOLDS",
     "DEV_SEASONS",
     "HOLDOUT_SEASON",
+    # DATA-007 certification exports (append-only).
+    "CERTIFICATION_VERSION",
+    "DEFAULT_CERTIFICATIONS_DIR",
+    "certification_status",
+    "build_certification",
+    "write_certification",
+    "certify_and_write",
 ]
