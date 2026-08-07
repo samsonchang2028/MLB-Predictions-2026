@@ -2,7 +2,7 @@
 
 ## Status
 
-candidate
+done
 
 ## Dependencies
 
@@ -53,3 +53,13 @@ Documentation/path sanity only.
 ## Handoff
 
 Summarize installed execution contract and any path changes.
+
+## Completion handoff
+
+- Added repository-level Git policy for task branches, commits, review, testing, and Orchestrator-owned merges.
+- Changed files: `AGENTS.md`, this task file, `tasks/index.md`, and `state/CURRENT.md`.
+- Validation: documentation/path sanity and `git diff --check` passed.
+- Reviewer: approved with no open P0/P1 findings after one repair loop.
+- Tester: not required for this documentation-only task.
+- Known limitations: downstream task-metadata completeness and legacy `old/` documentation are deferred P2 follow-ups.
+- ADR/state: no ADR required; project state updated to unlock DATA-001.

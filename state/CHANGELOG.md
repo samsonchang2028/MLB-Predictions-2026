@@ -11,6 +11,7 @@ This file records concise durable project milestones, not every code edit.
 - V1 task graph.
 - Project-state handoff format.
 - Initial architecture decision records.
+- Repository-level Git policy for task-prefixed candidate commits and Orchestrator-owned integration.
 
 ### Decisions
 

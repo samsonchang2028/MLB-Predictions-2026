@@ -22,14 +22,15 @@ Agent/harness planning and repository foundation.
   - Implementer,
   - Reviewer,
   - Tester.
+- META-001 — repository/agent foundation completed.
 
-## In review
+## In progress
 
-- META-001 — repository/agent foundation candidate awaiting approval and merge.
+- None.
 
 ## Blocked
 
-- DATA-001 — waiting for META-001 approval and merge.
+- None.
 
 ## Current architecture decisions
 
@@ -47,7 +48,12 @@ Agent/harness planning and repository foundation.
 
 ## Next implementation task
 
-- DATA-001 — create the storage foundation after META-001 is approved and merged. It remains blocked until then.
+- DATA-001 — create the storage foundation.
+
+## Deferred follow-ups
+
+- Complete missing execution-contract metadata in downstream task files before those tasks become executable.
+- Clarify the non-authoritative archival status of `old/docs/codex_workflow.md` in a separately authorized task.
 
 ## Notes for the next harness
 
