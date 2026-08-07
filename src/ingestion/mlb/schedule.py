@@ -147,8 +147,15 @@ def _parse_games(payload: bytes) -> list[dict[str, Any]]:
     if not isinstance(response, dict) or not isinstance(response.get("dates"), list):
         raise ValueError("MLB schedule response must contain a dates list")
 
-    games: list[dict[str, Any]] = []
-    seen_game_pks: set[int] = set()
+    # A season-wide schedule legitimately lists one game_pk under more than one
+    # date: a postponed game appears on its original date and its makeup appears
+    # on the reschedule date (confirmed real example game_pk 634627 in 2021).
+    # game_pk is the canonical game identity, and the observation table is keyed
+    # (game_pk, payload_sha256, observed_at) so a single response can retain only
+    # one observation per game_pk. Repeats within one response are therefore
+    # reconciled to a single canonical entry here rather than aborting the build.
+    grouped: dict[int, list[dict[str, Any]]] = {}
+    order: list[int] = []
     for date_entry in response.get("dates", []):
         if not isinstance(date_entry, dict) or not isinstance(date_entry.get("games"), list):
             raise ValueError("each schedule date must contain a games list")
@@ -157,11 +164,95 @@ def _parse_games(payload: bytes) -> list[dict[str, Any]]:
                 raise ValueError("each scheduled game must be an object")
             _validate_game(game)
             game_pk = game["gamePk"]
-            if game_pk in seen_game_pks:
-                raise ValueError(f"duplicate gamePk {game_pk} within one schedule response")
-            seen_game_pks.add(game_pk)
-            games.append(game)
-    return games
+            if game_pk not in grouped:
+                grouped[game_pk] = []
+                order.append(game_pk)
+            grouped[game_pk].append(game)
+    return [_reconcile_repeated_game(game_pk, grouped[game_pk]) for game_pk in order]
+
+
+# codedGameState lifecycle precedence. A played/Final game supersedes any
+# pre-play or postponed/cancelled/suspended placeholder carrying the same
+# game_pk. Postponed games can report abstractGameState 'Final' (see DATA-012),
+# so precedence is decided on the specific coded lifecycle state rather than the
+# abstract one.
+_LIFECYCLE_RANK = {
+    "C": 0,  # Cancelled
+    "D": 0,  # Postponed
+    "U": 0,  # Suspended
+    "T": 0,  # Suspended, tied
+    "S": 1,  # Scheduled
+    "P": 2,  # Pre-Game / Warmup
+    "I": 3,  # In Progress
+    "M": 3,  # Manager Challenge (in progress)
+    "O": 4,  # Game Over
+    "F": 5,  # Final
+}
+
+# Postponement/reschedule metadata carried forward onto the canonical entry so a
+# superseded placeholder's dates are not dropped.
+_RESCHEDULE_FIELDS = ("rescheduleDate", "rescheduledFromDate", "resumeDate")
+
+
+def _lifecycle_rank(game: dict[str, Any]) -> int:
+    return _LIFECYCLE_RANK.get(game["status"]["codedGameState"], 1)
+
+
+def _reconcile_repeated_game(
+    game_pk: int, entries: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Reconcile one or more schedule entries sharing a game_pk to a single row.
+
+    Precedence: the entry at the most-advanced coded lifecycle stage (Final over
+    postponed/scheduled) supplies the canonical outcome fields, and reschedule
+    metadata from superseded entries is preserved onto that row. Genuine
+    conflicts fail rather than being silently resolved: differing home/away teams
+    are an identity conflict, and two differing entries sharing the top lifecycle
+    stage cannot be reconciled.
+    """
+    if len(entries) == 1:
+        return entries[0]
+
+    # A game_pk denotes exactly one matchup; differing teams is a real identity
+    # conflict, not a reschedule.
+    identities = {
+        (
+            _team_id(entry["teams"], "home", game_pk),
+            _team_id(entry["teams"], "away", game_pk),
+        )
+        for entry in entries
+    }
+    if len(identities) > 1:
+        raise ValueError(
+            f"gamePk {game_pk} repeats with conflicting home/away teams "
+            "within one schedule response"
+        )
+
+    top_rank = max(_lifecycle_rank(entry) for entry in entries)
+    top_entries = [entry for entry in entries if _lifecycle_rank(entry) == top_rank]
+    canonical = top_entries[0]
+    for other in top_entries[1:]:
+        if other != canonical:
+            raise ValueError(
+                f"gamePk {game_pk} has conflicting duplicate entries at the same "
+                "lifecycle stage within one schedule response"
+            )
+    return _merge_reschedule_metadata(canonical, entries)
+
+
+def _merge_reschedule_metadata(
+    canonical: dict[str, Any], entries: list[dict[str, Any]]
+) -> dict[str, Any]:
+    merged = dict(canonical)
+    for field in _RESCHEDULE_FIELDS:
+        if merged.get(field) is not None:
+            continue
+        for entry in entries:
+            value = entry.get(field)
+            if value is not None:
+                merged[field] = value
+                break
+    return merged
 
 
 def _validate_game(game: dict[str, Any]) -> None:

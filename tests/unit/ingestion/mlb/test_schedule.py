@@ -5,14 +5,21 @@ from pathlib import Path
 import pytest
 
 from ingestion.mlb import ingest_schedule
+from storage import connect_database, storage_paths
 
 
 def _payload(*games: dict[str, object]) -> bytes:
     return json.dumps({"dates": [{"date": "2025-04-01", "games": games}]}).encode()
 
 
-def _game(game_pk: int) -> dict[str, object]:
-    return {
+def _game(game_pk: int, **overrides: object) -> dict[str, object]:
+    status = {
+        "abstractGameState": overrides.pop("abstractGameState", "Preview"),
+        "codedGameState": overrides.pop("codedGameState", "S"),
+        "detailedState": overrides.pop("detailedState", "Scheduled"),
+        "statusCode": overrides.pop("statusCode", "S"),
+    }
+    game: dict[str, object] = {
         "gamePk": game_pk,
         "season": "2025",
         "gameType": "R",
@@ -22,13 +29,10 @@ def _game(game_pk: int) -> dict[str, object]:
             "away": {"team": {"id": 110}},
             "home": {"team": {"id": 137}},
         },
-        "status": {
-            "abstractGameState": "Preview",
-            "codedGameState": "S",
-            "detailedState": "Scheduled",
-            "statusCode": "S",
-        },
+        "status": status,
     }
+    game.update(overrides)
+    return game
 
 
 def test_season_ingestion_builds_expected_request_and_retains_exact_bytes(
@@ -105,10 +109,122 @@ def test_invalid_query_scope_is_rejected_before_fetch(
     assert not called
 
 
-def test_duplicate_game_pk_in_one_response_is_a_cardinality_error(tmp_path: Path) -> None:
+def test_repeated_game_pk_in_one_response_is_reconciled_not_rejected(
+    tmp_path: Path,
+) -> None:
+    # DATA-013: this test previously asserted that a repeated gamePk within one
+    # response is a hard cardinality error. That assumption is incorrect against
+    # real MLB data: a season-wide schedule legitimately lists a postponed game
+    # on its original date and its makeup on the reschedule date under one
+    # game_pk (81 game_pks were duplicated in 2021 alone). Benign identical
+    # repeats must now reconcile to exactly one canonical row rather than abort
+    # the build, so the assertion is inverted here rather than deleted.
     response = _payload(_game(1), _game(1))
 
-    with pytest.raises(ValueError, match="duplicate gamePk 1"):
+    result = ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2025,
+        fetched_at=datetime(2025, 4, 1, tzinfo=timezone.utc),
+    )
+
+    assert result["games_seen"] == 1
+    with connect_database(storage_paths(tmp_path)["database"]) as connection:
+        canonical = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_games WHERE game_pk = 1"
+        ).fetchone()[0]
+        observations = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_game_observations WHERE game_pk = 1"
+        ).fetchone()[0]
+    assert canonical == 1
+    assert observations == 1
+
+
+def test_repeated_game_pk_prefers_final_and_preserves_reschedule_metadata(
+    tmp_path: Path,
+) -> None:
+    postponed = _game(
+        7,
+        detailedState="Postponed",
+        codedGameState="D",
+        statusCode="DR",
+        rescheduleDate="2025-04-03",
+    )
+    # abstractGameState 'Final' on the postponed placeholder mirrors real MLB
+    # data (DATA-012); precedence must still resolve on codedGameState.
+    postponed["status"]["abstractGameState"] = "Final"
+    makeup = _game(
+        7,
+        detailedState="Final",
+        codedGameState="F",
+        statusCode="F",
+        gameDate="2025-04-03T20:10:00Z",
+        officialDate="2025-04-03",
+        rescheduledFromDate="2025-04-01",
+    )
+    makeup["status"]["abstractGameState"] = "Final"
+    response = json.dumps(
+        {
+            "dates": [
+                {"date": "2025-04-01", "games": [postponed]},
+                {"date": "2025-04-03", "games": [makeup]},
+            ]
+        }
+    ).encode()
+
+    ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2025,
+        fetched_at=datetime(2025, 4, 4, tzinfo=timezone.utc),
+    )
+
+    with connect_database(storage_paths(tmp_path)["database"]) as connection:
+        row = connection.execute(
+            """
+            SELECT detailed_state, coded_game_state, official_date,
+                   reschedule_date, rescheduled_from_date
+            FROM bronze.mlb_games WHERE game_pk = 7
+            """
+        ).fetchone()
+        canonical = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_games WHERE game_pk = 7"
+        ).fetchone()[0]
+        observations = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_game_observations WHERE game_pk = 7"
+        ).fetchone()[0]
+
+    assert canonical == 1
+    assert observations == 1
+    # Final outcome state wins; the postponed placeholder's rescheduleDate and
+    # the makeup's rescheduledFromDate are both preserved on the canonical row.
+    assert row == ("Final", "F", date(2025, 4, 3), "2025-04-03", "2025-04-01")
+
+
+def test_repeated_game_pk_with_conflicting_teams_fails(tmp_path: Path) -> None:
+    original = _game(8)
+    swapped = _game(8)
+    swapped["teams"]["home"]["team"]["id"] = 999
+    response = _payload(original, swapped)
+
+    with pytest.raises(ValueError, match="conflicting home/away teams"):
+        ingest_schedule(
+            tmp_path,
+            lambda _: response,
+            season=2025,
+            fetched_at=datetime(2025, 4, 1, tzinfo=timezone.utc),
+        )
+
+
+def test_conflicting_entries_at_same_lifecycle_stage_fail(tmp_path: Path) -> None:
+    first = _game(9, detailedState="Final", codedGameState="F", statusCode="F")
+    # Same top (Final) lifecycle stage but a materially different official date:
+    # this cannot be silently resolved and must fail.
+    second = _game(9, detailedState="Final", codedGameState="F", statusCode="F")
+    second["officialDate"] = "2025-04-02"
+    response = _payload(first, second)
+
+    with pytest.raises(ValueError, match="conflicting duplicate entries"):
         ingest_schedule(
             tmp_path,
             lambda _: response,
