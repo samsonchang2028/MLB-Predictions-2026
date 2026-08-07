@@ -2,7 +2,7 @@
 
 ## Status
 
-candidate
+done
 
 ## Dependencies
 
@@ -54,3 +54,12 @@ Create the minimal V1 storage foundation for immutable raw data plus DuckDB/Parq
 - clean initialization,
 - repeat initialization,
 - database query smoke test.
+
+## Completion handoff
+
+- Added deterministic raw/Bronze/Silver/Gold storage layout, idempotent DuckDB schema initialization, reusable connections, and immutable raw-payload writes.
+- Changed `.gitignore`, `pyproject.toml`, `src/storage/`, and focused storage tests.
+- `python -m pytest -q`: 8 passed; compile and diff checks passed.
+- Reviewer approved and Tester passed with no open P0/P1 findings; temporal leakage was not applicable.
+- Known limitation: additional concurrency and traversal regression tests are optional P3 hardening; adversarial manual probes passed.
+- No ADR change required; project state updated to unlock DATA-002 and DATA-003.

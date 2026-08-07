@@ -12,6 +12,7 @@ This file records concise durable project milestones, not every code edit.
 - Project-state handoff format.
 - Initial architecture decision records.
 - Repository-level Git policy for task-prefixed candidate commits and Orchestrator-owned integration.
+- Idempotent local storage foundation with immutable raw writes and DuckDB Bronze/Silver/Gold schemas.
 
 ### Decisions
 

@@ -2,7 +2,7 @@
 
 ## Milestone
 
-Agent/harness planning and repository foundation.
+V1 data ingestion.
 
 ## Completed
 
@@ -23,10 +23,11 @@ Agent/harness planning and repository foundation.
   - Reviewer,
   - Tester.
 - META-001 — repository/agent foundation completed.
+- DATA-001 — local DuckDB/Parquet storage foundation completed.
 
-## In review
+## In progress
 
-- DATA-001 — storage foundation candidate under independent review and testing.
+- None.
 
 ## Blocked
 
@@ -48,7 +49,8 @@ Agent/harness planning and repository foundation.
 
 ## Next implementation task
 
-- DATA-002 and DATA-003 unlock after DATA-001 passes review/testing and merges.
+- DATA-002 — MLB ingestion.
+- DATA-003 — timestamped odds ingestion.
 
 ## Deferred follow-ups
 
