@@ -1,4 +1,4 @@
-# FEAT-003 — Bullpen Features
+# FEAT-003 - Bullpen Features
 
 ## Status
 
@@ -6,7 +6,7 @@ blocked
 
 ## Dependencies
 
-- DATA-004
+- DATA-007
 
 ## Execution
 
@@ -18,6 +18,18 @@ Worktree required: yes
 ## Goal
 
 Create point-in-time-safe bullpen quality and workload features.
+
+## Read first
+
+- `AGENTS.md`
+- `state/CURRENT.md`
+- `docs/decisions/ADR-002-point-in-time.md`
+- `docs/decisions/ADR-004-historical-data-and-certification.md`
+- `tasks/DATA-007-historical-data-certification.md`
+
+## Inputs
+
+- Certified Silver pitcher appearances from DATA-007.
 
 ## Allowed files
 
@@ -44,3 +56,15 @@ Create point-in-time-safe bullpen quality and workload features.
 - same-day doubleheader ordering is tested,
 - future bullpen appearances cannot affect earlier games,
 - workload windows are deterministic.
+
+## Required tests
+
+- unit tests for deterministic workload windows,
+- leakage tests proving current/future bullpen appearances cannot affect
+  earlier rows,
+- regression tests for same-day doubleheaders.
+
+## Merge-blocking conditions
+
+- Missing or failed historical MLB data certification.
+- Any current-game or future bullpen appearance leakage.

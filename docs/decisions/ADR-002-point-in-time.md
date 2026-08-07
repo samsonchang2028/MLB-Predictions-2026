@@ -21,6 +21,14 @@ Rules include:
 - all fit operations restricted to training partitions,
 - prediction timestamp must precede first pitch.
 
+Historical opening-odds benchmarking from the V1 archive is separate from
+timestamped live odds. It may support model edge versus opening market and
+simulated ROI at opening prices, but it must not be described as the exact odds
+available at an arbitrary historical prediction timestamp.
+
+For live/future predictions, the odds snapshot used by a prediction must exist
+before the prediction cutoff, and `prediction_timestamp < game_start_timestamp`.
+
 Leakage tests are merge-blocking.
 
 ## Consequences

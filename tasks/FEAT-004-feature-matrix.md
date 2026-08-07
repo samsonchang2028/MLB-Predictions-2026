@@ -1,4 +1,4 @@
-# FEAT-004 — Game Feature Matrix
+# FEAT-004 - Game Feature Matrix
 
 ## Status
 
@@ -6,6 +6,7 @@ blocked
 
 ## Dependencies
 
+- DATA-007
 - FEAT-001
 - FEAT-002
 - FEAT-003
@@ -19,7 +20,8 @@ Worktree required: yes
 
 ## Goal
 
-Combine component features into one game-level Gold dataset for training and inference.
+Combine component features into one game-level Gold dataset for training and
+inference.
 
 ## Allowed files
 
@@ -34,17 +36,20 @@ Combine component features into one game-level Gold dataset for training and inf
 - home and away component features,
 - explicit differential features,
 - target stored separately from predictive feature list,
-- prediction/reference timestamp retained.
+- prediction/reference timestamp retained,
+- certified 2021-2025 historical dataset build identity retained.
 
 ## Critical constraints
 
 - no many-to-many joins,
 - no target columns in model feature list,
-- all feature timestamps valid for the prediction time.
+- all feature timestamps valid for the prediction time,
+- failed/missing certification prevents Gold feature matrix publication.
 
 ## Acceptance criteria
 
 - uniqueness test passes,
 - schema is deterministic,
 - leakage checks pass,
-- target isolation test passes.
+- target isolation test passes,
+- feature matrix rows can be traced to the certified dataset build.

@@ -1,4 +1,4 @@
-# FEAT-002 — Starting Pitcher Features
+# FEAT-002 - Starting Pitcher Features
 
 ## Status
 
@@ -6,7 +6,7 @@ blocked
 
 ## Dependencies
 
-- DATA-004
+- DATA-007
 
 ## Execution
 
@@ -18,6 +18,18 @@ Worktree required: yes
 ## Goal
 
 Create point-in-time-safe starting pitcher features for each game.
+
+## Read first
+
+- `AGENTS.md`
+- `state/CURRENT.md`
+- `docs/decisions/ADR-002-point-in-time.md`
+- `docs/decisions/ADR-004-historical-data-and-certification.md`
+- `tasks/DATA-007-historical-data-certification.md`
+
+## Inputs
+
+- Certified Silver pitcher appearances and starter identity from DATA-007.
 
 ## Allowed files
 
@@ -49,3 +61,15 @@ Create point-in-time-safe starting pitcher features for each game.
 - leakage mutation test passes,
 - first-start behavior defined,
 - starter changes do not silently use the wrong pitcher.
+
+## Required tests
+
+- unit tests for deterministic transforms and first-start behavior,
+- leakage tests proving current/future pitcher appearances cannot affect
+  earlier rows,
+- regression tests for starter changes and missing starters.
+
+## Merge-blocking conditions
+
+- Missing or failed historical MLB data certification.
+- Any current-game or future pitcher appearance leakage.

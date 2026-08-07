@@ -1,4 +1,4 @@
-# DATA-003 — Odds Snapshot Ingestion
+# DATA-003 - Odds Snapshot Ingestion
 
 ## Status
 
@@ -18,6 +18,10 @@ Worktree required: yes
 ## Goal
 
 Ingest MLB moneyline snapshots with bookmaker/source and observation timestamps.
+
+Scope note: this completed task covers live/future timestamped odds snapshots.
+The finalized historical odds archive is a separate source and methodology owned
+by DATA-008 and DATA-009.
 
 ## Read first
 
@@ -43,7 +47,7 @@ Every observation must preserve:
 - snapshot timestamp,
 - commence time.
 
-Do not overwrite historical snapshots with newer prices.
+Do not overwrite stored timestamped snapshots with newer prices.
 
 ## Acceptance criteria
 

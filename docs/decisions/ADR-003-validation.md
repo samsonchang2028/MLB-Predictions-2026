@@ -49,3 +49,10 @@ Secondary:
 - accuracy,
 - simulated ROI,
 - market-relative performance.
+
+2026 remains excluded from feature methodology selection, hyperparameter/model
+selection, training-window selection, calibration-method selection, and market
+strategy selection.
+
+Historical data certification and leakage checks are merge-blocking
+prerequisites for downstream model work.

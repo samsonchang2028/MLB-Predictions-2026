@@ -1,4 +1,4 @@
-# DATA-002 — MLB Historical Ingestion
+# DATA-002 - MLB Schedule Historical Ingestion
 
 ## Status
 
@@ -17,7 +17,12 @@ Worktree required: yes
 
 ## Goal
 
-Ingest historical MLB schedules/game records while preserving immutable raw API payloads and stable game identity.
+Ingest historical MLB schedules/game records while preserving immutable raw API
+payloads and stable game identity.
+
+Scope note: this completed task covers schedule/game records only.
+Appearance-capable game-detail, boxscore, starter, and pitcher appearance
+ingestion is owned by DATA-005.
 
 ## Read first
 
