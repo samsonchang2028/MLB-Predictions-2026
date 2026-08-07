@@ -30,7 +30,7 @@ V1 data ingestion.
 
 ## In progress
 
-- None.
+- FEAT-001 — point-in-time team strength / recent-form features.
 
 ## In review
 
@@ -56,7 +56,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- FEAT-001 is ready for dispatch. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data.
+- FEAT-001 is implementing. FEAT-002/003 stay blocked on empty pitcher-appearance Silver data.
 
 ## Deferred follow-ups
 
