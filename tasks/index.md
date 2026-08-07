@@ -21,7 +21,7 @@ format.
 | DATA-011 | done | DATA-005/006/007/008/009 | merged; MLB-StatsAPI fetchers + `pipelines/certify_historical.py` runner. Real multi-hour build is operator-run |
 | DATA-012 | done | DATA-006 | merged; fix results.valid_scores for postponed games reported as abstract Final (found via DATA-011 real smoke) |
 | DATA-013 | done | DATA-002 | merged; reconcile repeated game_pk in season schedule responses (postponed+rescheduled Final), conflicts FAIL. Found via DATA-011 real build |
-| DATA-014 | in-progress | DATA-002, DATA-013 | reconcile suspended/resumed same-Final duplicate game_pk (same outcome), real outcome conflicts still FAIL. Found via DATA-011 real build |
+| DATA-014 | done | DATA-002, DATA-013 | merged; reconcile suspended/resumed same-Final duplicate game_pk (same outcome), real outcome conflicts still FAIL. Found via DATA-011 real build |
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | blocked | DATA-007 | needs certified pitcher appearance data |
 | FEAT-003 | blocked | DATA-007 | needs certified pitcher appearance data |
