@@ -30,11 +30,11 @@ V1 data ingestion.
 
 ## In progress
 
-- None.
+- FEAT-001 — repairing Reviewer P1 completed-game gate for team features.
 
 ## In review
 
-- FEAT-001 — point-in-time team features candidate.
+- None.
 
 ## Blocked
 
