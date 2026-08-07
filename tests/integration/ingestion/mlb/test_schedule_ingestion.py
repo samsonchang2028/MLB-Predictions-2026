@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ingestion.mlb import ingest_schedule
+from ingestion.odds import ingest_the_odds_api_moneylines
 from storage import connect_database, storage_paths
+from transforms import normalize_silver
 
 
 def _game(
@@ -340,3 +342,136 @@ def test_identical_content_preserves_each_fetch_time_and_latest_canonical_time(
         assert canonical_time == (later.replace(tzinfo=None),)
         assert payload_count == 1
         assert all(value[0].tzinfo is None for value in fetch_times)
+
+
+def _game_634627(
+    *,
+    game_date: str,
+    official_date: str,
+    detailed_state: str,
+    coded_game_state: str,
+    status_code: str,
+    **extra: object,
+) -> dict[str, object]:
+    # Real game_pk 634627 (2021): postponed on 2021-04-01, made up 2021-04-02.
+    # Postponed placeholders carry abstractGameState 'Final' in real MLB data
+    # (DATA-012), so it is set here on both entries deliberately.
+    return {
+        "gamePk": 634627,
+        "season": "2021",
+        "gameType": "R",
+        "gameDate": game_date,
+        "officialDate": official_date,
+        "teams": {
+            "away": {"team": {"id": 136, "name": "Seattle Mariners"}},
+            "home": {"team": {"id": 133, "name": "Oakland Athletics"}},
+        },
+        "status": {
+            "abstractGameState": "Final",
+            "codedGameState": coded_game_state,
+            "detailedState": detailed_state,
+            "statusCode": status_code,
+        },
+        **extra,
+    }
+
+
+def test_season_response_reconciles_postponed_and_makeup_gamepk_through_silver(
+    tmp_path: Path,
+) -> None:
+    # Regression for the real 2021 season build: game_pk 634627 appears twice in
+    # one season response (Postponed original date + Final makeup date). It must
+    # reconcile to one canonical Final game that preserves reschedule metadata,
+    # and Silver must contain exactly one games row for it.
+    postponed = _game_634627(
+        game_date="2021-04-01T17:10:00Z",
+        official_date="2021-04-01",
+        detailed_state="Postponed",
+        coded_game_state="D",
+        status_code="DR",
+        rescheduleDate="2021-04-02",
+    )
+    makeup = _game_634627(
+        game_date="2021-04-02T20:10:00Z",
+        official_date="2021-04-02",
+        detailed_state="Final",
+        coded_game_state="F",
+        status_code="F",
+        rescheduledFromDate="2021-04-01",
+    )
+    response = json.dumps(
+        {
+            "dates": [
+                {"date": "2021-04-01", "games": [postponed]},
+                {"date": "2021-04-02", "games": [makeup]},
+            ]
+        }
+    ).encode()
+
+    result = ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2021,
+        fetched_at=datetime(2021, 4, 3, 12, tzinfo=timezone.utc),
+    )
+
+    assert result["games_seen"] == 1
+    paths = storage_paths(tmp_path)
+    with connect_database(paths["database"]) as connection:
+        canonical = connection.execute(
+            """
+            SELECT detailed_state, coded_game_state, official_date,
+                   reschedule_date, rescheduled_from_date
+            FROM bronze.mlb_games WHERE game_pk = 634627
+            """
+        ).fetchone()
+        canonical_count = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_games WHERE game_pk = 634627"
+        ).fetchone()[0]
+        observation_count = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_game_observations WHERE game_pk = 634627"
+        ).fetchone()[0]
+        # Create the (empty) odds table so normalize_silver can run standalone.
+        ingest_the_odds_api_moneylines(connection, [])
+        normalize_silver(connection)
+        silver_rows = connection.execute(
+            """
+            SELECT detailed_state, rescheduled_from_date
+            FROM silver.games WHERE game_pk = 634627
+            """
+        ).fetchall()
+
+    assert canonical_count == 1
+    assert observation_count == 1
+    # Final outcome state wins; both the original (rescheduledFromDate) and the
+    # makeup (rescheduleDate) date metadata survive on the canonical row.
+    assert canonical == ("Final", "F", datetime(2021, 4, 2).date(), "2021-04-02", "2021-04-01")
+    assert silver_rows == [("Final", "2021-04-01")]
+
+
+def test_true_doubleheader_stays_distinct_through_silver(tmp_path: Path) -> None:
+    # Two DISTINCT game_pks on the same date (gameNumber 1 & 2) are a real
+    # doubleheader, not a duplicate, and must remain two separate rows in both
+    # Bronze and Silver.
+    response = _payload(_game(6101), _game(6102, game_number=2))
+
+    ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2025,
+        fetched_at=datetime(2025, 3, 1, 12, tzinfo=timezone.utc),
+    )
+
+    paths = storage_paths(tmp_path)
+    with connect_database(paths["database"]) as connection:
+        bronze = connection.execute(
+            "SELECT game_pk, game_number FROM bronze.mlb_games ORDER BY game_pk"
+        ).fetchall()
+        ingest_the_odds_api_moneylines(connection, [])
+        normalize_silver(connection)
+        silver = connection.execute(
+            "SELECT game_pk, game_number FROM silver.games ORDER BY game_pk"
+        ).fetchall()
+
+    assert bronze == [(6101, 1), (6102, 2)]
+    assert silver == [(6101, 1), (6102, 2)]
