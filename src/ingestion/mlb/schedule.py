@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -48,19 +49,28 @@ def ingest_schedule(
             connection.execute(
                 """
                 INSERT INTO bronze.mlb_schedule_payloads
-                    (payload_sha256, raw_path, request_json, fetched_at)
-                VALUES (?, ?, ?, ?)
+                    (payload_sha256, raw_path)
+                VALUES (?, ?)
+                ON CONFLICT DO NOTHING
+                """,
+                [payload_sha, relative_raw_path.as_posix()],
+            )
+            connection.execute(
+                """
+                INSERT INTO bronze.mlb_schedule_fetches
+                    (payload_sha256, fetched_at, request_json)
+                VALUES (?, ?, ?)
                 ON CONFLICT DO NOTHING
                 """,
                 [
                     payload_sha,
-                    relative_raw_path.as_posix(),
-                    json.dumps(request, sort_keys=True, separators=(",", ":")),
                     observed_at,
+                    json.dumps(request, sort_keys=True, separators=(",", ":")),
                 ],
             )
             for game in games:
                 values = _game_values(game, payload_sha, observed_at)
+                _reject_equal_time_conflict(connection, values)
                 connection.execute(_OBSERVATION_INSERT, values)
                 connection.execute(_CANONICAL_UPSERT, values)
             connection.execute("COMMIT")
@@ -82,7 +92,12 @@ def _request_parameters(
     if season is not None and using_range:
         raise ValueError("choose either season or date range ingestion")
     if season is not None:
-        if isinstance(season, bool) or not isinstance(season, int) or season < 1876:
+        latest_season = datetime.now(timezone.utc).year + 1
+        if (
+            isinstance(season, bool)
+            or not isinstance(season, int)
+            or not 1876 <= season <= latest_season
+        ):
             raise ValueError("season must be a valid MLB season year")
         return {"sportId": 1, "season": season}
     if start_date is None or end_date is None:
@@ -100,16 +115,18 @@ def _iso_date(value: date | str, name: str) -> date:
         raise ValueError(f"{name} must be a date, not a datetime")
     if isinstance(value, date):
         return value
+    if not isinstance(value, str) or re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) is None:
+        raise ValueError(f"{name} must use YYYY-MM-DD format")
     try:
         return date.fromisoformat(value)
-    except (TypeError, ValueError) as error:
+    except ValueError as error:
         raise ValueError(f"{name} must use YYYY-MM-DD format") from error
 
 
 def _utc_timestamp(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("fetched_at must include a timezone")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _retain_raw_payload(root: str | Path, relative_path: Path, payload: bytes) -> Path:
@@ -127,25 +144,69 @@ def _parse_games(payload: bytes) -> list[dict[str, Any]]:
         response = json.loads(payload)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError("MLB schedule response is not valid JSON") from error
-    if not isinstance(response, dict) or not isinstance(response.get("dates", []), list):
+    if not isinstance(response, dict) or not isinstance(response.get("dates"), list):
         raise ValueError("MLB schedule response must contain a dates list")
 
     games: list[dict[str, Any]] = []
     seen_game_pks: set[int] = set()
     for date_entry in response.get("dates", []):
-        if not isinstance(date_entry, dict) or not isinstance(date_entry.get("games", []), list):
+        if not isinstance(date_entry, dict) or not isinstance(date_entry.get("games"), list):
             raise ValueError("each schedule date must contain a games list")
-        for game in date_entry.get("games", []):
+        for game in date_entry["games"]:
             if not isinstance(game, dict):
                 raise ValueError("each scheduled game must be an object")
-            game_pk = game.get("gamePk")
-            if isinstance(game_pk, bool) or not isinstance(game_pk, int):
-                raise ValueError("every scheduled game must have an integer gamePk")
+            _validate_game(game)
+            game_pk = game["gamePk"]
             if game_pk in seen_game_pks:
                 raise ValueError(f"duplicate gamePk {game_pk} within one schedule response")
             seen_game_pks.add(game_pk)
             games.append(game)
     return games
+
+
+def _validate_game(game: dict[str, Any]) -> None:
+    game_pk = game.get("gamePk")
+    if isinstance(game_pk, bool) or not isinstance(game_pk, int) or game_pk <= 0:
+        raise ValueError("every scheduled game must have an integer gamePk")
+
+    game_date = game.get("gameDate")
+    if not isinstance(game_date, str):
+        raise ValueError(f"gamePk {game_pk} must have a gameDate timestamp")
+    try:
+        parsed_game_date = datetime.fromisoformat(game_date.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"gamePk {game_pk} has an invalid gameDate timestamp") from error
+    if parsed_game_date.tzinfo is None or parsed_game_date.utcoffset() is None:
+        raise ValueError(f"gamePk {game_pk} gameDate must include a timezone")
+
+    official_date = game.get("officialDate")
+    if (
+        not isinstance(official_date, str)
+        or re.fullmatch(r"\d{4}-\d{2}-\d{2}", official_date) is None
+    ):
+        raise ValueError(f"gamePk {game_pk} must have an officialDate")
+    try:
+        date.fromisoformat(official_date)
+    except ValueError as error:
+        raise ValueError(f"gamePk {game_pk} has an invalid officialDate") from error
+
+    status = game.get("status")
+    if not isinstance(status, dict):
+        raise ValueError(f"gamePk {game_pk} must have a status object")
+    for field in (
+        "abstractGameState",
+        "detailedState",
+        "codedGameState",
+        "statusCode",
+    ):
+        if not isinstance(status.get(field), str) or not status[field]:
+            raise ValueError(f"gamePk {game_pk} status must have {field}")
+
+    teams = game.get("teams")
+    if not isinstance(teams, dict):
+        raise ValueError(f"gamePk {game_pk} must have a teams object")
+    _team_id(teams, "home", game_pk)
+    _team_id(teams, "away", game_pk)
 
 
 _GAME_COLUMNS = """
@@ -185,9 +246,22 @@ _CANONICAL_UPSERT = f"""
         status_json = excluded.status_json,
         game_json = excluded.game_json
     WHERE excluded.observed_at > mlb_games.observed_at
-       OR (excluded.observed_at = mlb_games.observed_at
-           AND excluded.payload_sha256 > mlb_games.payload_sha256)
 """
+
+
+def _reject_equal_time_conflict(connection: Any, values: list[object]) -> None:
+    existing = connection.execute(
+        """
+        SELECT game_json
+        FROM bronze.mlb_games
+        WHERE game_pk = ? AND observed_at = ?
+        """,
+        [values[0], values[2]],
+    ).fetchone()
+    if existing is not None and json.loads(existing[0]) != json.loads(values[-1]):
+        raise ValueError(
+            f"conflicting observations for gamePk {values[0]} at {values[2].isoformat()}Z"
+        )
 
 
 def _game_values(
@@ -203,7 +277,7 @@ def _game_values(
         observed_at,
         game.get("season"),
         game.get("gameType"),
-        game.get("gameDate"),
+        _source_timestamp(game["gameDate"]),
         game.get("officialDate"),
         _team_id(teams, "home", game["gamePk"]),
         _team_id(teams, "away", game["gamePk"]),
@@ -231,22 +305,35 @@ def _team_id(teams: dict[str, Any], side: str, game_pk: int) -> int:
     return team_id
 
 
+def _source_timestamp(value: str) -> datetime:
+    """Return a dependency-free, naive UTC value for DuckDB TIMESTAMP."""
+    return (
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+
+
 def _create_tables(connection: Any) -> None:
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS bronze.mlb_schedule_payloads (
             payload_sha256 VARCHAR PRIMARY KEY,
-            raw_path VARCHAR NOT NULL,
+            raw_path VARCHAR NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS bronze.mlb_schedule_fetches (
+            payload_sha256 VARCHAR NOT NULL,
+            fetched_at TIMESTAMP NOT NULL,
             request_json VARCHAR NOT NULL,
-            fetched_at TIMESTAMPTZ NOT NULL
+            PRIMARY KEY (payload_sha256, fetched_at, request_json)
         );
         CREATE TABLE IF NOT EXISTS bronze.mlb_game_observations (
             game_pk BIGINT NOT NULL,
             payload_sha256 VARCHAR NOT NULL,
-            observed_at TIMESTAMPTZ NOT NULL,
+            observed_at TIMESTAMP NOT NULL,
             season VARCHAR,
             game_type VARCHAR,
-            game_date TIMESTAMPTZ,
+            game_date TIMESTAMP,
             official_date DATE,
             home_team_id BIGINT NOT NULL,
             away_team_id BIGINT NOT NULL,
@@ -261,15 +348,15 @@ def _create_tables(connection: Any) -> None:
             resume_date VARCHAR,
             status_json JSON NOT NULL,
             game_json JSON NOT NULL,
-            PRIMARY KEY (game_pk, payload_sha256)
+            PRIMARY KEY (game_pk, payload_sha256, observed_at)
         );
         CREATE TABLE IF NOT EXISTS bronze.mlb_games (
             game_pk BIGINT PRIMARY KEY,
             payload_sha256 VARCHAR NOT NULL,
-            observed_at TIMESTAMPTZ NOT NULL,
+            observed_at TIMESTAMP NOT NULL,
             season VARCHAR,
             game_type VARCHAR,
-            game_date TIMESTAMPTZ,
+            game_date TIMESTAMP,
             official_date DATE,
             home_team_id BIGINT NOT NULL,
             away_team_id BIGINT NOT NULL,

@@ -22,7 +22,12 @@ def _game(game_pk: int) -> dict[str, object]:
             "away": {"team": {"id": 110}},
             "home": {"team": {"id": 137}},
         },
-        "status": {"abstractGameState": "Preview", "detailedState": "Scheduled"},
+        "status": {
+            "abstractGameState": "Preview",
+            "codedGameState": "S",
+            "detailedState": "Scheduled",
+            "statusCode": "S",
+        },
     }
 
 
@@ -66,6 +71,8 @@ def test_date_range_ingestion_accepts_dates_and_iso_strings(tmp_path: Path) -> N
         {},
         {"season": 2025, "start_date": "2025-04-01", "end_date": "2025-04-02"},
         {"start_date": "2025-04-02", "end_date": "2025-04-01"},
+        {"start_date": "20250401", "end_date": "2025-04-02"},
+        {"season": 9999},
     ],
 )
 def test_invalid_query_scope_is_rejected_before_fetch(
@@ -103,4 +110,56 @@ def test_naive_ingestion_timestamp_is_rejected(tmp_path: Path) -> None:
             lambda _: b'{"dates": []}',
             season=2025,
             fetched_at=datetime(2025, 1, 1),
+        )
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        ({"message": "upstream unavailable"}, "dates list"),
+        ({"dates": None}, "dates list"),
+        ({"dates": [{}]}, "games list"),
+        ({"dates": [{"games": None}]}, "games list"),
+    ],
+)
+def test_upstream_error_or_partial_envelope_is_rejected(
+    tmp_path: Path, response: object, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ingest_schedule(
+            tmp_path,
+            lambda _: json.dumps(response).encode(),
+            season=2025,
+            fetched_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda game: game.pop("gamePk"), "integer gamePk"),
+        (lambda game: game.__setitem__("gamePk", -1), "integer gamePk"),
+        (lambda game: game.pop("gameDate"), "gameDate timestamp"),
+        (lambda game: game.__setitem__("gameDate", "2025-04-01T20:10:00"), "timezone"),
+        (lambda game: game.pop("officialDate"), "officialDate"),
+        (lambda game: game.__setitem__("officialDate", "20250401"), "officialDate"),
+        (lambda game: game.pop("status"), "status object"),
+        (
+            lambda game: game["status"].pop("statusCode"),
+            "status must have statusCode",
+        ),
+    ],
+)
+def test_partial_canonical_game_is_rejected(
+    tmp_path: Path, mutation: object, message: str
+) -> None:
+    game = _game(1)
+    mutation(game)
+
+    with pytest.raises(ValueError, match=message):
+        ingest_schedule(
+            tmp_path,
+            lambda _: _payload(game),
+            season=2025,
+            fetched_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
         )
