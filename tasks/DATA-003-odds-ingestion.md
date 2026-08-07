@@ -2,7 +2,7 @@
 
 ## Status
 
-candidate
+done
 
 ## Dependencies
 
@@ -51,3 +51,13 @@ Do not overwrite historical snapshots with newer prices.
 - multiple books and multiple timestamps can coexist,
 - malformed/missing timestamp data fails clearly,
 - tests pass.
+
+## Completion handoff
+
+- Added fixture-driven The Odds API moneyline parsing and append-only DuckDB ingestion with immutable-key conflict detection.
+- Preserves source/event/book/outcome/price plus timezone-aware snapshot and commence instants; supports multiple books and timestamps.
+- Added explicit transaction rollback, signed-32-bit American-price validation, and the minimal `pytz` dependency required for DuckDB `TIMESTAMPTZ` retrieval.
+- `python -m pytest`: 31 passed; compile, dependency, and diff checks passed.
+- Reviewer approved and Tester passed after one repair loop; no open P0/P1 or leakage finding.
+- Optional P3: commit a regression that forces a database constraint failure after an earlier row insert; the adversarial gate manually verified rollback.
+- No ADR change required; DATA-004 remains blocked on DATA-002.
