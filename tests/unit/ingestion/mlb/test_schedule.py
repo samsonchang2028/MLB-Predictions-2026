@@ -217,11 +217,16 @@ def test_repeated_game_pk_with_conflicting_teams_fails(tmp_path: Path) -> None:
 
 
 def test_conflicting_entries_at_same_lifecycle_stage_fail(tmp_path: Path) -> None:
+    # DATA-014 refined the same-top-stage guard to compare only outcome-
+    # identifying fields (home/away team id, home/away score, winner). A genuine
+    # outcome disagreement between two Final entries (here, a differing home
+    # score and winner) still cannot be silently resolved and must fail.
     first = _game(9, detailedState="Final", codedGameState="F", statusCode="F")
-    # Same top (Final) lifecycle stage but a materially different official date:
-    # this cannot be silently resolved and must fail.
+    first["teams"]["home"].update({"score": 6, "isWinner": True})
+    first["teams"]["away"].update({"score": 5, "isWinner": False})
     second = _game(9, detailedState="Final", codedGameState="F", statusCode="F")
-    second["officialDate"] = "2025-04-02"
+    second["teams"]["home"].update({"score": 3, "isWinner": False})
+    second["teams"]["away"].update({"score": 4, "isWinner": True})
     response = _payload(first, second)
 
     with pytest.raises(ValueError, match="conflicting duplicate entries"):
@@ -231,6 +236,64 @@ def test_conflicting_entries_at_same_lifecycle_stage_fail(tmp_path: Path) -> Non
             season=2025,
             fetched_at=datetime(2025, 4, 1, tzinfo=timezone.utc),
         )
+
+
+def test_same_stage_identical_outcome_suspended_resume_reconciles(
+    tmp_path: Path,
+) -> None:
+    # DATA-014: a suspended-then-resumed game lists the same game_pk under both
+    # its original date (Final + resumeDate) and its resumption date (Final +
+    # resumedFromDate). The outcome is identical; only scheduling/linkage
+    # metadata differs, so the two Final entries reconcile to one canonical row
+    # rather than failing the same-top-stage guard.
+    original = _game(11, detailedState="Final", codedGameState="F", statusCode="F")
+    original["teams"]["home"].update({"score": 6, "isWinner": True})
+    original["teams"]["away"].update({"score": 5, "isWinner": False})
+    original["resumeDate"] = "2025-08-31T20:10:00Z"
+    resumption = _game(11, detailedState="Final", codedGameState="F", statusCode="F")
+    resumption["teams"]["home"].update({"score": 6, "isWinner": True})
+    resumption["teams"]["away"].update({"score": 5, "isWinner": False})
+    resumption["gameDate"] = "2025-08-31T20:10:00Z"
+    resumption["resumedFromDate"] = "2025-04-01"
+    response = json.dumps(
+        {
+            "dates": [
+                {"date": "2025-04-01", "games": [original]},
+                {"date": "2025-08-31", "games": [resumption]},
+            ]
+        }
+    ).encode()
+
+    result = ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2025,
+        fetched_at=datetime(2025, 9, 1, tzinfo=timezone.utc),
+    )
+
+    assert result["games_seen"] == 1
+    with connect_database(storage_paths(tmp_path)["database"]) as connection:
+        canonical = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_games WHERE game_pk = 11"
+        ).fetchone()[0]
+        observations = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_game_observations WHERE game_pk = 11"
+        ).fetchone()[0]
+        row = connection.execute(
+            """
+            SELECT resume_date, game_date, official_date, game_json
+            FROM bronze.mlb_games WHERE game_pk = 11
+            """
+        ).fetchone()
+
+    assert canonical == 1
+    assert observations == 1
+    # Canonical selection picks the completion (resumption) entry: latest
+    # gameDate and the carried resume linkage on both sides.
+    assert row[0] == "2025-08-31T20:10:00Z"  # resumeDate merged from original
+    assert row[1] == datetime(2025, 8, 31, 20, 10)  # resumption gameDate
+    assert row[2] == date(2025, 4, 1)  # officialDate preserved
+    assert json.loads(row[3])["resumedFromDate"] == "2025-04-01"
 
 
 def test_naive_ingestion_timestamp_is_rejected(tmp_path: Path) -> None:
