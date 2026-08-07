@@ -11,7 +11,7 @@ This index lists task state and dependency relationships in a human-readable for
 | DATA-002 | done | DATA-001 | completed |
 | DATA-003 | done | DATA-001 | completed |
 | DATA-004 | done | DATA-002, DATA-003 | completed |
-| FEAT-001 | changes_requested | DATA-004 | repair P1 completed-game gate |
+| FEAT-001 | candidate | DATA-004 | re-review after Final-gate fix |
 | FEAT-002 | blocked | DATA-004 | needs pitcher appearance data |
 | FEAT-003 | blocked | DATA-004 | needs pitcher appearance data |
 | FEAT-004 | blocked | FEAT-001/002/003 | integration |
