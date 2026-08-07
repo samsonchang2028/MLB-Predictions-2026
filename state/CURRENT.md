@@ -26,7 +26,7 @@ Agent/harness planning and repository foundation.
 
 ## In progress
 
-- None.
+- DATA-001 — storage foundation implementation.
 
 ## Blocked
 
@@ -48,7 +48,7 @@ Agent/harness planning and repository foundation.
 
 ## Next implementation task
 
-- DATA-001 — create the storage foundation.
+- DATA-001 is currently implementing. DATA-002 and DATA-003 unlock after it passes review/testing and merges.
 
 ## Deferred follow-ups
 
