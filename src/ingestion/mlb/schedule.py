@@ -189,9 +189,16 @@ _LIFECYCLE_RANK = {
     "F": 5,  # Final
 }
 
-# Postponement/reschedule metadata carried forward onto the canonical entry so a
-# superseded placeholder's dates are not dropped.
-_RESCHEDULE_FIELDS = ("rescheduleDate", "rescheduledFromDate", "resumeDate")
+# Postponement/reschedule and suspension/resume linkage metadata carried forward
+# onto the canonical entry so a superseded placeholder's dates are not dropped.
+# resumeDate (on the original date) and resumedFromDate (on the resumption date)
+# link the two halves of a suspended-then-resumed game (DATA-014).
+_RESCHEDULE_FIELDS = (
+    "rescheduleDate",
+    "rescheduledFromDate",
+    "resumeDate",
+    "resumedFromDate",
+)
 
 
 def _lifecycle_rank(game: dict[str, Any]) -> int:
@@ -207,8 +214,16 @@ def _reconcile_repeated_game(
     postponed/scheduled) supplies the canonical outcome fields, and reschedule
     metadata from superseded entries is preserved onto that row. Genuine
     conflicts fail rather than being silently resolved: differing home/away teams
-    are an identity conflict, and two differing entries sharing the top lifecycle
-    stage cannot be reconciled.
+    are an identity conflict, and entries sharing the top lifecycle stage that
+    disagree on the game outcome cannot be reconciled.
+
+    A suspended-then-resumed game (DATA-014) lists the same game_pk under both
+    its original and resumption dates, and BOTH entries are Final. They describe
+    the same completed game and differ only in scheduling/linkage metadata
+    (gameDate, resumeDate/resumedFromDate, series counts), so the same-top-stage
+    decision compares only the OUTCOME-identifying fields (home/away team id,
+    home/away score, winner). Identical outcomes reconcile to one row; a genuine
+    outcome disagreement still fails.
     """
     if len(entries) == 1:
         return entries[0]
@@ -230,14 +245,67 @@ def _reconcile_repeated_game(
 
     top_rank = max(_lifecycle_rank(entry) for entry in entries)
     top_entries = [entry for entry in entries if _lifecycle_rank(entry) == top_rank]
-    canonical = top_entries[0]
-    for other in top_entries[1:]:
-        if other != canonical:
-            raise ValueError(
-                f"gamePk {game_pk} has conflicting duplicate entries at the same "
-                "lifecycle stage within one schedule response"
-            )
+
+    # Entries sharing the top lifecycle stage are reconcilable only when they
+    # agree on the outcome-identifying fields. Scheduling/linkage metadata may
+    # legitimately differ between the original and resumption halves of a
+    # suspended game, so it is deliberately excluded from this comparison.
+    outcomes = {_outcome_identity(entry, game_pk) for entry in top_entries}
+    if len(outcomes) > 1:
+        raise ValueError(
+            f"gamePk {game_pk} has conflicting duplicate entries at the same "
+            "lifecycle stage within one schedule response"
+        )
+    canonical = _canonical_completion_entry(top_entries)
     return _merge_reschedule_metadata(canonical, entries)
+
+
+# Outcome-identifying fields read from the game teams object. These, not the
+# scheduling metadata, decide whether two same-stage entries are the same
+# completed game. Score/isWinner are absent before a game is final, so they are
+# read defensively; among two Final entries they are populated in real data.
+def _outcome_identity(game: dict[str, Any], game_pk: int) -> tuple[object, ...]:
+    teams = game["teams"]
+    home = teams.get("home", {}) if isinstance(teams, dict) else {}
+    away = teams.get("away", {}) if isinstance(teams, dict) else {}
+    return (
+        _team_id(teams, "home", game_pk),
+        _team_id(teams, "away", game_pk),
+        home.get("score"),
+        away.get("score"),
+        home.get("isWinner"),
+        away.get("isWinner"),
+    )
+
+
+def _canonical_completion_entry(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Deterministically choose the entry that represents game completion.
+
+    Among identical-outcome entries at the top lifecycle stage the canonical row
+    is the completion entry: (1) the one carrying resumedFromDate (the resumption
+    half of a suspended game), then (2) the latest gameDate, then (3) the
+    earliest encounter order as a stable final tie-break. Point-in-time nuance
+    (deferred to a downstream FEAT task, not resolved here): a resumed game's
+    result is only known on the resumption gameDate (e.g. 2021-08-31) even though
+    its officialDate is the original date (2021-04-11). DATA-014 fixes ingestion
+    reconciliation only; temporal feature handling of resumed games is separate.
+    """
+    best_index, best_entry = 0, entries[0]
+    best_key = (best_entry.get("resumedFromDate") is not None, _game_date_instant(best_entry))
+    for index in range(1, len(entries)):
+        entry = entries[index]
+        key = (entry.get("resumedFromDate") is not None, _game_date_instant(entry))
+        # Strictly greater key wins; ties keep the earlier encounter order.
+        if key > best_key:
+            best_index, best_entry, best_key = index, entry, key
+    return best_entry
+
+
+def _game_date_instant(game: dict[str, Any]) -> datetime:
+    return (
+        datetime.fromisoformat(game["gameDate"].replace("Z", "+00:00"))
+        .astimezone(timezone.utc)
+    )
 
 
 def _merge_reschedule_metadata(

@@ -449,6 +449,123 @@ def test_season_response_reconciles_postponed_and_makeup_gamepk_through_silver(
     assert silver_rows == [("Final", "2021-04-01")]
 
 
+def _game_632192(
+    *,
+    game_date: str,
+    detailed_state: str,
+    coded_game_state: str,
+    status_code: str,
+    **extra: object,
+) -> dict[str, object]:
+    # Real game_pk 632192 (2021): suspended 2021-04-11, resumed/completed
+    # 2021-08-31. BOTH schedule entries are Final with identical outcome
+    # (home 121 score 6 win, away 146 score 5 loss) and share officialDate
+    # 2021-04-11; they differ only in scheduling/linkage metadata.
+    return {
+        "gamePk": 632192,
+        "season": "2021",
+        "gameType": "R",
+        "gameDate": game_date,
+        "officialDate": "2021-04-11",
+        "teams": {
+            "away": {
+                "team": {"id": 146, "name": "Miami Marlins"},
+                "score": 5,
+                "isWinner": False,
+            },
+            "home": {
+                "team": {"id": 121, "name": "New York Mets"},
+                "score": 6,
+                "isWinner": True,
+            },
+        },
+        "status": {
+            "abstractGameState": "Final",
+            "codedGameState": coded_game_state,
+            "detailedState": detailed_state,
+            "statusCode": status_code,
+        },
+        **extra,
+    }
+
+
+def test_suspended_resumed_gamepk_reconciles_to_one_silver_row(tmp_path: Path) -> None:
+    # DATA-014 regression: a suspended-then-resumed game_pk appears twice in one
+    # season response, BOTH Final, with an identical 6-5 outcome. It must
+    # reconcile to one canonical Final game that preserves the resume linkage
+    # metadata, and Silver must contain exactly one games row for it.
+    original = _game_632192(
+        game_date="2021-04-11T17:10:00Z",
+        detailed_state="Final",
+        coded_game_state="F",
+        status_code="F",
+        resumeDate="2021-08-31T23:10:00Z",
+    )
+    resumption = _game_632192(
+        game_date="2021-08-31T23:10:00Z",
+        detailed_state="Final",
+        coded_game_state="F",
+        status_code="F",
+        resumedFromDate="2021-04-11",
+    )
+    response = json.dumps(
+        {
+            "dates": [
+                {"date": "2021-04-11", "games": [original]},
+                {"date": "2021-08-31", "games": [resumption]},
+            ]
+        }
+    ).encode()
+
+    result = ingest_schedule(
+        tmp_path,
+        lambda _: response,
+        season=2021,
+        fetched_at=datetime(2021, 9, 1, 12, tzinfo=timezone.utc),
+    )
+
+    assert result["games_seen"] == 1
+    paths = storage_paths(tmp_path)
+    with connect_database(paths["database"]) as connection:
+        canonical = connection.execute(
+            """
+            SELECT detailed_state, coded_game_state, official_date, game_date,
+                   home_team_id, away_team_id, resume_date, game_json
+            FROM bronze.mlb_games WHERE game_pk = 632192
+            """
+        ).fetchone()
+        canonical_count = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_games WHERE game_pk = 632192"
+        ).fetchone()[0]
+        observation_count = connection.execute(
+            "SELECT count(*) FROM bronze.mlb_game_observations WHERE game_pk = 632192"
+        ).fetchone()[0]
+        ingest_the_odds_api_moneylines(connection, [])
+        normalize_silver(connection)
+        silver_rows = connection.execute(
+            """
+            SELECT detailed_state, official_date, home_team_id, away_team_id
+            FROM silver.games WHERE game_pk = 632192
+            """
+        ).fetchall()
+
+    assert canonical_count == 1
+    assert observation_count == 1
+    # Completion (resumption) entry is canonical: latest gameDate 2021-08-31,
+    # officialDate preserved as 2021-04-11, and both resume linkage sides kept.
+    assert canonical[0:6] == (
+        "Final",
+        "F",
+        datetime(2021, 4, 11).date(),
+        datetime(2021, 8, 31, 23, 10),
+        121,
+        146,
+    )
+    assert canonical[6] == "2021-08-31T23:10:00Z"  # resumeDate merged forward
+    assert json.loads(canonical[7])["resumedFromDate"] == "2021-04-11"
+    assert silver_rows == [("Final", datetime(2021, 4, 11).date(), 121, 146)]
+
+
 def test_true_doubleheader_stays_distinct_through_silver(tmp_path: Path) -> None:
     # Two DISTINCT game_pks on the same date (gameNumber 1 & 2) are a real
     # doubleheader, not a duplicate, and must remain two separate rows in both
