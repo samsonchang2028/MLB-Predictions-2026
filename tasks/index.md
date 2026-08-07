@@ -10,7 +10,7 @@ This index lists task state and dependency relationships in a human-readable for
 | DATA-001 | done | META-001 | completed |
 | DATA-002 | done | DATA-001 | completed |
 | DATA-003 | done | DATA-001 | completed |
-| DATA-004 | ready | DATA-002, DATA-003 | integration |
+| DATA-004 | implementing | DATA-002, DATA-003 | integration |
 | FEAT-001 | blocked | DATA-004 | parallel with FEAT-002/003 |
 | FEAT-002 | blocked | DATA-004 | parallel with FEAT-001/003 |
 | FEAT-003 | blocked | DATA-004 | parallel with FEAT-001/002 |

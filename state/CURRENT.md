@@ -29,7 +29,7 @@ V1 data ingestion.
 
 ## In progress
 
-- None.
+- DATA-004 — normalized Silver datasets and MLB/odds mapping contract.
 
 ## In review
 
@@ -55,11 +55,11 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-004 — build normalized datasets from the completed MLB and odds ingestion outputs.
+- DATA-004 is implementing. FEAT-001, FEAT-002, and FEAT-003 unlock after it passes review/testing and merges.
 
 ## Deferred follow-ups
 
-- Complete missing execution-contract metadata in downstream task files before those tasks become executable.
+- Complete missing execution-contract metadata in downstream task files before each becomes executable; DATA-004 metadata was completed at dispatch.
 - Clarify the non-authoritative archival status of `old/docs/codex_workflow.md` in a separately authorized task.
 
 ## Notes for the next harness

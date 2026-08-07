@@ -2,7 +2,7 @@
 
 ## Status
 
-ready
+implementing
 
 ## Dependencies
 
@@ -19,6 +19,19 @@ Worktree required: yes
 ## Goal
 
 Create stable Silver-layer normalized datasets and the MLB↔odds mapping contract.
+
+## Read first
+
+- `AGENTS.md`
+- `state/CURRENT.md`
+- `docs/decisions/ADR-001-storage.md`
+- `docs/decisions/ADR-002-point-in-time.md`
+
+## Inputs
+
+- Bronze MLB schedule tables produced by DATA-002.
+- Bronze odds snapshot tables produced by DATA-003.
+- Source payload, observation, and commence timestamps retained by ingestion.
 
 ## Allowed files
 
@@ -49,3 +62,15 @@ At minimum:
 - unique keys documented/tested,
 - doubleheaders map correctly,
 - unmapped odds events are surfaced rather than silently attached.
+
+## Required tests
+
+- deterministic repeated normalization,
+- unique-key and join-cardinality assertions,
+- doubleheader mapping,
+- unmapped and ambiguous odds-event handling,
+- source-timestamp preservation.
+
+## Handoff
+
+Document normalized table keys, mapping cardinalities, commands run, gate results, and any unmapped/ambiguous-event limitations.
