@@ -84,7 +84,24 @@ def backfill_game_details(
                 [game_pk],
             ).fetchone()
             if existing is not None:
-                _verify_raw_payload(storage_root, existing[0], existing[1])
+                try:
+                    _verify_raw_payload(storage_root, existing[0], existing[1])
+                except RuntimeError as error:
+                    # Isolate the corrupt game_pk instead of aborting the whole
+                    # backfill: record a retryable failure (never accept the
+                    # tampered payload as valid) and keep processing other games.
+                    attempted_at = (
+                        fixed_fetched_at
+                        or _utc_timestamp(datetime.now(timezone.utc))
+                    )
+                    _record_attempt(
+                        paths["database"], game_pk, endpoint, request, attempted_at,
+                        run_identity, build_identity, "failed",
+                        error_type=type(error).__name__, error_message=str(error),
+                    )
+                    result["failed"] += 1
+                    result["failed_game_pks"].append(game_pk)
+                    continue
                 result["skipped_fetched"] += 1
                 continue
             prior_status = connection.execute(
@@ -270,10 +287,23 @@ def _record_attempt(
     error_message: str | None = None,
 ) -> None:
     with connect_database(database_path) as connection:
+        # (ingestion_run_id, game_pk) holds the latest attempt within a run.
+        # Re-attempting the same game under a reused run_id (restart/retry)
+        # updates that row in place instead of raising a PK conflict.
         connection.execute(
             """INSERT INTO bronze.mlb_game_detail_attempts VALUES (
                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-               )""",
+               )
+               ON CONFLICT (ingestion_run_id, game_pk) DO UPDATE SET
+                   source = EXCLUDED.source,
+                   endpoint = EXCLUDED.endpoint,
+                   request_json = EXCLUDED.request_json,
+                   attempted_at = EXCLUDED.attempted_at,
+                   ingestion_build_id = EXCLUDED.ingestion_build_id,
+                   status = EXCLUDED.status,
+                   payload_sha256 = EXCLUDED.payload_sha256,
+                   error_type = EXCLUDED.error_type,
+                   error_message = EXCLUDED.error_message""",
             [
                 run_id, game_pk, SOURCE, endpoint,
                 json.dumps(request, sort_keys=True, separators=(",", ":")),
@@ -321,7 +351,17 @@ def _store_success(
             connection.execute(
                 """INSERT INTO bronze.mlb_game_detail_attempts VALUES (
                        ?, ?, ?, ?, ?, ?, ?, 'fetched', ?, NULL, NULL
-                   )""",
+                   )
+                   ON CONFLICT (ingestion_run_id, game_pk) DO UPDATE SET
+                       source = EXCLUDED.source,
+                       endpoint = EXCLUDED.endpoint,
+                       request_json = EXCLUDED.request_json,
+                       attempted_at = EXCLUDED.attempted_at,
+                       ingestion_build_id = EXCLUDED.ingestion_build_id,
+                       status = EXCLUDED.status,
+                       payload_sha256 = EXCLUDED.payload_sha256,
+                       error_type = EXCLUDED.error_type,
+                       error_message = EXCLUDED.error_message""",
                 [
                     run_id, game_pk, SOURCE, endpoint, request_json,
                     retrieved_at, build_id, payload_sha256,
