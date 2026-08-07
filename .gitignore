@@ -5,3 +5,10 @@ __pycache__/
 .venv/
 .cursor
 .claude
+
+# Local data build (reproducible from code; only certification artifacts under
+# state/data-certifications/ are versioned)
+data/
+*.duckdb
+# Published historical odds archive asset (large; SHA-256 pinned in ADR-004)
+mlb_odds_dataset.json
