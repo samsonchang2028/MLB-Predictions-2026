@@ -38,3 +38,38 @@ __all__ = [
     "DEV_SEASONS",
     "HOLDOUT_SEASON",
 ]
+
+# --- DATA-009: historical odds-archive validation + mapping (append-only) ---
+from validation.odds_mapping import (
+    AMBIGUOUS,
+    MATCHED,
+    UNMATCHED,
+    ArchiveEvent,
+    GameCandidate,
+    OddsGameMapping,
+    build_archive_events,
+    build_coverage_report,
+    decide_mapping,
+    map_archive_events,
+    normalize_team_name,
+    run_odds_archive_checks,
+    validate_odds_archive,
+    write_coverage_report,
+)
+
+__all__ += [
+    "MATCHED",
+    "UNMATCHED",
+    "AMBIGUOUS",
+    "ArchiveEvent",
+    "GameCandidate",
+    "OddsGameMapping",
+    "build_archive_events",
+    "build_coverage_report",
+    "decide_mapping",
+    "map_archive_events",
+    "normalize_team_name",
+    "run_odds_archive_checks",
+    "validate_odds_archive",
+    "write_coverage_report",
+]
