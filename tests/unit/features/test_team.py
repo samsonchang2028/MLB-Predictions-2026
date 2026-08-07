@@ -464,6 +464,110 @@ def test_bool_and_missing_opponent_scores_are_excluded() -> None:
     assert third["games_L7"] == 0
 
 
+def test_live_partial_scores_both_losers_excluded_from_history() -> None:
+    """Live/mid-game 2–0 with both is_winner=False must not pollute later features."""
+    rows = (
+        _game_pair(
+            1,
+            "2024-04-01T13:05:00",
+            home_id=10,
+            away_id=20,
+            home_score=2,
+            away_score=0,
+            home_won=False,
+            away_won=False,
+        )
+        + _game_pair(
+            2,
+            "2024-04-01T19:05:00",
+            home_id=10,
+            away_id=30,
+            home_score=None,
+            away_score=None,
+            home_won=None,
+            away_won=None,
+        )
+    )
+    features = _by_key(build_team_features(rows))
+
+    nightcap = features[(2, 10)]
+    assert nightcap["games_played_before"] == 0
+    assert nightcap["wins_before"] == 0
+    assert nightcap["win_pct_before"] is None
+    assert nightcap["runs_scored_total_before"] == 0
+    assert nightcap["runs_allowed_total_before"] == 0
+    assert nightcap["games_L7"] == 0
+    assert nightcap["win_pct_L7"] is None
+
+    # Opponent from the live game also must not carry that partial into later rows.
+    assert features[(1, 20)]["games_played_before"] == 0
+
+
+def test_duplicate_game_pk_team_id_raises() -> None:
+    when = _dt("2024-04-01T19:00:00")
+    rows = [
+        {
+            "game_pk": 1,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when,
+            "season": "2024",
+            "score": 5,
+            "is_winner": True,
+        },
+        {
+            "game_pk": 1,
+            "team_id": 20,
+            "side": "away",
+            "game_date": when,
+            "season": "2024",
+            "score": 3,
+            "is_winner": False,
+        },
+        {
+            "game_pk": 1,
+            "team_id": 10,
+            "side": "home",
+            "game_date": when,
+            "season": "2024",
+            "score": 5,
+            "is_winner": True,
+        },
+    ]
+    with pytest.raises(ValueError, match=r"duplicate \(game_pk, team_id\)"):
+        build_team_features(rows)
+
+
+def test_inconsistent_score_vs_is_winner_raises() -> None:
+    rows = _game_pair(
+        1,
+        "2024-04-01T19:00:00",
+        home_id=10,
+        away_id=20,
+        home_score=5,
+        away_score=3,
+        home_won=False,
+        away_won=True,
+    )
+    with pytest.raises(ValueError, match="disagrees with is_winner"):
+        build_team_features(rows)
+
+
+def test_both_teams_marked_winner_raises() -> None:
+    rows = _game_pair(
+        1,
+        "2024-04-01T19:00:00",
+        home_id=10,
+        away_id=20,
+        home_score=5,
+        away_score=3,
+        home_won=True,
+        away_won=True,
+    )
+    with pytest.raises(ValueError, match="both teams marked is_winner=True"):
+        build_team_features(rows)
+
+
 def test_league_fields_are_never_required_or_read() -> None:
     # Rows may omit league_* entirely; builder must not depend on them.
     rows = [

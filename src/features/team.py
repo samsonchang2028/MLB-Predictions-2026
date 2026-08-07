@@ -6,11 +6,27 @@ Each output row is keyed by ``(game_pk, team_id)`` and describes that team's
 state *before* the game starts. Post-game fields from
 ``silver.team_game_statistics`` (``score``, ``is_winner``, ``league_*``) are
 never used as inputs for the same game. They may contribute only to *later*
-games feature rows, after an explicit shift.
+team feature rows, after an explicit shift.
 
 Ordering: within each ``team_id``, games are sorted by
 ``(game_date, game_pk)``. Rolling windows use only prior completed games
 (shift-before-rolling). Home/away orientation is the Silver ``side`` value.
+
+Completed-game contract
+-----------------------
+A prior ``game_pk`` enters season/rolling history only when its two team-game
+rows form a coherent Final result:
+
+- exactly two distinct ``team_id`` rows for that ``game_pk``,
+- both ``score`` values are ints (``bool`` is rejected),
+- both ``is_winner`` values are bools,
+- exactly one side has ``is_winner=True`` and the other ``False``,
+- the side with the higher score is the ``is_winner=True`` side.
+
+Live / mid-game Silver rows (e.g. 2–0 with both ``is_winner=False``),
+pregame rows (missing scores / winners), and unpaired games never enter
+history. Duplicate ``(game_pk, team_id)`` keys and score/``is_winner``
+inconsistencies raise ``ValueError``.
 
 Cold start / window edges
 -------------------------
@@ -51,10 +67,12 @@ def build_team_features(
     - ``season`` — optional; defaults to calendar year of ``game_date``
 
     Opponent runs allowed are derived from the paired team row on the same
-    ``game_pk``. Rows without a usable prior result do not enter aggregates.
+    ``game_pk``. Only games that pass the completed-game contract enter
+    aggregates.
     """
     rows = [_normalize_row(row, index) for index, row in enumerate(team_game_statistics)]
-    opponent_score = _opponent_scores(rows)
+    _reject_duplicate_keys(rows)
+    completed = _completed_results_by_game(rows)
 
     by_team: dict[Any, list[dict[str, Any]]] = {}
     for row in rows:
@@ -81,7 +99,7 @@ def build_team_features(
                 )
             )
 
-            result = _completed_result(row, opponent_score)
+            result = completed.get(row["game_pk"], {}).get(row["team_id"])
             if result is None:
                 continue
             prior_season.append(result)
@@ -123,33 +141,79 @@ def _as_datetime(value: Any, index: int) -> datetime:
     )
 
 
-def _opponent_scores(rows: Sequence[Mapping[str, Any]]) -> dict[Any, dict[Any, Any]]:
-    by_game: dict[Any, dict[Any, Any]] = {}
+def _reject_duplicate_keys(rows: Sequence[Mapping[str, Any]]) -> None:
+    seen: set[tuple[Any, Any]] = set()
     for row in rows:
-        by_game.setdefault(row["game_pk"], {})[row["team_id"]] = row.get("score")
-    return by_game
+        key = (row["game_pk"], row["team_id"])
+        if key in seen:
+            raise ValueError(f"duplicate (game_pk, team_id)={key}")
+        seen.add(key)
 
 
-def _completed_result(
-    row: Mapping[str, Any],
-    opponent_score: Mapping[Any, Mapping[Any, Any]],
-) -> tuple[int, int, bool] | None:
-    """Return (runs_scored, runs_allowed, won) when the prior game is usable."""
-    score = row["score"]
-    is_winner = row["is_winner"]
-    if isinstance(score, bool) or not isinstance(score, int):
+def _is_int_score(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _completed_results_by_game(
+    rows: Sequence[Mapping[str, Any]],
+) -> dict[Any, dict[Any, tuple[int, int, bool]]]:
+    """Map game_pk -> {team_id: (runs_scored, runs_allowed, won)} for Final games."""
+    by_game: dict[Any, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        by_game.setdefault(row["game_pk"], []).append(row)
+
+    completed: dict[Any, dict[Any, tuple[int, int, bool]]] = {}
+    for game_pk, game_rows in by_game.items():
+        result = _coherent_final_results(game_pk, game_rows)
+        if result is not None:
+            completed[game_pk] = result
+    return completed
+
+
+def _coherent_final_results(
+    game_pk: Any,
+    game_rows: Sequence[Mapping[str, Any]],
+) -> dict[Any, tuple[int, int, bool]] | None:
+    """Return per-team results when both sides form a coherent Final, else None.
+
+    Raises ValueError when the pair claims a decided winner but scores and
+    ``is_winner`` flags contradict each other, or when more than two teams
+    appear for one ``game_pk``.
+    """
+    if len(game_rows) != 2:
+        if len(game_rows) > 2:
+            raise ValueError(f"game_pk={game_pk} has {len(game_rows)} team rows; expected 2")
         return None
-    if not isinstance(is_winner, bool):
+
+    a, b = game_rows[0], game_rows[1]
+    if not (_is_int_score(a["score"]) and _is_int_score(b["score"])):
         return None
-    scores = opponent_score.get(row["game_pk"], {})
-    allowed = None
-    for team_id, other_score in scores.items():
-        if team_id != row["team_id"]:
-            allowed = other_score
-            break
-    if isinstance(allowed, bool) or not isinstance(allowed, int):
+    if not (isinstance(a["is_winner"], bool) and isinstance(b["is_winner"], bool)):
         return None
-    return score, allowed, is_winner
+
+    winners = [row for row in (a, b) if row["is_winner"]]
+    if len(winners) == 0:
+        # Live / mid-game: partial scores with both is_winner=False.
+        return None
+    if len(winners) == 2:
+        raise ValueError(f"game_pk={game_pk} has both teams marked is_winner=True")
+
+    score_a = a["score"]
+    score_b = b["score"]
+    if score_a == score_b:
+        raise ValueError(
+            f"game_pk={game_pk} has equal scores {score_a}-{score_b} with a declared winner"
+        )
+    score_winner = a if score_a > score_b else b
+    if not score_winner["is_winner"]:
+        raise ValueError(
+            f"game_pk={game_pk} score {score_a}-{score_b} disagrees with is_winner flags"
+        )
+
+    return {
+        a["team_id"]: (score_a, score_b, a["is_winner"]),
+        b["team_id"]: (score_b, score_a, b["is_winner"]),
+    }
 
 
 def _feature_row(

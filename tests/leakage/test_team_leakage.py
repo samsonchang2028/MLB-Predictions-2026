@@ -158,3 +158,31 @@ def test_unrelated_team_future_game_does_not_change_features() -> None:
     after = _feature_map(extended)
     for key in earlier_keys:
         assert after[key] == original[key], key
+
+
+def test_live_midgame_scores_do_not_leak_into_later_features() -> None:
+    """Live-style 2–0 with both is_winner=False must not change later team features.
+
+    Same-day DH nightcap (and any later game) must match a schedule where the
+    live afternoon game is absent from completed history.
+    """
+    live_afternoon = _pair(1, 1, 10, 20, 2, 0, None)
+    for row in live_afternoon:
+        row["is_winner"] = False  # mid-game: both still False despite int scores
+
+    nightcap = _pair(2, 1, 10, 30, None, None, None)
+    later = _pair(3, 2, 40, 10, None, None, None)
+
+    with_live = live_afternoon + nightcap + later
+    without_live = nightcap + later
+
+    with_features = _feature_map(with_live)
+    without_features = _feature_map(without_live)
+
+    for key in ((2, 10), (2, 30), (3, 10), (3, 40)):
+        assert with_features[key] == without_features[key], key
+
+    # Sanity: nightcap is still cold-start for team 10.
+    assert with_features[(2, 10)]["games_played_before"] == 0
+    assert with_features[(2, 10)]["games_L7"] == 0
+    assert with_features[(3, 10)]["games_played_before"] == 0
