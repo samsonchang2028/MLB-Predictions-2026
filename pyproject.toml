@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlb-moneyline-predictor"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.4,<2",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8,<10",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
