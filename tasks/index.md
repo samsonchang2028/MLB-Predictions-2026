@@ -14,9 +14,9 @@ format.
 | DATA-004 | done | DATA-002, DATA-003 | completed Silver schedule/live-odds contracts |
 | DATA-005 | done | DATA-004 | merged e50747c; MLB game-detail/pitcher backfill |
 | DATA-006 | done | DATA-005 | merged 1d9b83b; validation package + side-effect-free certification runner |
-| DATA-007 | ready | DATA-006 | unblocked (DATA-006 merged); certification gate for 2021-2025 MLB data. Parallel-eligible with DATA-009 (owns cert artifact layer + `state/data-certifications/`) |
+| DATA-007 | done | DATA-006 | merged; certification artifact layer (`src/validation/certification.py` + `state/data-certifications/`). NOTE: a real 2021-2025 build must be ingested + certified PASS before FEAT-002/003 |
 | DATA-008 | done | DATA-001 | merged 479af32; checksum-verified historical odds archive ingestion |
-| DATA-009 | ready | DATA-004, DATA-008 | unblocked; `src/validation/` contract stable after DATA-006 merge. Parallel-eligible with DATA-007 (owns odds mapping in `src/transforms/` + odds validation); only `src/validation/__init__.py` shared (append-only) |
+| DATA-009 | done | DATA-004, DATA-008 | merged; odds->game_pk mapping audit + odds validation + coverage report (`src/validation/odds_mapping.py`) |
 | DATA-010 | done | DATA-005 | merged a87ef2b; MLB backfill restart resilience (reused run_id upsert + per-game integrity isolation) |
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | blocked | DATA-007 | needs certified pitcher appearance data |

@@ -32,6 +32,8 @@ V1 historical data completion and certification planning.
 - DATA-005 - immutable, restartable MLB game-detail backfill and Silver pitcher appearances completed (merged e50747c).
 - DATA-006 - historical MLB data validation package (`src/validation/`) + side-effect-free certification runner completed (merged 1d9b83b).
 - DATA-010 - MLB game-detail backfill restart resilience (reused-run_id upsert + per-game integrity isolation) completed (merged a87ef2b).
+- DATA-007 - historical MLB data certification gate: versioned PASS/FAIL artifact layer (`src/validation/certification.py`, `state/data-certifications/`) consuming the DATA-006 runner. Completed (merged).
+- DATA-009 - historical odds archive validation + auditable odds->`game_pk` mapping (MATCHED/UNMATCHED/AMBIGUOUS) with season/date/sportsbook coverage report (`src/validation/odds_mapping.py`). Completed (merged).
 - ADR-004 accepted:
   - MLB Stats API remains the historical baseball source,
   - 2021-2025 are the V1 historical development seasons,
@@ -50,34 +52,42 @@ V1 historical data completion and certification planning.
 
 ## Ready
 
-- DATA-007 - historical MLB data certification gate. Unblocked by DATA-006 merge.
-  Owns the certification artifact layer that consumes the DATA-006 validation
-  runner and writes a versioned PASS/FAIL artifact under
-  `state/data-certifications/`. Critical path: unblocks FEAT-002/FEAT-003.
-- DATA-009 - historical odds archive validation and `game_pk` mapping audit.
-  Data deps (DATA-004 + DATA-008) met; the `src/validation/` contract is now
-  stable after the DATA-006 merge. Owns odds mapping in `src/transforms/` plus
-  odds-specific validation.
+- None as pure code tasks. All validation/certification/odds tooling for the V1
+  historical gate is now merged (DATA-006, DATA-007, DATA-009) alongside the
+  ingestion resilience fix (DATA-010).
+
+## Next required action (gating the whole downstream graph)
+
+The certification LAYER exists, but no real 2021-2025 certified dataset has been
+produced. FEAT-002 / FEAT-003 (and everything downstream) require a PASS
+certification artifact from an actual build, not just the tooling. The next step
+is an operational/data build task:
+
+1. Run the real MLB game-detail backfill (DATA-005 machinery) + Silver
+   normalization over 2021-2025.
+2. Run DATA-008 real historical odds archive ingestion (verify published
+   SHA-256) and DATA-009 mapping/coverage over it.
+3. Run `validation.certify_and_write` to emit a durable
+   `state/data-certifications/certification-<STATUS>-*.json`.
+4. Only if the artifact is PASS (no P0/P1 or leakage failures) do FEAT-002 /
+   FEAT-003 become ready.
+
+Recommend the Orchestrator open a new task (e.g. DATA-011) to execute and commit
+this real-build certification, since it involves live API/data pulls rather than
+code changes. Flagged to the user for direction (network/data access needed).
 
 ## Safe parallel
 
-- DATA-007 and DATA-009 may run in parallel. Their substantive surfaces are
-  disjoint: DATA-007 adds a certification artifact layer + `state/data-certifications/`;
-  DATA-009 adds odds mapping in `src/transforms/` + odds validation. Neither
-  needs to modify the shared DATA-006 check modules (`checks.py`, `leakage.py`,
-  `results.py`, `runner.py`); the only shared file is `src/validation/__init__.py`
-  (append-only exports). Each worker must confine edits to its own new modules.
-
-## Sequenced (deps met, held on contract)
-
-- None. (DATA-009 released to Ready now that the `src/validation/` contract is
-  stable following the DATA-006 merge.)
+- None pending (no ready code tasks). FEAT-002 and FEAT-003 will be parallel
+  once a PASS certification artifact from a real build exists.
 
 ## Blocked
 
-- FEAT-002 / FEAT-003 - wait for certified historical pitcher appearance data from DATA-007.
-- FEAT-004 and all ML work - wait for DATA-007 plus feature dependencies.
-- MARKET-001 - waits for DATA-009 and ML-008.
+- FEAT-002 / FEAT-003 - blocked on a PASS certification artifact from a real
+  2021-2025 build (DATA-007 layer is merged; the real certified build is not yet
+  produced).
+- FEAT-004 and all ML work - wait for FEAT-002/FEAT-003 plus feature deps.
+- MARKET-001 - waits for ML-008 (DATA-009 odds benchmark inputs are now ready).
 
 ## Current architecture decisions
 
@@ -97,10 +107,11 @@ V1 historical data completion and certification planning.
 
 ## Next implementation task
 
-DATA-006 and DATA-010 are merged. DATA-007 (certification gate) and DATA-009
-(odds-archive validation) are both ready and own disjoint substantive surfaces,
-so they may be dispatched in parallel. DATA-007 is the critical-path node
-(unblocks FEAT-002/FEAT-003) and is the primary next dispatch.
+No pure-code task is ready. DATA-006, DATA-007, DATA-009, DATA-010 are merged.
+The pipeline is now gated on producing and committing a PASS certification
+artifact from a REAL 2021-2025 dataset build (see "Next required action"). This
+needs live MLB/odds data pulls, so it should be a new explicitly-scoped task
+(proposed DATA-011) and requires user direction on data/network access.
 
 ## Deferred follow-ups
 
