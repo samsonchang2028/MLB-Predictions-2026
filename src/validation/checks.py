@@ -176,18 +176,29 @@ def _orphan_side_rows(connection: Any, table: str) -> list[tuple[object, ...]]:
 # Results
 # --------------------------------------------------------------------------- #
 def check_results_scores(connection: Any) -> CheckResult:
-    """Final games must carry a non-negative score for each team side."""
+    """Completed games must carry a non-negative score for each team side.
+
+    A game reached a result when it is abstract ``Final`` AND not
+    postponed/suspended/cancelled. MLB sometimes reports ``abstractGameState``
+    ``Final`` for a postponed game (e.g. a doubleheader makeup); such a game
+    legitimately has no score and is retained per the no-drop rule, so it must
+    not be flagged here. ``detailed_state`` is coalesced so a NULL detailed state
+    on a Final game is still checked.
+    """
     bad = _fetch(
         connection,
         """SELECT g.game_pk, t.side, t.score
            FROM silver.games g
            JOIN silver.team_game_statistics t USING (game_pk)
            WHERE g.abstract_game_state = 'Final'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Postponed%'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Suspended%'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Cancelled%'
              AND (t.score IS NULL OR t.score < 0)
            ORDER BY g.game_pk, t.side""",
     )
     return finding(
-        "results.valid_scores", "P1", [tuple(r) for r in bad], "Final team rows with missing/negative score"
+        "results.valid_scores", "P1", [tuple(r) for r in bad], "completed team rows with missing/negative score"
     )
 
 
