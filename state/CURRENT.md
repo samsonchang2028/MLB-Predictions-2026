@@ -29,11 +29,11 @@ V1 data ingestion.
 
 ## In progress
 
-- DATA-004 — repairing Reviewer P0/P1 on Silver normalization / odds mapping.
+- None.
 
 ## In review
 
-- None.
+- DATA-004 — Silver normalization candidate after team-identity mapping repair.
 
 ## Blocked
 
@@ -55,7 +55,7 @@ V1 data ingestion.
 
 ## Next implementation task
 
-- DATA-004 repair pass 1: fix unsafe commence-only odds mapping (P0) and unlabeled post-game team stats (P1). FEAT-* remain blocked until merge.
+- DATA-004 is in re-review/testing after mapping-safety repair. FEAT-* unlock after gates pass and merge.
 
 ## Deferred follow-ups
 
