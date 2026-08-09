@@ -38,6 +38,22 @@ V1 historical data completion and certification planning.
   adapters (`src/ingestion/mlb/statsapi_fetchers.py`) + `src/pipelines/certify_historical.py`
   sequencing the full build->certify flow. Completed (merged). The runner is
   in-repo and gated; the actual multi-hour 2021-2025 live pull is operator-run.
+- DATA-013 - reconcile repeated `game_pk` in season schedule responses
+  (postponed+rescheduled Final); conflicts FAIL. Completed (merged). Found via the
+  DATA-011 real build.
+- DATA-014 - reconcile suspended/resumed same-Final duplicate `game_pk` by
+  outcome fields; genuine outcome conflicts FAIL. Completed (merged). Found via
+  the DATA-011 real build.
+- DATA-015 - `results.home_win_derivation` scoped to regular-season games so
+  certification does not FAIL on legitimate spring-training ties; regular-season
+  strictness preserved. Completed (merged). Found via the DATA-011 full build.
+- **Real 2021-2025 certified dataset PRODUCED (DATA-011 executed).** Full live
+  build ingested 14,520 games, 132,848 pitcher appearances, 29,015 starters, and
+  69,901 archive moneylines (12,367 MATCHED to `game_pk`, 0 AMBIGUOUS).
+  Certification: **PASS** (0 merge-blocking; 1 advisory WARN
+  `pitching.non_regular_season`). Durable artifact committed at
+  `state/data-certifications/certification-PASS-7225f7f46a5e27e9.json`
+  (git_commit aee9435). This is the gate that unblocks FEAT-002/FEAT-003.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -69,43 +85,29 @@ to certify cleanly.
 
 ## Ready
 
-- None as pure code tasks. All validation/certification/odds tooling for the V1
-  historical gate is now merged (DATA-006, DATA-007, DATA-009) alongside the
-  ingestion resilience fix (DATA-010).
+- FEAT-002 - point-in-time starter features. Unblocked by the PASS certification.
+  Owns `src/features/starter.py`. Must be point-in-time safe (shift-before-roll;
+  never read a pitcher's current-game line as a pregame input, per ADR-002).
+- FEAT-003 - point-in-time bullpen features. Unblocked by the PASS certification.
+  Owns `src/features/bullpen.py`. Point-in-time safe; parallel with FEAT-002.
 
-## Next required action (gating the whole downstream graph)
+## Next required action
 
-The certification LAYER and the build RUNNER (DATA-011) are merged, but no real
-2021-2025 certified dataset has been produced yet. FEAT-002 / FEAT-003 (and
-everything downstream) require a PASS certification artifact from an actual
-build. The operator step is a single multi-hour live pull:
-
-```
-# from repo root, with outbound access to statsapi.mlb.com and the archive present
-set PYTHONPATH=src
-python -m pipelines.certify_historical --storage-root data \
-    --odds-archive mlb_odds_dataset.json --run-id historical-2021-2025
-```
-
-This ingests 2021-2025 schedules + game details (MLB-StatsAPI), normalizes
-Silver, ingests the published odds archive (SHA-256 verified), maps odds->game_pk
-(DATA-009), and writes `state/data-certifications/certification-<STATUS>-*.json`.
-It is idempotent/restartable (stable run_id); re-run to resume after any
-interruption. Commit the artifact once it reports PASS. FEAT-002 / FEAT-003
-become ready only when that artifact is PASS (no P0/P1 or leakage failures).
+The 2021-2025 historical MLB dataset is certified PASS
+(`state/data-certifications/certification-PASS-7225f7f46a5e27e9.json`). Dispatch
+FEAT-002 (starter features) and FEAT-003 (bullpen features) in parallel; they own
+separate feature modules. FEAT-004 (feature matrix) is the later aggregation
+point. Feature builders must exclude non-regular-season pitcher data (advisory
+`pitching.non_regular_season`) and be point-in-time safe.
 
 ## Safe parallel
 
-- None pending (no ready code tasks). FEAT-002 and FEAT-003 will be parallel
-  once a PASS certification artifact from a real build exists.
+- FEAT-002 and FEAT-003 own separate feature modules and may run in parallel.
 
 ## Blocked
 
-- FEAT-002 / FEAT-003 - blocked on a PASS certification artifact from a real
-  2021-2025 build (DATA-007 layer is merged; the real certified build is not yet
-  produced).
-- FEAT-004 and all ML work - wait for FEAT-002/FEAT-003 plus feature deps.
-- MARKET-001 - waits for ML-008 (DATA-009 odds benchmark inputs are now ready).
+- FEAT-004 and all ML work - wait for FEAT-002/FEAT-003 (FEAT-001 is done).
+- MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions
 
@@ -125,11 +127,10 @@ become ready only when that artifact is PASS (no P0/P1 or leakage failures).
 
 ## Next implementation task
 
-No pure-code task is ready. DATA-006, DATA-007, DATA-009, DATA-010 are merged.
-The pipeline is now gated on producing and committing a PASS certification
-artifact from a REAL 2021-2025 dataset build (see "Next required action"). This
-needs live MLB/odds data pulls, so it should be a new explicitly-scoped task
-(proposed DATA-011) and requires user direction on data/network access.
+The real 2021-2025 dataset is built and certified PASS (DATA-011 executed;
+DATA-013/014/015 fixed the real-data edges it surfaced). FEAT-002 (starter) and
+FEAT-003 (bullpen) are ready and may be dispatched in parallel; FEAT-004 is the
+later aggregation point.
 
 ## Deferred follow-ups
 
