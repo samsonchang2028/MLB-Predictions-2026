@@ -24,8 +24,8 @@ format.
 | DATA-014 | done | DATA-002, DATA-013 | merged; reconcile suspended/resumed same-Final duplicate game_pk (same outcome), real outcome conflicts still FAIL. Found via DATA-011 real build |
 | DATA-015 | done | DATA-006 | merged; home_win_derivation scoped to regular season (spring ties no longer FAIL cert), regular-season strictness preserved. Found via DATA-011 full build |
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
-| FEAT-002 | ready | DATA-007 | UNBLOCKED: certified 2021-2025 build PASS (certification-PASS-7225f7f46a5e27e9). Starter features; parallel with FEAT-003 |
-| FEAT-003 | ready | DATA-007 | UNBLOCKED: certified 2021-2025 build PASS. Bullpen features; parallel with FEAT-002 |
+| FEAT-002 | in-progress | DATA-007 | dispatched; point-in-time starter features (`src/features/starter.py`); parallel with FEAT-003 |
+| FEAT-003 | in-progress | DATA-007 | dispatched; point-in-time bullpen features (`src/features/bullpen.py`); parallel with FEAT-002 |
 | FEAT-004 | blocked | DATA-007, FEAT-001/002/003 | integration |
 | ML-001 | blocked | FEAT-004 | parallel with ML-002/003 |
 | ML-002 | blocked | FEAT-004 | parallel with ML-001/003 |
