@@ -1,0 +1,247 @@
+"""Unit tests for the game-level Gold feature matrix (FEAT-004)."""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+
+import pytest
+
+from features.build import build_feature_matrix
+
+
+def _dt(stamp: str) -> datetime:
+    return datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
+
+
+def _cert(status: str = "PASS", fingerprint: str = "7225f7f46a5e27e9") -> dict:
+    return {"status": status, "dataset": {"fingerprint": fingerprint}}
+
+
+def _game(game_pk: int, home_id: int, away_id: int, date: str, game_type: str = "R") -> dict:
+    return {
+        "game_pk": game_pk,
+        "home_team_id": home_id,
+        "away_team_id": away_id,
+        "game_date": _dt(date),
+        "game_type": game_type,
+    }
+
+
+def _team_row(game_pk: int, team_id: int, *, win_pct: float, run_diff: float) -> dict:
+    return {
+        "game_pk": game_pk,
+        "team_id": team_id,
+        "side": "home",
+        "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"),
+        "season": "2024",
+        "win_pct_before": win_pct,
+        "run_diff_avg_before": run_diff,
+    }
+
+
+def _starter_row(game_pk: int, team_id: int, *, pitcher_id: int, era: float | None) -> dict:
+    return {
+        "game_pk": game_pk,
+        "team_id": team_id,
+        "side": "home",
+        "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"),
+        "season": "2024",
+        "starter_pitcher_id": pitcher_id,
+        "starter_known": True,
+        "season_era_before": era,
+    }
+
+
+def _bullpen_row(game_pk: int, team_id: int, *, ip_l7: float) -> dict:
+    return {
+        "game_pk": game_pk,
+        "team_id": team_id,
+        "side": "home",
+        "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"),
+        "bullpen_ip_L7": ip_l7,
+    }
+
+
+def _result(game_pk: int, team_id: int, *, score: int | None, is_winner: bool | None) -> dict:
+    return {
+        "game_pk": game_pk,
+        "team_id": team_id,
+        "side": "home",
+        "score": score,
+        "is_winner": is_winner,
+    }
+
+
+def _one_game_inputs():
+    """Single game 1: home=10 beats away=20."""
+    games = [_game(1, 10, 20, "2024-04-01T19:00:00")]
+    team = [
+        _team_row(1, 10, win_pct=0.6, run_diff=1.5),
+        _team_row(1, 20, win_pct=0.4, run_diff=-0.5),
+    ]
+    starter = [
+        _starter_row(1, 10, pitcher_id=100, era=3.0),
+        _starter_row(1, 20, pitcher_id=200, era=4.5),
+    ]
+    bullpen = [
+        _bullpen_row(1, 10, ip_l7=7.0),
+        _bullpen_row(1, 20, ip_l7=6.0),
+    ]
+    results = [
+        _result(1, 10, score=5, is_winner=True),
+        _result(1, 20, score=3, is_winner=False),
+    ]
+    return games, team, starter, bullpen, results
+
+
+def _build(**overrides):
+    games, team, starter, bullpen, results = _one_game_inputs()
+    kwargs = {
+        "team_features": team,
+        "starter_features": starter,
+        "bullpen_features": bullpen,
+        "results": results,
+        "certification": _cert(),
+    }
+    kwargs.update(overrides)
+    games = overrides.get("games", games)
+    return build_feature_matrix(games, **{k: v for k, v in kwargs.items() if k != "games"})
+
+
+def test_one_row_per_game_with_metadata() -> None:
+    matrix = _build()
+    assert len(matrix["rows"]) == 1
+    row = matrix["rows"][0]
+    assert row["game_pk"] == 1
+    assert row["home_team_id"] == 10
+    assert row["away_team_id"] == 20
+    assert row["game_date"] == _dt("2024-04-01T19:00:00")
+    assert row["prediction_timestamp"] == row["game_date"]
+
+
+def test_home_away_and_diff_features_present() -> None:
+    matrix = _build()
+    features = matrix["rows"][0]["features"]
+    # home/away component features across all three components
+    assert features["home_team_win_pct_before"] == 0.6
+    assert features["away_team_win_pct_before"] == 0.4
+    assert features["home_starter_season_era_before"] == 3.0
+    assert features["away_starter_season_era_before"] == 4.5
+    # Bullpen keys already carry a ``bullpen_`` prefix; the component namespace
+    # yields ``home_bullpen_bullpen_ip_L7`` (collision-safe, and avoids the
+    # ``home_win`` target token that a bare ``home_win_pct_before`` would form).
+    assert features["home_bullpen_bullpen_ip_L7"] == 7.0
+    assert features["away_bullpen_bullpen_ip_L7"] == 6.0
+    # explicit differentials = home - away
+    assert features["diff_team_win_pct_before"] == pytest.approx(0.2)
+    assert features["diff_team_run_diff_avg_before"] == pytest.approx(2.0)
+    assert features["diff_starter_season_era_before"] == pytest.approx(-1.5)
+    assert features["diff_bullpen_bullpen_ip_L7"] == pytest.approx(1.0)
+
+
+def test_target_isolated_from_features() -> None:
+    matrix = _build()
+    row = matrix["rows"][0]
+    assert row["target"] == {"home_win": True}
+    # target must not leak into predictive features or the schema
+    assert "home_win" not in row["features"]
+    assert "home_win" not in matrix["feature_columns"]
+    assert not any("home_win" in col for col in matrix["feature_columns"])
+    assert all("home_win" not in key for key in row["features"])
+
+
+def test_feature_columns_match_row_feature_keys() -> None:
+    matrix = _build()
+    columns = matrix["feature_columns"]
+    for row in matrix["rows"]:
+        assert sorted(row["features"]) == columns
+
+
+def test_deterministic_sorted_schema() -> None:
+    first = _build()["feature_columns"]
+    second = _build()["feature_columns"]
+    assert first == second
+    assert first == sorted(first)
+
+
+def test_diff_excludes_identity_and_boolean_columns() -> None:
+    matrix = _build()
+    columns = matrix["feature_columns"]
+    # identity + boolean columns are carried per-side but never differenced
+    assert "home_starter_starter_pitcher_id" in columns
+    assert "away_starter_starter_pitcher_id" in columns
+    assert "diff_starter_starter_pitcher_id" not in columns
+    assert "home_starter_starter_known" in columns
+    assert "diff_starter_starter_known" not in columns
+
+
+def test_build_id_stamped_on_every_row() -> None:
+    matrix = _build()
+    assert matrix["build_id"] == "7225f7f46a5e27e9"
+    assert matrix["certification_status"] == "PASS"
+    for row in matrix["rows"]:
+        assert row["build_id"] == "7225f7f46a5e27e9"
+
+
+def test_missing_certification_prevents_publication() -> None:
+    with pytest.raises(ValueError, match="certification status"):
+        _build(certification=_cert(status="FAIL"))
+    with pytest.raises(ValueError, match="certification status"):
+        _build(certification={"dataset": {"fingerprint": "x"}})  # no status
+    with pytest.raises(ValueError, match="dataset.fingerprint"):
+        _build(certification={"status": "PASS"})  # no fingerprint
+    with pytest.raises(ValueError, match="dataset.fingerprint"):
+        _build(certification=_cert(fingerprint=""))
+
+
+def test_duplicate_game_pk_rejected() -> None:
+    games = [
+        _game(1, 10, 20, "2024-04-01T19:00:00"),
+        _game(1, 10, 30, "2024-04-02T19:00:00"),
+    ]
+    with pytest.raises(ValueError, match="duplicate game_pk"):
+        _build(games=games)
+
+
+def test_duplicate_component_key_rejected() -> None:
+    _, team, _, _, _ = _one_game_inputs()
+    team.append(_team_row(1, 10, win_pct=0.9, run_diff=9.0))  # duplicate (1, 10)
+    with pytest.raises(ValueError, match="duplicate .* in team_features"):
+        _build(team_features=team)
+
+
+def test_missing_component_side_rejected() -> None:
+    _, _, starter, _, _ = _one_game_inputs()
+    starter = [row for row in starter if row["team_id"] != 20]  # drop away starter
+    with pytest.raises(ValueError, match="missing away starter"):
+        _build(starter_features=starter)
+
+
+def test_non_regular_season_game_excluded() -> None:
+    games = [
+        _game(1, 10, 20, "2024-04-01T19:00:00", game_type="R"),
+        _game(2, 30, 40, "2024-03-01T19:00:00", game_type="S"),
+    ]
+    matrix = _build(games=games)
+    assert [row["game_pk"] for row in matrix["rows"]] == [1]
+
+
+def test_home_win_from_score_fallback() -> None:
+    results = [
+        _result(1, 10, score=2, is_winner=None),  # is_winner unknown
+        _result(1, 20, score=7, is_winner=None),
+    ]
+    matrix = _build(results=results)
+    assert matrix["rows"][0]["target"]["home_win"] is False
+
+
+def test_home_win_none_when_unlabeled() -> None:
+    results = [
+        _result(1, 10, score=None, is_winner=None),
+        _result(1, 20, score=None, is_winner=None),
+    ]
+    matrix = _build(results=results)
+    assert matrix["rows"][0]["target"]["home_win"] is None
