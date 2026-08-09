@@ -26,10 +26,10 @@ format.
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | done | DATA-007 | merged; point-in-time starter features (`src/features/starter.py`), leakage-tested |
 | FEAT-003 | done | DATA-007 | merged; point-in-time bullpen features (`src/features/bullpen.py`), leakage-tested |
-| FEAT-004 | in-progress | DATA-007, FEAT-001/002/003 | dispatched; feature matrix / Gold (`src/features/build.py`) |
-| ML-001 | blocked | FEAT-004 | parallel with ML-002/003 |
-| ML-002 | blocked | FEAT-004 | parallel with ML-001/003 |
-| ML-003 | blocked | FEAT-004 | parallel with ML-001/002 |
+| FEAT-004 | done | DATA-007, FEAT-001/002/003 | merged; game feature matrix (`src/features/build.py`), target isolated, leakage-tested |
+| ML-001 | ready | FEAT-004 | UNBLOCKED; logistic regression; parallel with ML-002/003 |
+| ML-002 | ready | FEAT-004 | UNBLOCKED; random forest; parallel with ML-001/003 |
+| ML-003 | ready | FEAT-004 | UNBLOCKED; XGBoost; parallel with ML-001/002 |
 | ML-004 | blocked | ML-001/002/003 | shared validator |
 | ML-005 | blocked | ML-004 | parallel with ML-006 |
 | ML-006 | blocked | ML-004 | parallel with ML-005 |

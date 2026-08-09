@@ -60,6 +60,10 @@ V1 historical data completion and certification planning.
 - FEAT-003 - point-in-time bullpen features (`src/features/bullpen.py`): recent
   ERA/WHIP + workload over prior 1/3 days, same-day doubleheaders ordered
   chronologically, leakage-tested. Completed (merged).
+- FEAT-004 - game feature matrix (`src/features/build.py`): one row per game_pk
+  from team/starter/bullpen features (home/away + differentials), target
+  (home_win) isolated from features, prediction timestamp + certified build
+  identity retained, uniqueness/cardinality enforced. Completed (merged).
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -91,24 +95,28 @@ to certify cleanly.
 
 ## Ready
 
-- FEAT-004 - feature matrix. Unblocked: DATA-007 (certified PASS), FEAT-001,
-  FEAT-002, FEAT-003 are all done. Integration/aggregation point; owns
-  `src/features/build.py`. Sequence ML-001/002/003 after it.
+- ML-001 - logistic regression baseline. Unblocked by FEAT-004.
+- ML-002 - random forest. Unblocked by FEAT-004.
+- ML-003 - XGBoost. Unblocked by FEAT-004.
+  All three consume the FEAT-004 game feature matrix and may run in parallel.
+  Note: ML-002 (scikit-learn) and ML-003 (xgboost) will add dependencies; the
+  primary metrics are log loss / Brier / calibration (ADR-003), 2026 stays
+  untouched, and folds must be chronological.
 
 ## Next required action
 
-Dispatch FEAT-004 (feature matrix) to assemble the point-in-time feature set
-(team + starter + bullpen) keyed by `game_pk`, then unlock ML-001/002/003 in
-parallel. FEAT-004 must preserve point-in-time safety and chronological folds.
+Dispatch ML-001, ML-002, ML-003 in parallel (separate model modules) on the
+FEAT-004 matrix. They feed ML-004 (walk-forward), then ML-005/006 windows,
+ML-007 comparison, ML-008 calibration.
 
 ## Safe parallel
 
-- None right now (FEAT-004 is a single integration node). After FEAT-004,
-  ML-001/ML-002/ML-003 may run in parallel.
+- ML-001, ML-002, ML-003 own separate model modules and may run in parallel.
 
 ## Blocked
 
-- ML-001/002/003 and downstream - wait for FEAT-004.
+- ML-004 (walk-forward) - waits for ML-001/002/003.
+- ML-005..008, PIPE-001, APP/OBS - downstream.
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions
@@ -158,6 +166,15 @@ later aggregation point.
   `failed` but the existing payloads row short-circuits re-fetch, so recovery
   needs manual intervention rather than automatic retry — "retryable" wording is
   optimistic.
+- FEAT-004 follow-ups (non-blocking, for ML/PIPE consumers): (a) P2 \u2014 diff_*
+  column eligibility is based on observed non-None values across the build, so a
+  small cold-start inference build could omit diff_ columns present in the
+  training matrix (schema drift). Base diff eligibility on a declared column
+  union and emit None when unavailable; address in FEAT-004 hardening or PIPE-001.
+  (b) P3 \u2014 prediction_timestamp = game_date; document it as a pregame calendar
+  reference or derive a strict pre-first-pitch cutoff (ADR-002). (c) P3 \u2014
+  certification_status is hardcoded "PASS" (safe: the gate raises otherwise);
+  could echo the artifact status.
 - FEAT-002/FEAT-003 P3 design choices (non-blocking, for FEAT-004/model review):
   (a) FEAT-002 rolling windows and days_rest span the offseason (cross-season
   continuity) rather than resetting per season — documented; confirm during
