@@ -54,6 +54,12 @@ V1 historical data completion and certification planning.
   `pitching.non_regular_season`). Durable artifact committed at
   `state/data-certifications/certification-PASS-7225f7f46a5e27e9.json`
   (git_commit aee9435). This is the gate that unblocks FEAT-002/FEAT-003.
+- FEAT-002 - point-in-time starting-pitcher features (`src/features/starter.py`):
+  shift-before-roll, current appearance excluded, explicit first-start/missing/
+  changed-starter handling, leakage-tested. Completed (merged).
+- FEAT-003 - point-in-time bullpen features (`src/features/bullpen.py`): recent
+  ERA/WHIP + workload over prior 1/3 days, same-day doubleheaders ordered
+  chronologically, leakage-tested. Completed (merged).
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -85,28 +91,24 @@ to certify cleanly.
 
 ## Ready
 
-- FEAT-002 - point-in-time starter features. Unblocked by the PASS certification.
-  Owns `src/features/starter.py`. Must be point-in-time safe (shift-before-roll;
-  never read a pitcher's current-game line as a pregame input, per ADR-002).
-- FEAT-003 - point-in-time bullpen features. Unblocked by the PASS certification.
-  Owns `src/features/bullpen.py`. Point-in-time safe; parallel with FEAT-002.
+- FEAT-004 - feature matrix. Unblocked: DATA-007 (certified PASS), FEAT-001,
+  FEAT-002, FEAT-003 are all done. Integration/aggregation point; owns
+  `src/features/build.py`. Sequence ML-001/002/003 after it.
 
 ## Next required action
 
-The 2021-2025 historical MLB dataset is certified PASS
-(`state/data-certifications/certification-PASS-7225f7f46a5e27e9.json`). Dispatch
-FEAT-002 (starter features) and FEAT-003 (bullpen features) in parallel; they own
-separate feature modules. FEAT-004 (feature matrix) is the later aggregation
-point. Feature builders must exclude non-regular-season pitcher data (advisory
-`pitching.non_regular_season`) and be point-in-time safe.
+Dispatch FEAT-004 (feature matrix) to assemble the point-in-time feature set
+(team + starter + bullpen) keyed by `game_pk`, then unlock ML-001/002/003 in
+parallel. FEAT-004 must preserve point-in-time safety and chronological folds.
 
 ## Safe parallel
 
-- FEAT-002 and FEAT-003 own separate feature modules and may run in parallel.
+- None right now (FEAT-004 is a single integration node). After FEAT-004,
+  ML-001/ML-002/ML-003 may run in parallel.
 
 ## Blocked
 
-- FEAT-004 and all ML work - wait for FEAT-002/FEAT-003 (FEAT-001 is done).
+- ML-001/002/003 and downstream - wait for FEAT-004.
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions
@@ -156,6 +158,12 @@ later aggregation point.
   `failed` but the existing payloads row short-circuits re-fetch, so recovery
   needs manual intervention rather than automatic retry — "retryable" wording is
   optimistic.
+- FEAT-002/FEAT-003 P3 design choices (non-blocking, for FEAT-004/model review):
+  (a) FEAT-002 rolling windows and days_rest span the offseason (cross-season
+  continuity) rather than resetting per season — documented; confirm during
+  modeling whether a season reset is preferred; (b) FEAT-003 day-based workload
+  windows use 24h*N timestamp deltas rather than calendar-day boundaries —
+  documented, does not cause leakage.
 - FEAT-001 is complete, but its downstream use against real 2021-2025 data must
   be covered by DATA-006/DATA-007 validation and certification.
 - Optional P2: document/backfill legacy bronze odds rows with NULL team names;
