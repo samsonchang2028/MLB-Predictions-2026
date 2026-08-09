@@ -203,14 +203,33 @@ def check_results_scores(connection: Any) -> CheckResult:
 
 
 def check_home_win_derivation(connection: Any) -> CheckResult:
-    """For Final games, is_winner must equal (that side scored more), with
-    exactly one winner and unequal scores."""
+    """For regular-season Final games, ``is_winner`` must equal (that side scored
+    more), with exactly one winner and unequal scores.
+
+    Policy (DATA-015): this check is scoped to regular-season games
+    (``game_type = 'R'``). ADR-004 scopes V1 to the 2021-2025 REGULAR seasons;
+    spring/exhibition games are already advisory/excluded (DATA-005 P3(c),
+    DATA-006 ``pitching.non_regular_season``). Non-regular-season Final games
+    legitimately produce outcomes this check would otherwise reject — spring
+    training games can end in a TIE (equal scores, no winner flag on either
+    side) and can be reported ``Final`` without a populated ``is_winner`` flag
+    (e.g. game_pk 642061, a decisive 4-7 spring game with no winner set). Those
+    are not data-quality defects for a regular-season predictor, so flagging
+    them as P0 would wrongly FAIL certification. Restricting to ``game_type='R'``
+    excludes them while preserving full strictness for the games V1 actually
+    predicts on.
+
+    Regular-season strictness is unchanged: a ``game_type='R'`` Final game whose
+    winner flag disagrees with the scores, that declares two winners, or that
+    declares a winner on equal scores, is still flagged (P0).
+    """
     rows = _fetch(
         connection,
         """SELECT g.game_pk, t.side, t.score, t.is_winner
            FROM silver.games g
            JOIN silver.team_game_statistics t USING (game_pk)
            WHERE g.abstract_game_state = 'Final'
+             AND g.game_type = 'R'
            ORDER BY g.game_pk, t.side""",
     )
     sides: dict[Any, dict[str, tuple[Any, Any]]] = {}
