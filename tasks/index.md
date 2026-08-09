@@ -26,7 +26,7 @@ format.
 | FEAT-001 | done | DATA-004 | completed; downstream real-dataset use gated by DATA-007 |
 | FEAT-002 | done | DATA-007 | merged; point-in-time starter features (`src/features/starter.py`), leakage-tested |
 | FEAT-003 | done | DATA-007 | merged; point-in-time bullpen features (`src/features/bullpen.py`), leakage-tested |
-| FEAT-004 | ready | DATA-007, FEAT-001/002/003 | UNBLOCKED: all feature deps done. Integration/aggregation point (feature matrix) |
+| FEAT-004 | in-progress | DATA-007, FEAT-001/002/003 | dispatched; feature matrix / Gold (`src/features/build.py`) |
 | ML-001 | blocked | FEAT-004 | parallel with ML-002/003 |
 | ML-002 | blocked | FEAT-004 | parallel with ML-001/003 |
 | ML-003 | blocked | FEAT-004 | parallel with ML-001/002 |
