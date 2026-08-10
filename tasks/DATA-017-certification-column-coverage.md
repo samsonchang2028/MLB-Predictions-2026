@@ -41,6 +41,12 @@ PASS.
 - The expected columns must be declared explicitly in code (an allowlist), so a
   newly added column is either declared or intentionally excluded - do not infer
   silently.
+- PLAUSIBILITY (substance, not just presence): add documented sanity assertions on
+  declared measures so degenerate-but-non-null data also fails. At minimum:
+  a constant/zero-variance measure column is a failure; and each declared measure
+  must fall inside a documented plausible range (e.g. home-win rate in
+  [0.45, 0.60]; per-appearance `outs_recorded` and `earned_runs` within sane
+  bounds). Record the observed values so drift is visible build over build.
 - Keep the check deterministic and side-effect free, consistent with the existing
   certification checks, and include the coverage numbers in the artifact so
   future builds are comparable.

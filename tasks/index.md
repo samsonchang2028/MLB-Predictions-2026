@@ -40,9 +40,10 @@ format.
 | PIPE-001 | done | MARKET-001 | merged; daily pipeline (`src/pipelines/daily.py`); immutable idempotent records; PIT-guarded |
 | OBS-001 | ready | PIPE-001 | UNBLOCKED; prediction journal; parallel with APP-001 (dispatch deferred for real-data run) |
 | APP-001 | ready | PIPE-001 | UNBLOCKED; Streamlit board; parallel with OBS-001 (dispatch deferred for real-data run) |
-| DATA-016 | ready | DATA-011 | P0 for model quality: game-detail `fields=` projection dropped ALL pitching stats; re-ingest required |
-| DATA-017 | ready | DATA-007 | certification must FAIL on 100%-NULL declared measure columns (let the hollow build pass) |
+| DATA-016 | in-progress | DATA-011 | dispatched; P0: fields= projection dropped ALL pitching stats; fix + correct the wrong test + hollow-payload guard + real-payload contract; re-ingest |
+| DATA-017 | in-progress | DATA-007 | dispatched; certification coverage + plausibility checks (100%-NULL and degenerate columns FAIL) |
 | FEAT-005 | ready | FEAT-004 | component-coverage policy: 4 games with zero appearances hard-fail the matrix build |
+| FEAT-006 | in-progress | FEAT-004 | dispatched; feature-matrix must not publish all-empty columns (last line of defense) |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
 
 ## Status transitions

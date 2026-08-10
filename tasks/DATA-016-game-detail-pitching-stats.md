@@ -58,10 +58,22 @@ NOT listed, so the API returned `stats: {}` for every player. The existing
 comment correctly avoided listing `players` (which would empty the subtree) but
 omitted the stat keys underneath it.
 
+## The test that locked the bug in place
+
+`tests/unit/ingestion/mlb/test_game_detail.py::test_players_subtree_is_not_field_filtered`
+asserts that `stats`, `pitching`, `inningsPitched`, `earnedRuns`, `hits`, and
+`numberOfPitches` are NOT in the allowlist. Its premise is only half true:
+listing `players` itself does empty the subtree, but the stat LEAF keys must be
+listed or the API returns `stats: {}`. Proof from the stored payload: `person`
+IS in the allowlist and came back populated, while `stats` was omitted and came
+back empty. This test must be corrected, not deleted, and its replacement must
+encode the true invariant.
+
 ## Goal
 
 Persist the pitching stat lines so starter/bullpen features are real, then
-re-ingest game details and confirm non-null coverage.
+re-ingest game details and confirm non-null coverage. Make the request/response
+contract provable so it cannot silently regress.
 
 ## Requirements
 
@@ -70,12 +82,23 @@ re-ingest game details and confirm non-null coverage.
   `battersFaced`, `numberOfPitches`, `hits`, `runs`, `earnedRuns`,
   `baseOnBalls`, `strikeOuts`, `homeRuns`) or drop the `fields` filter for this
   endpoint if a correct allowlist cannot be guaranteed.
-- Prefer the smallest projection that provably returns the stats; do not silently
-  retain play-by-play/pitch-level content if it can be avoided.
+- CORRECT `test_players_subtree_is_not_field_filtered` to assert the true
+  invariant (`players` itself stays unlisted; the stat leaf keys ARE listed).
+  Document why, citing the populated-`person` vs empty-`stats` evidence.
+- HOLLOW-PAYLOAD GUARD: parsing a completed game whose boxscore yields pitcher
+  appearances with NO stat values must be an explicit ingestion failure/status,
+  not a silently persisted row. A Final game with `stats: {}` for every pitcher
+  is a defect, and ingest is the earliest place to see it.
+- REAL-PAYLOAD CONTRACT FIXTURE: commit one recorded REAL `feed/live` response
+  (captured with the production `fields` string, trimmed of irrelevant subtrees
+  if large) as a golden fixture, and assert the parser extracts non-null stat
+  lines from it. This is the check that would have caught the bug offline.
+- LIVE SMOKE CHECK: add an opt-in script/marker (network, excluded from the
+  default suite) that fetches ONE game with the production `fields` string and
+  asserts the response contains non-empty pitching stats. Document how to run it
+  before any long backfill.
 - Raw payloads remain immutable and ingestion idempotent; re-ingestion must be
   resumable (DATA-010 semantics) since the backfill is long (~4.5h previously).
-- Add a test that FAILS on a hollow payload: assert that parsed appearances have
-  non-null stat fields for a realistic fixture, so this cannot regress silently.
 - After re-ingest, `silver.pitcher_appearances` stat columns must be
   substantially non-null and the feature matrix must have no fully-empty
   starter/bullpen columns.
