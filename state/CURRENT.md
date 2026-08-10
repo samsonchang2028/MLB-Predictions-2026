@@ -98,6 +98,14 @@ V1 historical data completion and certification planning.
   the test fold), comparing calibrated vs uncalibrated log loss / Brier /
   reliability on identical folds with the same base-fit partition. 2026 untouched.
   Completed (merged); leakage-tested (a leaky base-fit provably fails the invariant).
+- MARKET-001 - market probability and edge engine (`src/market/`): American odds
+  -> implied probability, two-way no-vig normalization (sums to 1.0) with
+  overround, model-vs-market edge, expected value. Preserves bookmaker identity +
+  odds snapshot timestamp and REFUSES snapshots not strictly before the prediction
+  cutoff/first pitch (ADR-002); CLOSING odds usable only as post-hoc benchmarks;
+  archive opening odds labeled model-edge-vs-opening-market / simulated ROI at
+  opening prices; UNMATCHED/AMBIGUOUS DATA-009 records excluded from canonical
+  evaluation. Completed (merged); formulas pinned to hand-verified known values.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -129,30 +137,28 @@ to certify cleanly.
 
 ## Ready
 
-- MARKET-001 - market probability and edge engine. Unblocked: BOTH deps merged
-  (DATA-009 odds archive validated - 69,901 archive moneylines, 12,367 MATCHED;
-  ML-008 calibration merged). Owns `src/market/` + `tests/unit/market/`: American
-  odds conversion, two-way no-vig normalization, edge + expected value,
-  deterministic formula tests. Constraints: preserve the odds timestamp used for
-  live/future predictions; archive opening odds support model-vs-opening-market
-  only; never use closing/current-style odds as a pregame input unless the
-  prediction timestamp is actually at close (post-hoc benchmark only); label
-  archive ROI as simulated ROI at opening prices.
+- PIPE-001 - daily prediction pipeline. Unblocked: MARKET-001 merged, so the full
+  chain exists (certified data -> FEAT-004 matrix -> model families -> walk-forward
+  + calibration -> market edge/EV). Must respect: prediction_timestamp strictly
+  before first pitch (ADR-002), only odds snapshots that exist before the cutoff,
+  idempotent/reproducible daily runs, and the FEAT-004 P2 caveat that a cold-start
+  inference build can omit diff_ columns present in training (base the inference
+  feature columns on a declared column union, not the observed rows).
 
 ## Next required action
 
-Dispatch MARKET-001 (single node) to build the market probability/edge engine on
-the validated DATA-009 opening-market inputs. It then unblocks PIPE-001 (daily
-prediction pipeline) -> OBS-001 + APP-001 (parallel).
+Dispatch PIPE-001 (daily prediction pipeline) wiring features -> selected model
++ calibration -> market edge/EV into a reproducible daily run. It then unblocks
+OBS-001 (prediction journal) and APP-001, which may run in parallel.
 
 ## Safe parallel
 
-- None right now (MARKET-001 is a single node).
+- None right now (PIPE-001 is a single integration node). After PIPE-001,
+  OBS-001 and APP-001 may run in parallel.
 
 ## Blocked
 
-- PIPE-001 - waits for MARKET-001; OBS-001 + APP-001 - wait for PIPE-001
-  (then parallel).
+- OBS-001 + APP-001 - wait for PIPE-001 (then parallel).
 
 ## Current architecture decisions
 

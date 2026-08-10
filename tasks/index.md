@@ -36,8 +36,8 @@ format.
 | ML-006 | done | ML-004A | merged; rolling 2/3-season experiments (`src/experiments/rolling.py`), shared schema |
 | ML-007 | done | ML-005/006 | merged; model x window comparison (`src/experiments/comparison.py`); fair on {2024,2025}; 2026 unused |
 | ML-008 | done | ML-007 | merged; calibration (`src/evaluation/calibration.py`), inner calibration split, leakage-tested |
-| MARKET-001 | in-progress | DATA-009, ML-008 | dispatched; market engine (`src/market/`); no-vig, edge, EV; opening-market benchmark only |
-| PIPE-001 | blocked | MARKET-001 | daily production |
+| MARKET-001 | done | DATA-009, ML-008 | merged; market engine (`src/market/`); no-vig, edge, EV; timestamp-guarded; opening-benchmark only |
+| PIPE-001 | ready | MARKET-001 | UNBLOCKED; daily prediction pipeline |
 | OBS-001 | blocked | PIPE-001 | parallel with APP-001 |
 | APP-001 | blocked | PIPE-001 | parallel with OBS-001 |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
