@@ -70,6 +70,12 @@ V1 historical data completion and certification planning.
   expose the shared `build_model`/`predict_proba`/`model_metadata` contract so the
   ML-004 walk-forward evaluator can drive them uniformly. scikit-learn + xgboost
   added as dependencies.
+- ML-004 - walk-forward validation framework (`src/evaluation/splits.py` +
+  `runner.py`): deterministic expanding + rolling 2/3-season folds (no train/test
+  overlap, chronological, 2026 excluded), stable feature vectorization of the
+  FEAT-004 matrix, per-fold fresh-model fit (preprocessing inside the fold), and
+  probability-quality metrics (log loss/Brier/calibration; ROC-AUC/accuracy
+  secondary) across all three families. Completed (merged); leakage-tested.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -101,26 +107,25 @@ to certify cleanly.
 
 ## Ready
 
-- ML-004 - walk-forward validation framework. Unblocked: ML-001/002/003 merged
-  and expose the shared `build_model`/`predict_proba`/`model_metadata` contract.
-  Owns `src/evaluation/splits.py` + `src/evaluation/runner.py`; must own the
-  feature-dict->array vectorization + folds, fit preprocessing inside each fold,
-  keep folds chronological with no train/test overlap, and exclude 2026.
+- ML-005 - expanding-window experiment. Unblocked by ML-004.
+- ML-006 - rolling-window experiments (2-season and 3-season). Unblocked by ML-004.
+  Both use the ML-004 evaluator over the three model families and may run in
+  parallel. NOTE (ML-004 P3): rolling schemes share test seasons {2024, 2025};
+  ML-007 must compare expanding vs rolling on those shared folds.
 
 ## Next required action
 
-Dispatch ML-004 (walk-forward evaluator) as the single integration node that
-drives all three model families uniformly on the FEAT-004 matrix. It then
-unlocks ML-005 (expanding) and ML-006 (rolling) window experiments in parallel.
+Dispatch ML-005 (expanding) and ML-006 (rolling) in parallel using the ML-004
+runner + splits. They feed ML-007 (model/window comparison) -> ML-008
+(calibration) -> MARKET-001.
 
 ## Safe parallel
 
-- None right now (ML-004 is a single integration node). After ML-004,
-  ML-005 and ML-006 may run in parallel.
+- ML-005 and ML-006 own separate experiment modules and may run in parallel.
 
 ## Blocked
 
-- ML-005/006 - wait for ML-004; ML-007 (comparison) -> ML-008 (calibration).
+- ML-007 (comparison) - waits for ML-005/006; ML-008 (calibration) - after ML-007.
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions

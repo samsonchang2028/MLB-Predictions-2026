@@ -30,9 +30,9 @@ format.
 | ML-001 | done | FEAT-004 | merged; logistic regression (`src/models/logistic.py`), shared contract |
 | ML-002 | done | FEAT-004 | merged; random forest (`src/models/random_forest.py`), shared contract |
 | ML-003 | done | FEAT-004 | merged; XGBoost (`src/models/xgboost_model.py`), shared contract |
-| ML-004 | in-progress | ML-001/002/003 | dispatched; walk-forward validation framework (`src/evaluation/`) |
-| ML-005 | blocked | ML-004 | parallel with ML-006 |
-| ML-006 | blocked | ML-004 | parallel with ML-005 |
+| ML-004 | done | ML-001/002/003 | merged; walk-forward framework (`src/evaluation/`), drives all 3 families; leakage-tested |
+| ML-005 | ready | ML-004 | UNBLOCKED; expanding-window experiment; parallel with ML-006 |
+| ML-006 | ready | ML-004 | UNBLOCKED; rolling-window experiments; parallel with ML-005 |
 | ML-007 | blocked | ML-005/006 | comparison |
 | ML-008 | blocked | ML-007 | calibration |
 | MARKET-001 | blocked | DATA-009, ML-008 | market engine; historical opening benchmark plus live timestamped odds |
