@@ -245,3 +245,122 @@ def test_home_win_none_when_unlabeled() -> None:
     ]
     matrix = _build(results=results)
     assert matrix["rows"][0]["target"]["home_win"] is None
+
+
+# --- FEAT-005: component-coverage policy -------------------------------------
+#
+# A game whose whole component family has no source detail for *either* team is
+# excluded and reported in ``matrix["excluded"]`` (option (b): no silent drop).
+# A component present for one team but not the other on an otherwise-covered game
+# is corruption and still raises (strictness preserved). See build.py docstring
+# for the per-game classification of the four real certified-build games
+# (632457/746577 legitimate Cancelled; 746596/746597 DATA-016 ingestion defects).
+
+
+def _two_game_inputs():
+    """Game 1 fully covered; game 2 covered too (caller drops a component)."""
+    games = [
+        _game(1, 10, 20, "2024-04-01T19:00:00"),
+        _game(2, 30, 40, "2024-04-02T19:00:00"),
+    ]
+    team = [
+        _team_row(1, 10, win_pct=0.6, run_diff=1.5),
+        _team_row(1, 20, win_pct=0.4, run_diff=-0.5),
+        _team_row(2, 30, win_pct=0.5, run_diff=0.0),
+        _team_row(2, 40, win_pct=0.5, run_diff=0.0),
+    ]
+    starter = [
+        _starter_row(1, 10, pitcher_id=100, era=3.0),
+        _starter_row(1, 20, pitcher_id=200, era=4.5),
+        _starter_row(2, 30, pitcher_id=300, era=2.5),
+        _starter_row(2, 40, pitcher_id=400, era=5.0),
+    ]
+    bullpen = [
+        _bullpen_row(1, 10, ip_l7=7.0),
+        _bullpen_row(1, 20, ip_l7=6.0),
+        _bullpen_row(2, 30, ip_l7=5.0),
+        _bullpen_row(2, 40, ip_l7=4.0),
+    ]
+    results = [
+        _result(1, 10, score=5, is_winner=True),
+        _result(1, 20, score=3, is_winner=False),
+        _result(2, 30, score=1, is_winner=False),
+        _result(2, 40, score=2, is_winner=True),
+    ]
+    return games, team, starter, bullpen, results
+
+
+def _build_two(*, bullpen=None, starter=None):
+    games, team, s, b, results = _two_game_inputs()
+    return build_feature_matrix(
+        games,
+        team_features=team,
+        starter_features=starter if starter is not None else s,
+        bullpen_features=bullpen if bullpen is not None else b,
+        results=results,
+        certification=_cert(),
+    )
+
+
+def test_result_exposes_empty_excluded_list_when_fully_covered() -> None:
+    matrix = _build()
+    # The policy is always visible in the result shape, even with no exclusions.
+    assert matrix["excluded"] == []
+    assert [row["game_pk"] for row in matrix["rows"]] == [1]
+
+
+def test_game_missing_both_teams_bullpen_is_excluded_not_raised() -> None:
+    # Single game with zero bullpen coverage for either team (the real 4-game
+    # pattern). Must NOT raise and must NOT silently vanish.
+    matrix = _build(bullpen_features=[])
+    assert matrix["rows"] == []
+    assert len(matrix["excluded"]) == 1
+    entry = matrix["excluded"][0]
+    assert entry["game_pk"] == 1
+    assert entry["missing_components"] == ["bullpen"]
+    assert "bullpen" in entry["reason"]
+    # game identity is carried for auditing
+    assert entry["home_team_id"] == 10
+    assert entry["away_team_id"] == 20
+
+
+def test_game_missing_both_teams_starter_and_bullpen_reports_both() -> None:
+    matrix = _build(starter_features=[], bullpen_features=[])
+    assert matrix["rows"] == []
+    assert len(matrix["excluded"]) == 1
+    # order follows the fixed component order (team, starter, bullpen)
+    assert matrix["excluded"][0]["missing_components"] == ["starter", "bullpen"]
+
+
+def test_covered_game_unaffected_while_other_is_excluded() -> None:
+    # Game 2 loses bullpen for BOTH teams; game 1 stays fully covered.
+    bullpen = [_bullpen_row(1, 10, ip_l7=7.0), _bullpen_row(1, 20, ip_l7=6.0)]
+    matrix = _build_two(bullpen=bullpen)
+    assert [row["game_pk"] for row in matrix["rows"]] == [1]
+    # Fully covered game 1 keeps its features and target intact.
+    row1 = matrix["rows"][0]
+    assert row1["features"]["home_bullpen_bullpen_ip_L7"] == 7.0
+    assert row1["target"] == {"home_win": True}
+    # Game 2 is surfaced as excluded with a reason, not dropped silently.
+    assert [e["game_pk"] for e in matrix["excluded"]] == [2]
+    assert matrix["excluded"][0]["missing_components"] == ["bullpen"]
+
+
+def test_one_sided_component_on_covered_game_still_raises() -> None:
+    # Game 2 has bullpen for team 30 but NOT team 40: corruption, not absence.
+    bullpen = [
+        _bullpen_row(1, 10, ip_l7=7.0),
+        _bullpen_row(1, 20, ip_l7=6.0),
+        _bullpen_row(2, 30, ip_l7=5.0),
+    ]
+    with pytest.raises(ValueError, match="missing away bullpen"):
+        _build_two(bullpen=bullpen)
+
+
+def test_excluded_games_absent_from_feature_rows() -> None:
+    # An excluded game must never leak into rows/targets (no partial rows).
+    matrix = _build(bullpen_features=[])
+    assert all(row["game_pk"] != 1 for row in matrix["rows"])
+    excluded_pks = {e["game_pk"] for e in matrix["excluded"]}
+    row_pks = {row["game_pk"] for row in matrix["rows"]}
+    assert excluded_pks.isdisjoint(row_pks)

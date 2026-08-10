@@ -27,7 +27,7 @@ in any row's ``features`` mapping (target-isolation contract, below).
 Target-isolation contract
 --------------------------
 ``build_feature_matrix`` returns ``{build_id, certification_status,
-feature_columns, rows}``. Each row is::
+feature_columns, rows, excluded}``. Each row is::
 
     {
         "game_pk": <int>,
@@ -57,8 +57,60 @@ Cardinality
 - regular-season only (``game_type == 'R'``; missing type treated as regular,
   consistent with the starter builder).
 - both home and away rows must exist for every included game in every component;
-  a missing side raises (no partial/one-sided game rows).
+  a missing side raises (no partial/one-sided game rows). See the
+  component-coverage policy below for absent-coverage versus one-sided corruption.
 Any violation raises ``ValueError`` (fail loudly, no silent many-to-one collapse).
+
+Component-coverage policy (FEAT-005)
+------------------------------------
+A real certified build contains regular-season games for which a whole component
+family has *no* source detail for *either* team. In the certified 2021-2025 build
+four games have zero parsed pitcher appearances, so neither team gets starter or
+bullpen features. Per component a game is in exactly one of three states:
+
+* **both sides present** -> usable component.
+* **both sides absent** -> the upstream detail is missing for the whole game
+  (absent source detail, not corruption).
+* **exactly one side present** -> an inconsistency that signals corruption (one
+  team has detail the other lacks on the same otherwise-covered game). This
+  **still raises** ``ValueError``; the existing strictness is preserved.
+
+Chosen policy: a game with any both-sides-absent component is **excluded from
+``rows`` and returned in the ``excluded`` list** carrying its ``game_pk``,
+``missing_components`` and a human-readable ``reason``. This is option (b) of the
+task, not silent dropping (AGENTS.md): the drop is explicit, counted, reason
+tagged and testable. Emitting the game instead with ``None`` component features
+was rejected because it would (1) break FEAT-004's row-completeness guarantee that
+every emitted row carries both sides of every component, and (2) feed a
+pitching-signal-free game into training under imputation - exactly the silent
+signal dilution ADR-005 warns against. Fully covered rows are byte-for-byte
+unchanged.
+
+The four affected games in the certified build (classified per FEAT-005 STEP 1;
+the classification informs *which follow-up task owns the fix* but does not change
+this aggregator's coverage-driven behavior, which keys only on observable
+component presence):
+
+* ``632457`` (2021-09-16, 144 vs 115) - **legitimate exclusion**: detail payload
+  fetched, but ``detailed_state='Cancelled'`` (``status_code='CI'``); no pitching
+  line exists and no result (score/is_winner NULL), so it is unlabeled anyway.
+* ``746577`` (2024-09-29, 114 vs 117) - **legitimate exclusion**: detail payload
+  fetched, ``detailed_state='Cancelled'`` (``status_code='CR'``); no pitching line,
+  no result.
+* ``746596`` (2024-08-26, 114 vs 118) - **ingestion defect (DATA-016)**: a
+  completed ``Final`` game with a real score (4-9), but the game-detail fetch
+  ``failed`` with a ``ConnectionError`` (DNS resolution), so no
+  ``bronze.mlb_game_detail_payloads`` row exists. The payload exists upstream; we
+  failed to fetch it. Should be re-fetched under DATA-016, not repaired here.
+* ``746597`` (2024-08-23, 114 vs 140) - **ingestion defect (DATA-016)**: a
+  completed ``Final`` game (score 3-5) whose detail fetch likewise ``failed`` with
+  a ``ConnectionError``; no payload row. DATA-016 scope.
+
+Consequently 632457/746577 are legitimate permanent exclusions, while
+746596/746597 are transient ingestion gaps that a DATA-016 re-fetch should
+re-populate (after which they leave the ``excluded`` list automatically). This
+aggregator does not distinguish the two causes because it cannot observe game
+lifecycle state; it reports the observable coverage gap and lets the caller audit.
 """
 
 from __future__ import annotations
@@ -118,14 +170,32 @@ def build_feature_matrix(
     feature_columns = _feature_schema(game_index, component_index)
 
     rows: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
     for game_pk in sorted(game_index):
         game = game_index[game_pk]
         home_id = game["home_team_id"]
         away_id = game["away_team_id"]
 
-        home_side, away_side = _game_component_values(
+        home_side, away_side, missing_components = _game_component_values(
             game_pk, home_id, away_id, component_index
         )
+        if missing_components:
+            excluded.append(
+                {
+                    "game_pk": game_pk,
+                    "game_date": game["game_date"],
+                    "home_team_id": home_id,
+                    "away_team_id": away_id,
+                    "missing_components": missing_components,
+                    "reason": (
+                        "incomplete component coverage: no "
+                        + ", ".join(missing_components)
+                        + " features for either team"
+                    ),
+                }
+            )
+            continue
+
         features = _assemble_features(feature_columns, home_side, away_side)
 
         rows.append(
@@ -149,6 +219,7 @@ def build_feature_matrix(
         "certification_status": "PASS",
         "feature_columns": feature_columns,
         "rows": rows,
+        "excluded": excluded,
     }
 
 
@@ -271,14 +342,32 @@ def _game_component_values(
     home_id: Any,
     away_id: Any,
     component_index: Mapping[str, Mapping[tuple[Any, Any], Mapping[str, Any]]],
-) -> tuple[dict[str, Mapping[str, Any]], dict[str, Mapping[str, Any]]]:
-    """Resolve the home and away component rows, requiring both sides present."""
+) -> tuple[dict[str, Mapping[str, Any]], dict[str, Mapping[str, Any]], list[str]]:
+    """Resolve home/away component rows and classify per-component coverage.
+
+    For each component the game is in exactly one of three states (see the
+    module-level component-coverage policy):
+
+    * **both sides present** -> added to ``home_side`` / ``away_side``.
+    * **both sides absent** -> recorded in ``missing_components`` (absent source
+      detail for the whole game; the caller excludes the game and reports it).
+    * **exactly one side present** -> raises ``ValueError`` (a one-sided component
+      on an otherwise-covered game signals corruption, not absent detail).
+
+    Returns ``(home_side, away_side, missing_components)`` where
+    ``missing_components`` is the ordered list of components absent on both sides
+    (empty => fully covered).
+    """
     home_side: dict[str, Mapping[str, Any]] = {}
     away_side: dict[str, Mapping[str, Any]] = {}
+    missing_components: list[str] = []
     for component in _COMPONENTS:
         index = component_index[component]
         home_row = index.get((game_pk, home_id))
         away_row = index.get((game_pk, away_id))
+        if home_row is None and away_row is None:
+            missing_components.append(component)
+            continue
         if home_row is None:
             raise ValueError(
                 f"game_pk={game_pk} missing home {component} features "
@@ -291,7 +380,7 @@ def _game_component_values(
             )
         home_side[component] = home_row
         away_side[component] = away_row
-    return home_side, away_side
+    return home_side, away_side, missing_components
 
 
 def _assemble_features(
