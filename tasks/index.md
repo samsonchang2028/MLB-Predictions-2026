@@ -40,6 +40,9 @@ format.
 | PIPE-001 | done | MARKET-001 | merged; daily pipeline (`src/pipelines/daily.py`); immutable idempotent records; PIT-guarded |
 | OBS-001 | ready | PIPE-001 | UNBLOCKED; prediction journal; parallel with APP-001 (dispatch deferred for real-data run) |
 | APP-001 | ready | PIPE-001 | UNBLOCKED; Streamlit board; parallel with OBS-001 (dispatch deferred for real-data run) |
+| DATA-016 | ready | DATA-011 | P0 for model quality: game-detail `fields=` projection dropped ALL pitching stats; re-ingest required |
+| DATA-017 | ready | DATA-007 | certification must FAIL on 100%-NULL declared measure columns (let the hollow build pass) |
+| FEAT-005 | ready | FEAT-004 | component-coverage policy: 4 games with zero appearances hard-fail the matrix build |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
 
 ## Status transitions

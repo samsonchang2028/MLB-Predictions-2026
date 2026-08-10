@@ -147,36 +147,68 @@ to certify cleanly.
 
 ## Ready
 
-- OBS-001 - prediction journal / observability over the immutable PIPE-001
-  records. Unblocked by PIPE-001.
-- APP-001 - app/UI surface over the daily predictions. Unblocked by PIPE-001.
-  Both read the PIPE-001 prediction records and own separate surfaces, so they
-  may run in parallel. Neither may mutate prediction records (append-only) and
-  neither may re-derive market/model math - consume the stored record fields.
+- DATA-016 (do FIRST) - game-detail `fields=` projection dropped ALL pitching
+  stats; `silver.pitcher_appearances` is 100% NULL on every stat column, so 58 of
+  211 feature columns are structurally empty and the first real experiment trained
+  on team features only. Requires a projection fix + game-detail RE-INGEST
+  (~4.5h, single-writer) + re-certification. P0 for model quality.
+- DATA-017 - certification must FAIL on 100%-NULL declared measure columns; this
+  gap let the hollow build certify PASS.
+- FEAT-005 - component-coverage policy: 4 regular-season games with zero parsed
+  appearances hard-fail `build_feature_matrix` (worked around out-of-band in the
+  experiment driver).
+- OBS-001 + APP-001 - prediction journal and Streamlit board (parallel-safe).
+  Dispatch was deferred to run the real experiment; both remain unblocked.
+
+## First real experiment (2021-2025 certified build) - RESULTS
+
+Executed on the certified build `7225f7f46a5e27e9`: 12,146 regular-season games,
+211 feature columns, seasons balanced (~2,430/season), 100% labeled, home-win rate
+0.5315. Report: `reports/experiments/v1-real.json`.
+
+Ranking on the common test seasons {2024, 2025} (primary: log loss -> Brier ->
+ECE), 4,857 test games per combination:
+
+| # | model | window | log loss | Brier | ECE | AUC | acc |
+|---|-------|--------|----------|-------|-----|-----|-----|
+| 1 | logistic | expanding | 0.68395 | 0.24545 | 0.0169 | 0.5662 | 0.5516 |
+| 2 | logistic | rolling_3 | 0.68496 | 0.24594 | 0.0180 | 0.5626 | 0.5495 |
+| 3 | logistic | rolling_2 | 0.68615 | 0.24652 | 0.0245 | 0.5611 | 0.5450 |
+| 4 | xgboost | expanding | 0.68732 | 0.24706 | 0.0252 | 0.5604 | 0.5448 |
+| 7 | random_forest | rolling_3 | 0.69206 | 0.24932 | 0.0332 | 0.5476 | 0.5403 |
+
+Best: **logistic regression + expanding window**. Reference: predicting the base
+rate (0.5315) gives log loss ~0.6912 / Brier ~0.2490, so the model beats the base
+rate by ~0.007 log loss - a real but WEAK edge. Expanding beat both rolling
+windows for every family; the linear model beat both nonlinear families.
+
+Calibration (ML-008, logistic/expanding, pooled over its folds):
+uncalibrated 0.68897 / ECE 0.0287; **sigmoid 0.68506 / ECE 0.00965** (best);
+isotonic 0.71753 / ECE 0.0414 (overfits). Platt/sigmoid calibration is the clear
+choice and cuts reliability error ~3x.
+
+**Interpretation caveat (important):** these numbers reflect TEAM FEATURES ONLY.
+All starter and bullpen ERA/WHIP features were empty (DATA-016), so the pitching
+signal - normally the strongest input to an MLB moneyline model - was absent. The
+weak edge is expected under that handicap and should be re-measured after
+DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-Dispatch OBS-001 and APP-001 in parallel over the immutable prediction records.
+Dispatch DATA-016 (pitching-stat projection fix + re-ingest) and DATA-017
+(certification coverage check) - DATA-017 can proceed in parallel since it touches
+`src/validation/` while DATA-016 touches `src/ingestion/mlb/`. Then re-certify,
+rebuild the matrix, and re-run the experiment to get trustworthy metrics.
 
 ## Safe parallel
 
-- OBS-001 and APP-001 own separate surfaces and may run in parallel.
+- DATA-016 (`src/ingestion/mlb/`) and DATA-017 (`src/validation/`) own disjoint
+  surfaces. FEAT-005 (`src/features/build.py`) is also disjoint. OBS-001 and
+  APP-001 remain parallel-safe with each other.
 
 ## Blocked
 
-- None. The V1 chain (ingest -> certify -> features -> models -> validation ->
-  calibration -> market -> daily pipeline) is complete and merged; only the
-  observability/app surfaces remain.
-
-## Deferred / follow-ups worth scheduling
-
-- Real-data execution: the model + market + pipeline layers are unit/leakage
-  tested on synthetic matrices. A real run over the certified 2021-2025 build
-  (FEAT-004 matrix -> ML-005/006 experiments -> ML-007 selection -> ML-008
-  calibration) has NOT been executed yet; that is the natural next milestone
-  after the surfaces, or sooner if empirical metrics are wanted now.
-- PIPE-001 P3s: silent zero-probability fallback in `_positive_class_proba`,
-  malformed-label crash-vs-skip, tz-mixing TypeError.
+- Nothing structurally. Trustworthy model metrics are gated on DATA-016.
 
 ## Current architecture decisions
 
