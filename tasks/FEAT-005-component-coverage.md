@@ -43,10 +43,29 @@ out-of-band workaround.
 Decide and implement an explicit, auditable policy for games with incomplete
 component coverage.
 
+## Required classification (do this first)
+
+For EACH of the four games, determine and document which it is:
+
+- a **legitimate exclusion** (e.g. the game genuinely has no pitching line and
+  never will),
+- a **lifecycle/data-source edge case** (e.g. resumed/suspended lineage, a game
+  whose detail lives under a different game_pk),
+- or an **ingestion defect** (the payload exists upstream but we failed to fetch
+  or parse it - in which case it belongs in DATA-016's scope, not here).
+
+Record the finding per game_pk with evidence. Note that 2 of these games also lack
+a `bronze.mlb_game_detail_payloads` row (14,518 payloads vs 14,520 games), so the
+four are unlikely to share a single cause.
+
 ## Requirements
 
+- The throwaway experiment-driver workaround (filtering these games out in an
+  operational script) must NOT be preserved. Encode the correct behavior in
+  production code.
 - Do NOT silently drop games (AGENTS.md data rules).
-- Choose ONE explicit policy and document it in the module docstring:
+- Choose ONE explicit policy per classification and document it in the module
+  docstring:
   (a) emit the game with `None` component features (downstream vectorization
   already fills `NaN`, and model pipelines impute), or
   (b) exclude the game but RETURN the exclusions with `game_pk` + reason so the
@@ -57,6 +76,7 @@ component coverage.
   row present for one team but not the other of a covered game should remain an
   error if that indicates corruption rather than absent source detail).
 - Keep the target isolated and all FEAT-004 guarantees intact.
+- Add regression tests for the encoded behavior.
 
 ## Acceptance criteria
 

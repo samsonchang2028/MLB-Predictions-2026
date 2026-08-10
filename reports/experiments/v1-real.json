@@ -1,4 +1,7 @@
 {
+  "status": "DIAGNOSTIC_ONLY__INVALID_FOR_METHODOLOGY_SELECTION",
+  "invalid_reason": "Ran without meaningful starter/bullpen signal: DATA-016 found the game-detail fields= projection dropped all pitching stats, so silver.pitcher_appearances stat columns were 100% NULL and 58 of 211 Gold feature columns were entirely empty. Model-family, training-window, and calibration-method conclusions in this artifact are NOT locked and must be re-derived after repaired ingestion + certification PASS + Gold completeness PASS + leakage tests PASS (see ADR-005).",
+  "retained_for": "provenance and before/after comparison",
   "build_id": "7225f7f46a5e27e9",
   "n_rows": 12146,
   "n_feature_columns": 211,

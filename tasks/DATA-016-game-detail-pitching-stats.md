@@ -99,6 +99,24 @@ contract provable so it cannot silently regress.
   before any long backfill.
 - Raw payloads remain immutable and ingestion idempotent; re-ingestion must be
   resumable (DATA-010 semantics) since the backfill is long (~4.5h previously).
+- PRESERVE THE MINIMAL-PROJECTION PHILOSOPHY: request the pitching stats that
+  FEAT-002/FEAT-003 actually require; do not request play-by-play, pitch-level, or
+  other unnecessary MLB data. Justify each added key.
+- VERIFY AGAINST REAL MLB RESPONSES, not fixtures alone.
+- SMOKE TEST BEFORE ANY FULL BACKFILL: a small real-data smoke backfill covering
+  MULTIPLE COMPLETED games (across more than one season/date) must run first, and
+  its pitcher-stat population must be inspected before the full re-ingest is
+  launched. The Orchestrator gates the long run on this result.
+- DO NOT accept a payload merely because a `stats` object EXISTS. Assert the
+  required NESTED values are actually present and meaningful for the fields
+  FEAT-002/FEAT-003 consume: innings pitched, outs, earned runs, hits allowed,
+  walks, strikeouts, batters faced (and pitches where required). An empty or
+  all-zero-across-the-board stat object is a failure, not a pass.
+- Confirm ACTUAL STARTERS AND RELIEVERS remain identifiable after the projection
+  change (`is_actual_starter` / appearance ordering must still resolve).
+- The repaired backfill must regenerate the affected Bronze/Silver lineage using
+  the existing immutability/versioning conventions. Do NOT silently reuse the
+  hollow historical pitcher data.
 - After re-ingest, `silver.pitcher_appearances` stat columns must be
   substantially non-null and the feature matrix must have no fully-empty
   starter/bullpen columns.

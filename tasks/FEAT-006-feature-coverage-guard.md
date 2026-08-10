@@ -33,18 +33,50 @@ rather than sparse data.
 
 ## Goal
 
-Make feature coverage explicit, reported, and enforceable.
+Add a GOLD PRE-MODEL COMPLETENESS GATE: before ML experiments may run, the Gold
+feature matrix must produce a feature-completeness report, and a required feature
+family that is effectively absent must BLOCK the experiments.
 
 ## Requirements
 
 - Compute per-column coverage (non-null rate) for the published feature columns
   and include it in the matrix result (e.g. `feature_coverage`), so callers and
   reports can see it without recomputation.
-- A feature column with ZERO observed values across the whole build must not pass
-  silently. Default behavior should FAIL the build with the offending column names
-  (they indicate an upstream defect), with an explicit, documented opt-out
-  parameter for legitimate cold-start/small-slate inference builds where sparse
-  coverage is expected.
+- Produce a FAMILY-LEVEL report over the declared V1 families - at minimum
+  **team, starter, bullpen, rest/schedule** - reporting, per family, required
+  columns present and population status, conceptually:
+
+  ```
+  TEAM FEATURES
+    required columns ........ PASS
+    population .............. PASS
+
+  STARTER FEATURES
+    required columns ........ PASS/FAIL
+    population .............. PASS/FAIL
+
+  BULLPEN FEATURES
+    required columns ........ PASS/FAIL
+    population .............. PASS/FAIL
+
+  REST FEATURES
+    required columns ........ PASS/FAIL
+    population .............. PASS/FAIL
+  ```
+
+- The gate must DETECT: entirely null feature columns; entirely missing required
+  feature families; unexpected CONSTANT columns; feature families with
+  implausibly low population; and unresolved missingness that would cause the
+  model to effectively ignore a planned feature family.
+- Any required feature family that is effectively absent must BLOCK ML
+  experiments (fail the gate).
+- **DO NOT solve this by automatically dropping broken features.** A broken
+  planned feature family must be repaired, or explicitly removed from project
+  methodology through an accepted ADR. Auto-dropping is forbidden because it hides
+  the defect - exactly how this incident went unnoticed.
+- Declare the required families/columns explicitly in code and document the
+  population thresholds with reasons (legitimate sparsity, e.g. early-2021
+  starters lacking prior-season history, must not be treated as failure).
 - Distinguish the build-time case (full historical matrix - dead column = defect)
   from the inference case (a one-day slate legitimately lacks history), so the
   PIPE-001 declared-column-union path is not broken by this guard.
@@ -53,8 +85,11 @@ Make feature coverage explicit, reported, and enforceable.
 
 ## Acceptance criteria
 
-- A matrix build containing an all-empty feature column fails with that column
-  named, and the message points at upstream data rather than the feature code.
-- Coverage is exposed in the result and covered by tests.
-- A legitimately sparse inference build still works via the documented opt-out.
+- A matrix build containing an all-empty feature column or an absent required
+  family FAILS the gate, naming the column(s)/family and pointing at upstream data
+  rather than the feature code.
+- The family-level completeness report is produced, exposed, and tested.
+- A constant column is detected.
+- Legitimate sparsity does not fail; thresholds are documented with reasons.
+- A legitimately sparse inference build still works via the documented path.
 - Existing FEAT-004 tests and the PIPE-001 pipeline tests remain green.
