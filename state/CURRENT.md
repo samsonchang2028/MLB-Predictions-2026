@@ -64,6 +64,12 @@ V1 historical data completion and certification planning.
   from team/starter/bullpen features (home/away + differentials), target
   (home_win) isolated from features, prediction timestamp + certified build
   identity retained, uniqueness/cardinality enforced. Completed (merged).
+- ML-001/002/003 - probabilistic P(home_win) model families completed (merged):
+  logistic regression (`src/models/logistic.py`), random forest
+  (`src/models/random_forest.py`), XGBoost (`src/models/xgboost_model.py`). All
+  expose the shared `build_model`/`predict_proba`/`model_metadata` contract so the
+  ML-004 walk-forward evaluator can drive them uniformly. scikit-learn + xgboost
+  added as dependencies.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -95,28 +101,26 @@ to certify cleanly.
 
 ## Ready
 
-- ML-001 - logistic regression baseline. Unblocked by FEAT-004.
-- ML-002 - random forest. Unblocked by FEAT-004.
-- ML-003 - XGBoost. Unblocked by FEAT-004.
-  All three consume the FEAT-004 game feature matrix and may run in parallel.
-  Note: ML-002 (scikit-learn) and ML-003 (xgboost) will add dependencies; the
-  primary metrics are log loss / Brier / calibration (ADR-003), 2026 stays
-  untouched, and folds must be chronological.
+- ML-004 - walk-forward validation framework. Unblocked: ML-001/002/003 merged
+  and expose the shared `build_model`/`predict_proba`/`model_metadata` contract.
+  Owns `src/evaluation/splits.py` + `src/evaluation/runner.py`; must own the
+  feature-dict->array vectorization + folds, fit preprocessing inside each fold,
+  keep folds chronological with no train/test overlap, and exclude 2026.
 
 ## Next required action
 
-Dispatch ML-001, ML-002, ML-003 in parallel (separate model modules) on the
-FEAT-004 matrix. They feed ML-004 (walk-forward), then ML-005/006 windows,
-ML-007 comparison, ML-008 calibration.
+Dispatch ML-004 (walk-forward evaluator) as the single integration node that
+drives all three model families uniformly on the FEAT-004 matrix. It then
+unlocks ML-005 (expanding) and ML-006 (rolling) window experiments in parallel.
 
 ## Safe parallel
 
-- ML-001, ML-002, ML-003 own separate model modules and may run in parallel.
+- None right now (ML-004 is a single integration node). After ML-004,
+  ML-005 and ML-006 may run in parallel.
 
 ## Blocked
 
-- ML-004 (walk-forward) - waits for ML-001/002/003.
-- ML-005..008, PIPE-001, APP/OBS - downstream.
+- ML-005/006 - wait for ML-004; ML-007 (comparison) -> ML-008 (calibration).
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions

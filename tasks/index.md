@@ -27,10 +27,10 @@ format.
 | FEAT-002 | done | DATA-007 | merged; point-in-time starter features (`src/features/starter.py`), leakage-tested |
 | FEAT-003 | done | DATA-007 | merged; point-in-time bullpen features (`src/features/bullpen.py`), leakage-tested |
 | FEAT-004 | done | DATA-007, FEAT-001/002/003 | merged; game feature matrix (`src/features/build.py`), target isolated, leakage-tested |
-| ML-001 | in-progress | FEAT-004 | dispatched; logistic regression; parallel with ML-002/003 |
-| ML-002 | in-progress | FEAT-004 | dispatched; random forest; parallel with ML-001/003 |
-| ML-003 | in-progress | FEAT-004 | dispatched; XGBoost; parallel with ML-001/002 |
-| ML-004 | blocked | ML-001/002/003 | shared validator |
+| ML-001 | done | FEAT-004 | merged; logistic regression (`src/models/logistic.py`), shared contract |
+| ML-002 | done | FEAT-004 | merged; random forest (`src/models/random_forest.py`), shared contract |
+| ML-003 | done | FEAT-004 | merged; XGBoost (`src/models/xgboost_model.py`), shared contract |
+| ML-004 | ready | ML-001/002/003 | UNBLOCKED; walk-forward validation framework; drives all three via build_model contract |
 | ML-005 | blocked | ML-004 | parallel with ML-006 |
 | ML-006 | blocked | ML-004 | parallel with ML-005 |
 | ML-007 | blocked | ML-005/006 | comparison |
