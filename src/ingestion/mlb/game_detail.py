@@ -19,17 +19,55 @@ ENDPOINT_TEMPLATE = "/api/v1.1/game/{game_pk}/feed/live"
 DEFAULT_SEASONS = (2021, 2022, 2023, 2024, 2025)
 BUILD_ID = "DATA-005"
 
-# One filtered live-feed request provides probable starters and boxscore data
-# without retaining play-by-play or pitch-level content. The boxscore ``players``
-# object is keyed by dynamic ids (e.g. "ID660271") that cannot be enumerated in a
-# static allowlist; listing it makes the live feed return ``players`` empty, which
-# then breaks silver pitcher-stat extraction. So ``players`` and its sub-keys are
-# deliberately omitted here and the full players subtree is returned unfiltered.
+# One filtered live-feed request provides probable starters and boxscore pitching
+# lines without retaining play-by-play or pitch-level content.
+#
+# MLB ``fields=`` is an allowlist applied at EVERY nesting level. Two API
+# semantics shape this list (DATA-016 P0 incident):
+#   * The boxscore ``players`` object is keyed by dynamic ids (e.g. "ID660271").
+#     Listing ``players`` itself empties the subtree, so it is deliberately
+#     UNLISTED; the dynamic-id entries are still returned because their listed
+#     descendants (``person`` id/fullName and the pitching leaf keys below) match.
+#   * A leaf key is returned ONLY if it is listed. The prior projection listed the
+#     identity leaves (``id``/``fullName``, so ``person`` came back populated) but
+#     omitted the pitching-stat leaves, so the API returned ``stats: {}`` for every
+#     player and silver.pitcher_appearances landed 100% NULL. The stat leaves must
+#     therefore be listed explicitly.
+#
+# Only the pitching-line values FEAT-002 (starter) and FEAT-003 (bullpen) consume
+# are added; no play-by-play, pitch-level, batting, or seasonStats data is
+# requested. Each added leaf maps to a silver.pitcher_appearances column.
 GAME_DETAIL_FIELDS = ",".join(
     (
+        # navigation + identity: locate the game, probable starters, each team
+        # boxscore, its ordered ``pitchers`` list, and each player ``person``.
         "gamePk", "gameData", "probablePitchers", "away", "home", "id",
         "fullName", "liveData", "boxscore", "teams", "team", "pitchers",
+        # stat containers: without ``stats`` + ``pitching`` the leaves below are
+        # unreachable and the whole line collapses to ``{}``.
+        "stats", "pitching",
+        # pitching-line leaves (each -> a silver.pitcher_appearances column):
+        "inningsPitched",   # innings_pitched (IP text)
+        "outs",             # outs_recorded (workload; IP = outs/3)
+        "battersFaced",     # batters_faced (K%/BB% denominator)
+        "numberOfPitches",  # pitches_thrown (prev-start / bullpen workload)
+        "hits",             # hits_allowed (WHIP)
+        "runs",             # runs_allowed (line completeness / sanity)
+        "earnedRuns",       # earned_runs (ERA)
+        "baseOnBalls",      # walks (WHIP, BB%)
+        "strikeOuts",       # strikeouts (K%)
+        "homeRuns",         # home_runs_allowed (line completeness)
     )
+)
+
+# A boxscore pitcher (one listed in a team's ``pitchers`` array) actually threw,
+# so a completed game must carry a real pitching line for them. These are the
+# leaves FEAT-002/FEAT-003 need; their absence means the ``fields`` projection
+# silently dropped the stats (the DATA-016 defect), which must fail ingestion
+# rather than persist a hollow row.
+_REQUIRED_PITCHING_STATS = (
+    "inningsPitched", "outs", "battersFaced",
+    "earnedRuns", "hits", "baseOnBalls", "strikeOuts",
 )
 
 
@@ -245,7 +283,63 @@ def _validate_payload(payload: object, expected_game_pk: int) -> str:
         raise ValueError(
             f"game-detail gamePk {game_pk!r} does not match requested {expected_game_pk}"
         )
+    _assert_pitching_stats_present(response, expected_game_pk)
     return text
+
+
+def _assert_pitching_stats_present(response: dict[str, Any], game_pk: int) -> None:
+    """Reject a hollow boxscore: every listed pitcher must carry a real line.
+
+    A pitcher listed in a team's boxscore ``pitchers`` array actually took the
+    mound, so their ``stats.pitching`` must contain the required nested values.
+    An empty ``stats: {}`` (the DATA-016 projection defect) or an all-zero,
+    no-activity line is a defect caught here, at the earliest point, instead of
+    being persisted as NULL silver rows. Games with no boxscore pitchers
+    (postponed/cancelled/suspended-before-play) are left untouched: they have
+    empty ``pitchers`` arrays and legitimately carry no line.
+    """
+    live_data = response.get("liveData")
+    boxscore = live_data.get("boxscore") if isinstance(live_data, dict) else None
+    teams = boxscore.get("teams") if isinstance(boxscore, dict) else None
+    if not isinstance(teams, dict):
+        return
+    for side in ("home", "away"):
+        side_box = teams.get(side)
+        if not isinstance(side_box, dict):
+            continue
+        pitchers = side_box.get("pitchers")
+        if not isinstance(pitchers, list) or not pitchers:
+            continue
+        players = side_box.get("players")
+        players = players if isinstance(players, dict) else {}
+        for pitcher_id in pitchers:
+            player = players.get(f"ID{pitcher_id}")
+            stats = player.get("stats") if isinstance(player, dict) else None
+            pitching = stats.get("pitching") if isinstance(stats, dict) else None
+            if not isinstance(pitching, dict) or not pitching:
+                raise ValueError(
+                    f"game-detail game_pk {game_pk} {side} pitcher {pitcher_id} has "
+                    f"empty pitching stats: hollow boxscore payload (projection defect)"
+                )
+            missing = [
+                key for key in _REQUIRED_PITCHING_STATS if pitching.get(key) is None
+            ]
+            if missing:
+                raise ValueError(
+                    f"game-detail game_pk {game_pk} {side} pitcher {pitcher_id} is "
+                    f"missing required pitching stats {missing}: hollow boxscore payload"
+                )
+            outs = pitching.get("outs")
+            faced = pitching.get("battersFaced")
+            recorded_activity = (
+                (isinstance(outs, int) and not isinstance(outs, bool) and outs > 0)
+                or (isinstance(faced, int) and not isinstance(faced, bool) and faced > 0)
+            )
+            if not recorded_activity:
+                raise ValueError(
+                    f"game-detail game_pk {game_pk} {side} pitcher {pitcher_id} has an "
+                    f"all-zero pitching line (no outs or batters faced): hollow payload"
+                )
 
 
 def _retain_raw_payload(root: str | Path, relative_path: Path, payload: bytes) -> Path:
