@@ -30,7 +30,7 @@ format.
 | ML-001 | done | FEAT-004 | merged; logistic regression (`src/models/logistic.py`), shared contract |
 | ML-002 | done | FEAT-004 | merged; random forest (`src/models/random_forest.py`), shared contract |
 | ML-003 | done | FEAT-004 | merged; XGBoost (`src/models/xgboost_model.py`), shared contract |
-| ML-004 | ready | ML-001/002/003 | UNBLOCKED; walk-forward validation framework; drives all three via build_model contract |
+| ML-004 | in-progress | ML-001/002/003 | dispatched; walk-forward validation framework (`src/evaluation/`) |
 | ML-005 | blocked | ML-004 | parallel with ML-006 |
 | ML-006 | blocked | ML-004 | parallel with ML-005 |
 | ML-007 | blocked | ML-005/006 | comparison |
