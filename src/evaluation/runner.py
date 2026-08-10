@@ -55,6 +55,7 @@ def run_evaluation(
     *,
     random_state: int = 0,
     model_name: str | None = None,
+    return_predictions: bool = False,
 ) -> dict[str, Any]:
     """Evaluate one model family over ``folds`` of ``matrix``.
 
@@ -73,6 +74,13 @@ def run_evaluation(
         Seed threaded into every per-fold ``build_model`` call for determinism.
     model_name:
         Optional override for the reported family name.
+    return_predictions:
+        When ``False`` (default) the return shape/behavior is unchanged. When
+        ``True`` each per-fold report gains a ``"predictions"`` list with one
+        ``{game_pk, p_home_win, y_true}`` entry per **labeled** test row of that
+        fold, aligned to the exact probabilities/labels the fold's metrics use
+        (i.e. after the identical unlabeled-drop) and ordered by the runner's
+        chronological ``(game_date, game_pk)`` row order.
 
     Returns
     -------
@@ -84,7 +92,7 @@ def run_evaluation(
     build = _resolve_build_model(model)
     name = model_name or _model_name(model, build)
 
-    X, y, seasons, feature_columns = vectorize_matrix(matrix)
+    X, y, seasons, feature_columns, game_pks = _vectorize(matrix)
 
     fold_reports: list[dict[str, Any]] = []
     pooled_y: list[np.ndarray] = []
@@ -92,11 +100,20 @@ def run_evaluation(
 
     for fold in folds:
         train_idx, test_idx = fold_indices(fold, seasons)
-        metrics, y_test, p_test = _evaluate_fold(
-            build, X, y, train_idx, test_idx, random_state
+        metrics, y_test, p_test, game_pk_test = _evaluate_fold(
+            build, X, y, train_idx, test_idx, random_state, game_pks
         )
         metrics["train_seasons"] = list(fold.train_seasons)
         metrics["test_season"] = fold.test_season
+        if return_predictions:
+            metrics["predictions"] = [
+                {
+                    "game_pk": pk,
+                    "p_home_win": float(p),
+                    "y_true": int(yt),
+                }
+                for pk, p, yt in zip(game_pk_test, p_test, y_test)
+            ]
         fold_reports.append(metrics)
         pooled_y.append(y_test)
         pooled_p.append(p_test)
@@ -126,6 +143,20 @@ def vectorize_matrix(
     ``home_win`` label as ``{0.0, 1.0}`` (``NaN`` for undecided). Rows are ordered
     chronologically by ``(game_date, game_pk)`` so indices are deterministic.
     """
+    X, y, seasons, feature_columns, _game_pks = _vectorize(matrix)
+    return X, y, seasons, feature_columns
+
+
+def _vectorize(
+    matrix: Any,
+) -> tuple[np.ndarray, np.ndarray, list[int], list[str], list[Any]]:
+    """Internal vectorizer that also returns the per-row canonical ``game_pk``.
+
+    Identical to :func:`vectorize_matrix` but additionally returns ``game_pks``
+    in the same chronological ``(game_date, game_pk)`` row order, so callers can
+    recover per-row identity without re-implementing the sort. The public
+    :func:`vectorize_matrix` 4-tuple is preserved by dropping ``game_pks``.
+    """
     rows = _matrix_rows(matrix)
     rows = sorted(rows, key=lambda r: (r["game_date"], r["game_pk"]))
 
@@ -135,6 +166,7 @@ def vectorize_matrix(
     X = np.full((len(rows), len(feature_columns)), np.nan, dtype=float)
     y = np.full(len(rows), np.nan, dtype=float)
     seasons: list[int] = []
+    game_pks: list[Any] = []
 
     for i, row in enumerate(rows):
         features = row.get("features", {}) or {}
@@ -146,8 +178,9 @@ def vectorize_matrix(
         if label is not None:
             y[i] = label
         seasons.append(_row_season(row))
+        game_pks.append(row["game_pk"])
 
-    return X, y, seasons, feature_columns
+    return X, y, seasons, feature_columns, game_pks
 
 
 def _evaluate_fold(
@@ -157,13 +190,24 @@ def _evaluate_fold(
     train_idx: tuple[int, ...],
     test_idx: tuple[int, ...],
     random_state: int,
-) -> tuple[dict[str, Any], np.ndarray, np.ndarray]:
-    """Fit a fresh estimator on the train rows and score the test rows."""
+    game_pks: Sequence[Any] | None = None,
+) -> tuple[dict[str, Any], np.ndarray, np.ndarray, list[Any]]:
+    """Fit a fresh estimator on the train rows and score the test rows.
+
+    Returns ``(metrics, y_test, p_test, game_pk_test)`` where ``game_pk_test`` is
+    the canonical ``game_pk`` for each **labeled** test row, in the same order as
+    ``y_test``/``p_test`` and filtered by the identical unlabeled-drop mask, so
+    the game_pk/probability/label triples stay aligned.
+    """
     train = np.fromiter(train_idx, dtype=int, count=len(train_idx))
     test = np.fromiter(test_idx, dtype=int, count=len(test_idx))
 
     X_train, y_train = _drop_unlabeled(X[train], y[train])
-    X_test, y_test = _drop_unlabeled(X[test], y[test])
+    # Identical unlabeled-drop as _drop_unlabeled, but the mask is retained so the
+    # test-row game_pks can be filtered in lockstep with X_test/y_test.
+    test_mask = ~np.isnan(y[test])
+    X_test = X[test][test_mask]
+    y_test = y[test][test_mask].astype(int)
     if len(y_train) == 0:
         raise ValueError("training partition has no labeled rows")
     if len(y_test) == 0:
@@ -175,7 +219,13 @@ def _evaluate_fold(
 
     metrics = _probability_metrics(y_test, p_test)
     metrics["n_train"] = int(len(y_train))
-    return metrics, y_test, p_test
+
+    if game_pks is None:
+        game_pk_test: list[Any] = []
+    else:
+        kept = test[test_mask]
+        game_pk_test = [game_pks[i] for i in kept]
+    return metrics, y_test, p_test, game_pk_test
 
 
 def _probability_metrics(y_true: np.ndarray, p: np.ndarray) -> dict[str, Any]:
