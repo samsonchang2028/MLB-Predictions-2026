@@ -92,6 +92,12 @@ V1 historical data completion and certification planning.
   ROC-AUC/accuracy secondary), and selects the winner on the common test seasons
   {2024, 2025} for a fair head-to-head. 2026 never used for selection (asserted).
   Completed (merged).
+- ML-008 - probability calibration (`src/evaluation/calibration.py`): Platt/
+  sigmoid + isotonic fitted on a chronological INNER calibration partition of each
+  fold's training rows (base-fit earlier, calibration later, both disjoint from
+  the test fold), comparing calibrated vs uncalibrated log loss / Brier /
+  reliability on identical folds with the same base-fit partition. 2026 untouched.
+  Completed (merged); leakage-tested (a leaky base-fit provably fails the invariant).
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -123,25 +129,30 @@ to certify cleanly.
 
 ## Ready
 
-- ML-008 - probability calibration. Unblocked: ML-007 merged (model x window
-  comparison selects the winner by primary metrics on the common test seasons
-  {2024, 2025}). Fit/select the calibration method on development folds only,
-  refit calibrators inside the appropriate training partition, and keep 2026
-  untouched (ADR-003: calibration-method selection excludes 2026).
+- MARKET-001 - market probability and edge engine. Unblocked: BOTH deps merged
+  (DATA-009 odds archive validated - 69,901 archive moneylines, 12,367 MATCHED;
+  ML-008 calibration merged). Owns `src/market/` + `tests/unit/market/`: American
+  odds conversion, two-way no-vig normalization, edge + expected value,
+  deterministic formula tests. Constraints: preserve the odds timestamp used for
+  live/future predictions; archive opening odds support model-vs-opening-market
+  only; never use closing/current-style odds as a pregame input unless the
+  prediction timestamp is actually at close (post-hoc benchmark only); label
+  archive ROI as simulated ROI at opening prices.
 
 ## Next required action
 
-Dispatch ML-008 (probability calibration) as the single node consuming the
-ML-007 comparison / the walk-forward predictions. It then unblocks MARKET-001.
+Dispatch MARKET-001 (single node) to build the market probability/edge engine on
+the validated DATA-009 opening-market inputs. It then unblocks PIPE-001 (daily
+prediction pipeline) -> OBS-001 + APP-001 (parallel).
 
 ## Safe parallel
 
-- None right now (ML-008 is a single node).
+- None right now (MARKET-001 is a single node).
 
 ## Blocked
 
-- MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
-- PIPE-001 / APP / OBS - downstream of the model + market layer.
+- PIPE-001 - waits for MARKET-001; OBS-001 + APP-001 - wait for PIPE-001
+  (then parallel).
 
 ## Current architecture decisions
 
