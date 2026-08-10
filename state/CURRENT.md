@@ -86,6 +86,12 @@ V1 historical data completion and certification planning.
   (`src/experiments/rolling.py`), each driving all three families via the runner
   and emitting an identical result schema (fold_metrics + game_pk-keyed
   predictions) for ML-007. 2026 never inspected.
+- ML-007 - model family x training-window comparison
+  (`src/experiments/comparison.py`): pools run_expanding + run_rolling predictions
+  per (model, window), ranks by primary metrics (log loss -> Brier -> calibration;
+  ROC-AUC/accuracy secondary), and selects the winner on the common test seasons
+  {2024, 2025} for a fair head-to-head. 2026 never used for selection (asserted).
+  Completed (merged).
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -117,26 +123,25 @@ to certify cleanly.
 
 ## Ready
 
-- ML-007 - model family x training-window comparison on development folds only.
-  Unblocked: ML-005 (expanding) + ML-006 (rolling 2/3) merged and emit the
-  identical result schema (fold_metrics + game_pk-keyed predictions). Rank by
-  primary metrics (log loss, Brier, calibration); ROC-AUC/accuracy/ROI secondary.
-  Compare expanding vs rolling on the shared test seasons {2024, 2025}. Never
-  select using 2026.
+- ML-008 - probability calibration. Unblocked: ML-007 merged (model x window
+  comparison selects the winner by primary metrics on the common test seasons
+  {2024, 2025}). Fit/select the calibration method on development folds only,
+  refit calibrators inside the appropriate training partition, and keep 2026
+  untouched (ADR-003: calibration-method selection excludes 2026).
 
 ## Next required action
 
-Dispatch ML-007 (single comparison node) consuming run_expanding + run_rolling
-outputs. It then feeds ML-008 (calibration) -> MARKET-001.
+Dispatch ML-008 (probability calibration) as the single node consuming the
+ML-007 comparison / the walk-forward predictions. It then unblocks MARKET-001.
 
 ## Safe parallel
 
-- None right now (ML-007 is a single comparison node).
+- None right now (ML-008 is a single node).
 
 ## Blocked
 
-- ML-008 (calibration) - waits for ML-007.
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
+- PIPE-001 / APP / OBS - downstream of the model + market layer.
 
 ## Current architecture decisions
 

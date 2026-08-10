@@ -34,8 +34,8 @@ format.
 | ML-004A | done | ML-004 | merged; game_pk-keyed per-fold predictions in runner (`return_predictions`) |
 | ML-005 | done | ML-004A | merged; expanding-window experiment (`src/experiments/expanding.py`), shared schema |
 | ML-006 | done | ML-004A | merged; rolling 2/3-season experiments (`src/experiments/rolling.py`), shared schema |
-| ML-007 | in-progress | ML-005/006 | dispatched; model x window comparison (`src/experiments/comparison.py`); 2026 not used |
-| ML-008 | blocked | ML-007 | calibration |
+| ML-007 | done | ML-005/006 | merged; model x window comparison (`src/experiments/comparison.py`); fair on {2024,2025}; 2026 unused |
+| ML-008 | ready | ML-007 | UNBLOCKED; probability calibration; method selected on dev folds, 2026 untouched |
 | MARKET-001 | blocked | DATA-009, ML-008 | market engine; historical opening benchmark plus live timestamped odds |
 | PIPE-001 | blocked | MARKET-001 | daily production |
 | OBS-001 | blocked | PIPE-001 | parallel with APP-001 |
