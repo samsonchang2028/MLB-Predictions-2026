@@ -38,8 +38,8 @@ format.
 | ML-008 | done | ML-007 | merged; calibration (`src/evaluation/calibration.py`), inner calibration split, leakage-tested |
 | MARKET-001 | done | DATA-009, ML-008 | merged; market engine (`src/market/`); no-vig, edge, EV; timestamp-guarded; opening-benchmark only |
 | PIPE-001 | done | MARKET-001 | merged; daily pipeline (`src/pipelines/daily.py`); immutable idempotent records; PIT-guarded |
-| OBS-001 | in-progress | PIPE-001 | dispatched; prediction journal (`src/observability/`); parallel with APP-001 |
-| APP-001 | in-progress | PIPE-001 | dispatched; Streamlit board (`src/app/`); parallel with OBS-001 |
+| OBS-001 | ready | PIPE-001 | UNBLOCKED; prediction journal; parallel with APP-001 (dispatch deferred for real-data run) |
+| APP-001 | ready | PIPE-001 | UNBLOCKED; Streamlit board; parallel with OBS-001 (dispatch deferred for real-data run) |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
 
 ## Status transitions
