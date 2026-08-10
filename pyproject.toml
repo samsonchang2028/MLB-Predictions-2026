@@ -18,6 +18,9 @@ dependencies = [
 test = [
     "pytest>=8,<10",
 ]
+app = [
+    "streamlit>=1.37,<2",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
