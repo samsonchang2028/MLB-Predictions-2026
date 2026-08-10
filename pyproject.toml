@@ -10,6 +10,8 @@ dependencies = [
     "duckdb>=1.4,<2",
     "pytz>=2024.1",
     "MLB-StatsAPI>=1.9,<2",
+    "scikit-learn>=1.4,<2",
+    "xgboost>=2,<4",
 ]
 
 [project.optional-dependencies]
