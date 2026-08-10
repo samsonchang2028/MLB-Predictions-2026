@@ -32,9 +32,9 @@ format.
 | ML-003 | done | FEAT-004 | merged; XGBoost (`src/models/xgboost_model.py`), shared contract |
 | ML-004 | done | ML-001/002/003 | merged; walk-forward framework (`src/evaluation/`), drives all 3 families; leakage-tested |
 | ML-004A | done | ML-004 | merged; game_pk-keyed per-fold predictions in runner (`return_predictions`) |
-| ML-005 | in-progress | ML-004A | dispatched; expanding-window experiment; parallel with ML-006 |
-| ML-006 | in-progress | ML-004A | dispatched; rolling-window experiments; parallel with ML-005 |
-| ML-007 | blocked | ML-005/006 | comparison |
+| ML-005 | done | ML-004A | merged; expanding-window experiment (`src/experiments/expanding.py`), shared schema |
+| ML-006 | done | ML-004A | merged; rolling 2/3-season experiments (`src/experiments/rolling.py`), shared schema |
+| ML-007 | ready | ML-005/006 | UNBLOCKED; model x window comparison on dev folds; 2026 not used |
 | ML-008 | blocked | ML-007 | calibration |
 | MARKET-001 | blocked | DATA-009, ML-008 | market engine; historical opening benchmark plus live timestamped odds |
 | PIPE-001 | blocked | MARKET-001 | daily production |

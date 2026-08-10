@@ -76,6 +76,16 @@ V1 historical data completion and certification planning.
   FEAT-004 matrix, per-fold fresh-model fit (preprocessing inside the fold), and
   probability-quality metrics (log loss/Brier/calibration; ROC-AUC/accuracy
   secondary) across all three families. Completed (merged); leakage-tested.
+- ML-004A - game_pk-keyed per-fold predictions in the runner
+  (`run_evaluation(..., return_predictions=True)`): opt-in per-fold prediction
+  table [{game_pk, p_home_win, y_true}] for labeled test rows, aligned after the
+  unlabeled-drop backing the metrics; default return shape unchanged. Single
+  source of truth for experiment predictions. Completed (merged).
+- ML-005/006 - development window experiments completed (merged): expanding
+  (`src/experiments/expanding.py`, 4 ADR-003 folds) and rolling 2/3-season
+  (`src/experiments/rolling.py`), each driving all three families via the runner
+  and emitting an identical result schema (fold_metrics + game_pk-keyed
+  predictions) for ML-007. 2026 never inspected.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -107,25 +117,25 @@ to certify cleanly.
 
 ## Ready
 
-- ML-005 - expanding-window experiment. Unblocked by ML-004.
-- ML-006 - rolling-window experiments (2-season and 3-season). Unblocked by ML-004.
-  Both use the ML-004 evaluator over the three model families and may run in
-  parallel. NOTE (ML-004 P3): rolling schemes share test seasons {2024, 2025};
-  ML-007 must compare expanding vs rolling on those shared folds.
+- ML-007 - model family x training-window comparison on development folds only.
+  Unblocked: ML-005 (expanding) + ML-006 (rolling 2/3) merged and emit the
+  identical result schema (fold_metrics + game_pk-keyed predictions). Rank by
+  primary metrics (log loss, Brier, calibration); ROC-AUC/accuracy/ROI secondary.
+  Compare expanding vs rolling on the shared test seasons {2024, 2025}. Never
+  select using 2026.
 
 ## Next required action
 
-Dispatch ML-005 (expanding) and ML-006 (rolling) in parallel using the ML-004
-runner + splits. They feed ML-007 (model/window comparison) -> ML-008
-(calibration) -> MARKET-001.
+Dispatch ML-007 (single comparison node) consuming run_expanding + run_rolling
+outputs. It then feeds ML-008 (calibration) -> MARKET-001.
 
 ## Safe parallel
 
-- ML-005 and ML-006 own separate experiment modules and may run in parallel.
+- None right now (ML-007 is a single comparison node).
 
 ## Blocked
 
-- ML-007 (comparison) - waits for ML-005/006; ML-008 (calibration) - after ML-007.
+- ML-008 (calibration) - waits for ML-007.
 - MARKET-001 - waits for ML-008 (DATA-009 opening-market inputs are ready).
 
 ## Current architecture decisions
