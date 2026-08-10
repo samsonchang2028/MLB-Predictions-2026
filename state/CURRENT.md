@@ -106,6 +106,16 @@ V1 historical data completion and certification planning.
   archive opening odds labeled model-edge-vs-opening-market / simulated ROI at
   opening prices; UNMATCHED/AMBIGUOUS DATA-009 records excluded from canonical
   evaluation. Completed (merged); formulas pinned to hand-verified known values.
+- PIPE-001 - daily prediction pipeline (`src/pipelines/daily.py`): one
+  deterministic run with injected providers (no forced network/DB) producing
+  IMMUTABLE append-only prediction records carrying game_pk, prediction_timestamp,
+  model_version, build_id (feature/schema version), model_probability,
+  odds_snapshot_timestamp, no-vig market_probability and edge. Enforces
+  prediction_timestamp < first pitch and snapshot < cutoff (ADR-002), skipping
+  violators with an explicit reason; re-runs are idempotent and a conflicting
+  re-write raises. CLOSES the FEAT-004 P2 gap: inference features come from the
+  declared training column union (missing -> NaN in order; unexpected column
+  raises schema drift). Completed (merged).
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
@@ -137,28 +147,36 @@ to certify cleanly.
 
 ## Ready
 
-- PIPE-001 - daily prediction pipeline. Unblocked: MARKET-001 merged, so the full
-  chain exists (certified data -> FEAT-004 matrix -> model families -> walk-forward
-  + calibration -> market edge/EV). Must respect: prediction_timestamp strictly
-  before first pitch (ADR-002), only odds snapshots that exist before the cutoff,
-  idempotent/reproducible daily runs, and the FEAT-004 P2 caveat that a cold-start
-  inference build can omit diff_ columns present in training (base the inference
-  feature columns on a declared column union, not the observed rows).
+- OBS-001 - prediction journal / observability over the immutable PIPE-001
+  records. Unblocked by PIPE-001.
+- APP-001 - app/UI surface over the daily predictions. Unblocked by PIPE-001.
+  Both read the PIPE-001 prediction records and own separate surfaces, so they
+  may run in parallel. Neither may mutate prediction records (append-only) and
+  neither may re-derive market/model math - consume the stored record fields.
 
 ## Next required action
 
-Dispatch PIPE-001 (daily prediction pipeline) wiring features -> selected model
-+ calibration -> market edge/EV into a reproducible daily run. It then unblocks
-OBS-001 (prediction journal) and APP-001, which may run in parallel.
+Dispatch OBS-001 and APP-001 in parallel over the immutable prediction records.
 
 ## Safe parallel
 
-- None right now (PIPE-001 is a single integration node). After PIPE-001,
-  OBS-001 and APP-001 may run in parallel.
+- OBS-001 and APP-001 own separate surfaces and may run in parallel.
 
 ## Blocked
 
-- OBS-001 + APP-001 - wait for PIPE-001 (then parallel).
+- None. The V1 chain (ingest -> certify -> features -> models -> validation ->
+  calibration -> market -> daily pipeline) is complete and merged; only the
+  observability/app surfaces remain.
+
+## Deferred / follow-ups worth scheduling
+
+- Real-data execution: the model + market + pipeline layers are unit/leakage
+  tested on synthetic matrices. A real run over the certified 2021-2025 build
+  (FEAT-004 matrix -> ML-005/006 experiments -> ML-007 selection -> ML-008
+  calibration) has NOT been executed yet; that is the natural next milestone
+  after the surfaces, or sooner if empirical metrics are wanted now.
+- PIPE-001 P3s: silent zero-probability fallback in `_positive_class_proba`,
+  malformed-label crash-vs-skip, tz-mixing TypeError.
 
 ## Current architecture decisions
 

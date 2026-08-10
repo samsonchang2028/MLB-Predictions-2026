@@ -37,9 +37,9 @@ format.
 | ML-007 | done | ML-005/006 | merged; model x window comparison (`src/experiments/comparison.py`); fair on {2024,2025}; 2026 unused |
 | ML-008 | done | ML-007 | merged; calibration (`src/evaluation/calibration.py`), inner calibration split, leakage-tested |
 | MARKET-001 | done | DATA-009, ML-008 | merged; market engine (`src/market/`); no-vig, edge, EV; timestamp-guarded; opening-benchmark only |
-| PIPE-001 | in-progress | MARKET-001 | dispatched; daily prediction pipeline (`src/pipelines/daily.py`); immutable records |
-| OBS-001 | blocked | PIPE-001 | parallel with APP-001 |
-| APP-001 | blocked | PIPE-001 | parallel with OBS-001 |
+| PIPE-001 | done | MARKET-001 | merged; daily pipeline (`src/pipelines/daily.py`); immutable idempotent records; PIT-guarded |
+| OBS-001 | ready | PIPE-001 | UNBLOCKED; prediction journal; parallel with APP-001 |
+| APP-001 | ready | PIPE-001 | UNBLOCKED; UI/app surface; parallel with OBS-001 |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
 
 ## Status transitions
