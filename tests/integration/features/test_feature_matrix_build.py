@@ -132,6 +132,7 @@ def _build_matrix(games, tgs, appearances):
         bullpen_features=bullpen,
         results=tgs,
         certification=_cert(),
+        completeness_mode="inference",
     )
 
 

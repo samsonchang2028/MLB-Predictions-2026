@@ -65,6 +65,7 @@ from evaluation.runner import (
     vectorize_matrix,
 )
 from evaluation.splits import Fold, fold_indices
+from features.completeness import require_historical_feature_completeness
 
 # Platt/sigmoid + isotonic are the ML-008 candidate calibration methods.
 CALIBRATION_METHODS: tuple[str, ...] = ("sigmoid", "isotonic")
@@ -106,6 +107,7 @@ def evaluate_calibration(
             f"method must be one of {CALIBRATION_METHODS}, got {method!r}"
         )
 
+    require_historical_feature_completeness(matrix)
     build = _resolve_build_model(model)
     name = _model_name(model, build)
     X, y, seasons, feature_columns = vectorize_matrix(matrix)
@@ -179,6 +181,7 @@ def compare_calibration(
                 f"method must be one of {CALIBRATION_METHODS}, got {m!r}"
             )
 
+    require_historical_feature_completeness(matrix)
     build = _resolve_build_model(model)
     name = _model_name(model, build)
     X, y, seasons, feature_columns = vectorize_matrix(matrix)

@@ -57,6 +57,19 @@ def _synthetic_matrix(
     return {"feature_columns": [], "rows": rows}
 
 
+def test_published_gold_matrix_requires_historical_completeness_pass() -> None:
+    matrix = _synthetic_matrix()
+    matrix.update(
+        {
+            "build_id": "certified-build",
+            "certification_status": "PASS",
+            "feature_completeness": {"mode": "inference", "status": "WARN"},
+        }
+    )
+    with pytest.raises(ValueError, match="historical feature completeness PASS"):
+        run_evaluation(logistic, matrix, expanding_folds())
+
+
 def test_vectorize_stable_sorted_schema_with_nan_fill() -> None:
     rows = [
         {

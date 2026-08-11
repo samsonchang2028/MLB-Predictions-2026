@@ -27,7 +27,8 @@ in any row's ``features`` mapping (target-isolation contract, below).
 Target-isolation contract
 --------------------------
 ``build_feature_matrix`` returns ``{build_id, certification_status,
-feature_columns, rows, excluded}``. Each row is::
+feature_columns, feature_coverage, feature_completeness, rows, excluded}``.
+Each row is::
 
     {
         "game_pk": <int>,
@@ -118,6 +119,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from features.completeness import (
+    HISTORICAL_MODE,
+    FeatureCompletenessError,
+    build_feature_completeness_report,
+)
+
 # Component keys that are join keys / metadata rather than predictive features.
 _NON_FEATURE_KEYS = frozenset(
     {"game_pk", "team_id", "side", "is_home", "game_date", "season"}
@@ -138,6 +145,7 @@ def build_feature_matrix(
     bullpen_features: Sequence[Mapping[str, Any]],
     results: Sequence[Mapping[str, Any]],
     certification: Mapping[str, Any],
+    completeness_mode: str = HISTORICAL_MODE,
 ) -> dict[str, Any]:
     """Build one Gold feature row per regular-season MLB game.
 
@@ -156,6 +164,11 @@ def build_feature_matrix(
     certification:
         Certification artifact mapping (ADR-004). Must have ``status == 'PASS'``
         and ``dataset.fingerprint``; otherwise publication is refused.
+    completeness_mode:
+        ``"historical"`` (default) applies the blocking Gold pre-model gate.
+        ``"inference"`` produces the same report with non-blocking WARNs for a
+        legitimately sparse current slate; PIPE-001 uses that path while keeping
+        its declared training-column union.
     """
     build_id = _certified_build_id(certification)
 
@@ -214,10 +227,17 @@ def build_feature_matrix(
         )
 
     _assert_unique_game_rows(rows)
+    completeness = build_feature_completeness_report(
+        feature_columns, rows, mode=completeness_mode
+    )
+    if completeness_mode == HISTORICAL_MODE and completeness["status"] != "PASS":
+        raise FeatureCompletenessError(completeness)
     return {
         "build_id": build_id,
         "certification_status": "PASS",
         "feature_columns": feature_columns,
+        "feature_coverage": completeness["columns"],
+        "feature_completeness": completeness,
         "rows": rows,
         "excluded": excluded,
     }

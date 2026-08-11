@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import pytest
 
 from features.build import build_feature_matrix
+from features.completeness import FeatureCompletenessError
 
 
 def _dt(stamp: str) -> datetime:
@@ -105,6 +106,7 @@ def _build(**overrides):
         "bullpen_features": bullpen,
         "results": results,
         "certification": _cert(),
+        "completeness_mode": "inference",
     }
     kwargs.update(overrides)
     games = overrides.get("games", games)
@@ -120,6 +122,22 @@ def test_one_row_per_game_with_metadata() -> None:
     assert row["away_team_id"] == 20
     assert row["game_date"] == _dt("2024-04-01T19:00:00")
     assert row["prediction_timestamp"] == row["game_date"]
+
+
+def test_result_exposes_gold_coverage_report() -> None:
+    matrix = _build()
+    assert matrix["feature_coverage"] == matrix["feature_completeness"]["columns"]
+    assert set(matrix["feature_completeness"]["families"]) == {
+        "team", "starter", "bullpen", "rest_schedule"
+    }
+    assert matrix["feature_completeness"]["mode"] == "inference"
+
+
+def test_historical_mode_blocks_incomplete_declared_v1_contract() -> None:
+    with pytest.raises(FeatureCompletenessError) as caught:
+        _build(completeness_mode="historical")
+    assert caught.value.report["status"] == "FAIL"
+    assert caught.value.report["families"]["team"]["missing_required_columns"]
 
 
 def test_home_away_and_diff_features_present() -> None:
@@ -299,6 +317,7 @@ def _build_two(*, bullpen=None, starter=None):
         bullpen_features=bullpen if bullpen is not None else b,
         results=results,
         certification=_cert(),
+        completeness_mode="inference",
     )
 
 

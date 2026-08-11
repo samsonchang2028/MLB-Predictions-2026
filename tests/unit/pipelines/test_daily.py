@@ -122,6 +122,7 @@ def _training_columns(schedule, team, starter, bullpen, extra=()):
         bullpen_features=bullpen,
         results=[],
         certification=_cert(),
+        completeness_mode="inference",
     )
     return list(matrix["feature_columns"]) + list(extra)
 
@@ -209,6 +210,7 @@ def test_inference_uses_declared_training_columns_missing_filled_nan() -> None:
     rows = build_feature_matrix(
         schedule, team_features=team, starter_features=starter,
         bullpen_features=bullpen, results=[], certification=_cert(),
+        completeness_mode="inference",
     )["rows"]
 
     X, columns, game_pks = build_inference_matrix(rows, declared)
