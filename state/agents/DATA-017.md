@@ -53,4 +53,39 @@
   pre-existing environment gap, not a DATA-017 defect, and were excluded per
   the orchestrator's instructions.)
 - Committed: yes, on `agent/DATA-017-column-coverage`. Not merged to main.
-- Next: dispatch reviewer + tester gates (task file requires both).
+
+## Reviewer + Tester gate — both PASS
+
+**Reviewer verdict: APPROVE.** No P0/P1. Verified (not just trusted) that a
+100%-NULL required column and a required family with zero usable inputs both
+FAIL (not WARN); the generalized constant-value degeneracy check only fires
+above `DEGENERATE_MIN_SAMPLE`; the `_dimension_status` WARN-propagation fix is
+used at both call sites; the `COMPLETED_GAME_PREDICATE` extraction is a
+byte-identical pure refactor (no weakened check); measure-column allowlists are
+hardcoded, not schema-inferred; all 8 thresholds are documented with
+baseball-specific reasoning; and the DATA-006-fixture WARN-assertion fix is
+legitimate (game_pk 400 is genuinely spring training). Re-ran tests: 101 +
+443 passed. Two non-blocking P3s: `HOME_WIN_RATE_MIN_SAMPLE`/
+`FAMILY_EMPTY_MIN_GAMES` are independently-chosen similar-purpose scale gates
+(could use a one-line note on why they differ); `_measure_group_check`
+duplicates some branch logic already in `_column_status` for message wording.
+
+**Tester verdict: LOOKS_SAFE_TO_MERGE.** Re-ran both suites (105/447 after
+additions). Probed: zero-row table vs. all-NULL column (column-level check
+PASSes on an empty table by design, but the family-level check correctly FAILs
+once population scale is met — documented tradeoff, not a gap); constant-zero
+vs. NULL conflation (safe, both require `non_null > 0`); `DEGENERATE_MIN_SAMPLE`
+boundary (correct, no off-by-one); NULL `detailed_state` on a completed game
+(correctly passes through as completed); `detailed_state` containing-but-not-
+prefixed-with "Postponed" (hypothetical, doesn't match any real MLB
+`detailedState` value seen anywhere in the codebase); two simultaneous
+distinct-family failures (both reported, not just the first). Found and closed
+one real test-coverage gap: no existing test drove a **semantic** (as opposed
+to structural) WARN through the certification-layer aggregation functions
+repaired in this task — added 4 regression tests in
+`tests/unit/validation/test_certification.py` (committed `b02dac3`,
+test-only), confirmed they fail against the pre-repair `_dimension_status`
+logic and pass against the candidate.
+
+**Orchestrator decision: MERGE.** No P0/P1 from either gate; all P2/P3s are
+non-blocking and recorded here. Merged to `main`.
