@@ -10,6 +10,7 @@ gate certified PASS.
 from __future__ import annotations
 
 import duckdb
+import pytest
 
 from validation.coverage import (
     DEGENERATE_MIN_SAMPLE,
@@ -38,6 +39,7 @@ def _connection() -> duckdb.DuckDBPyConnection:
                game_pk BIGINT,
                game_type VARCHAR,
                abstract_game_state VARCHAR,
+               detailed_state VARCHAR,
                game_date TIMESTAMP
            )"""
     )
@@ -71,8 +73,8 @@ def _add_game(
     state: str = "Final",
 ) -> None:
     con.execute(
-        "INSERT INTO silver.games VALUES (?, ?, ?, TIMESTAMP '2024-04-10 23:10:00')",
-        [game_pk, game_type, state],
+        "INSERT INTO silver.games VALUES (?, ?, ?, ?, TIMESTAMP '2024-04-10 23:10:00')",
+        [game_pk, game_type, state, state],
     )
     con.execute(
         "INSERT INTO silver.team_game_statistics VALUES (?, 111, 'home', ?, ?), (?, 222, 'away', ?, ?)",
@@ -112,19 +114,20 @@ def _add_appearance(
 
 
 def _full_line(pid: int) -> dict:
+    partial_outs = pid % 3
     return {
-        "innings_pitched": "6.0",
-        "outs_recorded": 18,
-        "batters_faced": 24,
-        "pitches_thrown": 90,
-        "strikes": 60,
-        "balls": 30,
-        "hits_allowed": 5,
-        "runs_allowed": 3 + (pid % 3),
-        "earned_runs": 2 + (pid % 3),
-        "walks": 1,
-        "strikeouts": 7,
-        "home_runs_allowed": 1,
+        "innings_pitched": f"5.{partial_outs}",
+        "outs_recorded": 15 + partial_outs,
+        "batters_faced": 21 + (pid % 7),
+        "pitches_thrown": 80 + (pid % 20),
+        "strikes": 50 + (pid % 15),
+        "balls": 25 + (pid % 8),
+        "hits_allowed": 3 + (pid % 5),
+        "runs_allowed": 1 + (pid % 4),
+        "earned_runs": pid % 4,
+        "walks": pid % 4,
+        "strikeouts": 4 + (pid % 8),
+        "home_runs_allowed": pid % 3,
     }
 
 
@@ -266,6 +269,25 @@ def test_constant_zero_below_scale_does_not_fail() -> None:
     assert result.status == "PASS", result.message
 
 
+@pytest.mark.parametrize(
+    ("column", "value"),
+    [("outs_recorded", 18), ("earned_runs", 2), ("innings_pitched", "6.0")],
+)
+def test_nonzero_constant_required_stat_fails_at_scale(column, value) -> None:
+    con = _connection()
+    _populated_dataset(con, n_games=DEGENERATE_MIN_SAMPLE)
+    con.execute(f"UPDATE silver.pitcher_appearances SET {column} = ?", [value])
+
+    result = _by_check(run_coverage_checks(con))["semantic.pitcher_stat_coverage"]
+    stats = coverage_report(con)["columns"][f"silver.pitcher_appearances.{column}"]
+
+    assert result.status == "FAIL"
+    assert "constant value" in result.message
+    assert stats["distinct_count"] == 1
+    assert stats["is_constant"] is True
+    assert str(value) in str(stats["constant_value"])
+
+
 def test_implausible_outs_per_appearance_hard_fails() -> None:
     """A populated but corrupted stat line is not semantically complete."""
     con = _connection()
@@ -354,6 +376,39 @@ def test_empty_starter_family_at_scale_hard_fails() -> None:
     assert "entirely empty" in result.message
 
 
+def test_empty_bullpen_family_at_scale_hard_fails() -> None:
+    con = _connection()
+    for i in range(40):
+        game_pk = 100 + i
+        _add_game(con, game_pk)
+        _add_appearance(
+            con, game_pk, 111, "home", 900 + i, 1,
+            starter=True, line=_full_line(900 + i),
+        )
+        _add_appearance(
+            con, game_pk, 222, "away", 700 + i, 1,
+            starter=True, line=_full_line(700 + i),
+        )
+    result = _by_check(run_coverage_checks(con))["semantic.feature_family_bullpen"]
+    assert result.status == "FAIL"
+    assert "entirely empty" in result.message
+
+
+def test_empty_rest_schedule_family_at_scale_hard_fails() -> None:
+    con = _connection()
+    for i in range(40):
+        game_pk = 100 + i
+        con.execute(
+            "INSERT INTO silver.games VALUES (?, 'R', 'Final', 'Final', NULL)",
+            [game_pk],
+        )
+    result = _by_check(run_coverage_checks(con))[
+        "semantic.feature_family_rest_schedule"
+    ]
+    assert result.status == "FAIL"
+    assert "NONE are usable" in result.message
+
+
 def test_team_family_reported_and_passes_when_populated() -> None:
     con = _connection()
     _populated_dataset(con, n_games=40)
@@ -403,7 +458,7 @@ def test_all_null_score_fails() -> None:
     for i in range(5):
         game_pk = 100 + i
         con.execute(
-            "INSERT INTO silver.games VALUES (?, 'R', 'Final', TIMESTAMP '2024-04-10 23:10:00')",
+            "INSERT INTO silver.games VALUES (?, 'R', 'Final', 'Final', TIMESTAMP '2024-04-10 23:10:00')",
             [game_pk],
         )
         con.execute(
@@ -414,6 +469,38 @@ def test_all_null_score_fails() -> None:
     assert result.status == "FAIL"
     assert result.blocking is True
     assert "silver.team_game_statistics.score" in result.message
+
+
+def test_all_null_is_winner_fails() -> None:
+    con = _connection()
+    for i in range(5):
+        game_pk = 200 + i
+        _add_game(con, game_pk)
+        con.execute(
+            "UPDATE silver.team_game_statistics SET is_winner = NULL WHERE game_pk = ?",
+            [game_pk],
+        )
+    result = _by_check(run_coverage_checks(con))["semantic.team_outcome_coverage"]
+    assert result.status == "FAIL"
+    assert "silver.team_game_statistics.is_winner" in result.message
+
+
+@pytest.mark.parametrize("lifecycle", ["Postponed", "Suspended: Rain", "Cancelled"])
+def test_final_lifecycle_exclusions_do_not_skew_team_coverage(lifecycle) -> None:
+    con = _connection()
+    con.execute(
+        "INSERT INTO silver.games VALUES (1, 'R', 'Final', ?, TIMESTAMP '2024-04-10')",
+        [lifecycle],
+    )
+    con.execute(
+        """INSERT INTO silver.team_game_statistics VALUES
+               (1, 111, 'home', NULL, NULL), (1, 222, 'away', NULL, NULL)"""
+    )
+    report = coverage_report(con)
+    score = report["columns"]["silver.team_game_statistics.score"]
+    winner = report["columns"]["silver.team_game_statistics.is_winner"]
+    assert score["row_count"] == winner["row_count"] == 0
+    assert report["home_win_rate"]["games"] == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -428,7 +515,9 @@ def test_coverage_report_records_per_column_numbers() -> None:
     assert stat["row_count"] == 160  # 40 games * 2 teams * 2 pitchers
     assert stat["non_null"] == 160
     assert stat["null_rate"] == 0.0
-    assert stat["min"] == 18 and stat["max"] == 18
+    assert stat["min"] < stat["max"]
+    assert stat["distinct_count"] > 1
+    assert stat["is_constant"] is False
     assert stat["required"] is True
     assert stat["status"] == "PASS"
     assert stat["plausible_range"] == [0, 81]

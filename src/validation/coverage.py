@@ -37,9 +37,9 @@ Declared measure columns (allowlist)
   and reported so Silver measurements cannot disappear from certification by
   inference, but their absence does not block the V1 feature families.
 
-``silver.team_game_statistics`` (evaluated over regular-season Final games,
-``game_type = 'R' AND abstract_game_state = 'Final'`` — the only population where
-these outcomes must exist; postponed/preview games legitimately lack them):
+``silver.team_game_statistics`` (evaluated over regular-season completed games,
+using the shared DATA-012 lifecycle exclusions — postponed/suspended/cancelled
+rows can be abstract ``Final`` but legitimately lack outcomes):
 
 - required: ``score``, ``is_winner``.
 
@@ -70,13 +70,11 @@ Documented thresholds (every threshold has a reason)
   is an early signal of a partial-ingestion regression and must stay visible
   build-over-build. It is advisory, not blocking, because some missingness is
   legitimate.
-- ``DEGENERATE_MIN_SAMPLE = 100`` — constant-zero degeneracy (a required numeric
-  stat whose values are all zero) only hard-fails once at least this many
-  observations exist. Reason: across the historical dataset the SUM of outs,
-  batters faced, hits, walks, strikeouts, or earned runs cannot be zero; but a
-  tiny fixture of, say, two shutout starts is legitimately all-zero for
-  ``earned_runs``, so the check targets a broken pipeline emitting a constant
-  across the whole dataset, not small legitimate samples.
+- ``DEGENERATE_MIN_SAMPLE = 100`` — a required baseball measurement that is
+  constant (zero or nonzero) only hard-fails once at least this many populated
+  observations exist. Reason: innings pitched, outs, batters faced, runs/hits/
+  walks/strikeouts, scores, and winner flags are guaranteed to vary across a
+  historical MLB population, while a tiny fixture can legitimately be constant.
 - ``FAMILY_EMPTY_MIN_GAMES = 30`` — a required family with ZERO declared inputs
   hard-fails only once the dataset spans at least this many regular-season games.
   Reason: a full historical build has thousands of games where relievers and
@@ -105,6 +103,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from validation.checks import COMPLETED_GAME_PREDICATE
 from validation.results import CheckResult, fail, ok, warn
 
 # --------------------------------------------------------------------------- #
@@ -129,6 +128,7 @@ class MeasureColumn:
     required: bool
     numeric: bool
     zero_is_degenerate: bool = False
+    constant_is_degenerate: bool = False
     plausible_min: int | float | None = None
     plausible_max: int | float | None = None
 
@@ -139,29 +139,46 @@ class MeasureColumn:
 
 # Regular-season pitcher stat line (allowlist). ``game_type = 'R'`` scope.
 PITCHER_APPEARANCE_MEASURES: tuple[MeasureColumn, ...] = (
-    MeasureColumn("pitcher_appearances", "innings_pitched", required=True, numeric=False),
+    MeasureColumn(
+        "pitcher_appearances", "innings_pitched", required=True, numeric=False,
+        constant_is_degenerate=True,
+    ),
     MeasureColumn(
         "pitcher_appearances",
         "outs_recorded",
         required=True,
         numeric=True,
         zero_is_degenerate=True,
+        constant_is_degenerate=True,
         plausible_min=0,
         plausible_max=MAX_OUTS_PER_APPEARANCE,
     ),
-    MeasureColumn("pitcher_appearances", "batters_faced", required=True, numeric=True, zero_is_degenerate=True),
+    MeasureColumn(
+        "pitcher_appearances", "batters_faced", required=True, numeric=True,
+        zero_is_degenerate=True, constant_is_degenerate=True,
+    ),
     MeasureColumn(
         "pitcher_appearances",
         "earned_runs",
         required=True,
         numeric=True,
         zero_is_degenerate=True,
+        constant_is_degenerate=True,
         plausible_min=0,
         plausible_max=MAX_EARNED_RUNS_PER_APPEARANCE,
     ),
-    MeasureColumn("pitcher_appearances", "hits_allowed", required=True, numeric=True, zero_is_degenerate=True),
-    MeasureColumn("pitcher_appearances", "walks", required=True, numeric=True, zero_is_degenerate=True),
-    MeasureColumn("pitcher_appearances", "strikeouts", required=True, numeric=True, zero_is_degenerate=True),
+    MeasureColumn(
+        "pitcher_appearances", "hits_allowed", required=True, numeric=True,
+        zero_is_degenerate=True, constant_is_degenerate=True,
+    ),
+    MeasureColumn(
+        "pitcher_appearances", "walks", required=True, numeric=True,
+        zero_is_degenerate=True, constant_is_degenerate=True,
+    ),
+    MeasureColumn(
+        "pitcher_appearances", "strikeouts", required=True, numeric=True,
+        zero_is_degenerate=True, constant_is_degenerate=True,
+    ),
     # Documented optional: nullable in older boxscores (starter.py/bullpen.py).
     MeasureColumn("pitcher_appearances", "pitches_thrown", required=False, numeric=True),
     # Explicitly outside declared V1 feature inputs; retained for drift reporting.
@@ -175,8 +192,14 @@ PITCHER_APPEARANCE_MEASURES: tuple[MeasureColumn, ...] = (
 
 # Team outcome measures (allowlist). Regular-season Final scope.
 TEAM_OUTCOME_MEASURES: tuple[MeasureColumn, ...] = (
-    MeasureColumn("team_game_statistics", "score", required=True, numeric=True, zero_is_degenerate=True),
-    MeasureColumn("team_game_statistics", "is_winner", required=True, numeric=False),
+    MeasureColumn(
+        "team_game_statistics", "score", required=True, numeric=True,
+        zero_is_degenerate=True, constant_is_degenerate=True,
+    ),
+    MeasureColumn(
+        "team_game_statistics", "is_winner", required=True, numeric=False,
+        constant_is_degenerate=True,
+    ),
 )
 
 # WHERE clauses defining the population each measure family is required over.
@@ -186,7 +209,7 @@ _REGULAR_APPEARANCES = (
 )
 _REGULAR_FINAL_TEAM = (
     "FROM silver.team_game_statistics t JOIN silver.games g USING (game_pk) "
-    "WHERE g.game_type = 'R' AND g.abstract_game_state = 'Final'"
+    f"WHERE g.game_type = 'R' AND {COMPLETED_GAME_PREDICATE}"
 )
 
 
@@ -266,12 +289,18 @@ def _column_stats(
     if measure.numeric:
         row = _fetch(
             connection,
-            f"SELECT count(*), count({col}), min({col}), max({col}) {source}",
+            f"SELECT count(*), count({col}), count(DISTINCT {col}), "
+            f"min({col}), max({col}) {source}",
         )[0]
-        row_count, non_null, col_min, col_max = row
+        row_count, non_null, distinct_count, col_min, col_max = row
+        constant_value = col_min if distinct_count == 1 else None
     else:
-        row = _fetch(connection, f"SELECT count(*), count({col}) {source}")[0]
-        row_count, non_null = row
+        row = _fetch(
+            connection,
+            f"SELECT count(*), count({col}), count(DISTINCT {col}), "
+            f"min(CAST({col} AS VARCHAR)) {source}",
+        )[0]
+        row_count, non_null, distinct_count, constant_value = row
         col_min = col_max = None
     null_rate = None if row_count == 0 else (row_count - non_null) / row_count
     all_zero = bool(
@@ -286,10 +315,13 @@ def _column_stats(
         "required": measure.required,
         "row_count": row_count,
         "non_null": non_null,
+        "distinct_count": distinct_count,
         "null_rate": null_rate,
         "min": col_min,
         "max": col_max,
         "all_zero": all_zero,
+        "is_constant": non_null > 0 and distinct_count == 1,
+        "constant_value": constant_value,
         "plausible_range": [measure.plausible_min, measure.plausible_max],
     }
     stats["status"] = _column_status(measure, stats)
@@ -302,7 +334,11 @@ def _column_status(measure: MeasureColumn, stats: dict[str, Any]) -> str:
         return "PASS"
     if stats["null_rate"] >= REQUIRED_NULL_FAIL_RATE:
         return "FAIL"
-    if stats["all_zero"] and stats["non_null"] >= DEGENERATE_MIN_SAMPLE:
+    if (
+        measure.constant_is_degenerate
+        and stats["is_constant"]
+        and stats["non_null"] >= DEGENERATE_MIN_SAMPLE
+    ):
         return "FAIL"
     below_min = (
         measure.plausible_min is not None
@@ -363,11 +399,14 @@ def _measure_group_check(
             continue
         if (
             measure.required
-            and stats["all_zero"]
+            and measure.constant_is_degenerate
+            and stats["is_constant"]
             and stats["non_null"] >= DEGENERATE_MIN_SAMPLE
         ):
+            label = "constant zero" if stats["all_zero"] else "constant value"
             failures.append(
-                f"{measure.qualified} is a constant zero across all "
+                f"{measure.qualified} is a {label} "
+                f"{stats['constant_value']!r} across all "
                 f"{stats['non_null']} populated rows (degenerate/broken)"
             )
             continue
@@ -541,11 +580,11 @@ def _family_check(name: str, report: dict[str, Any]) -> CheckResult:
 def _home_win_rate_stats(connection: Any) -> dict[str, Any]:
     row = _fetch(
         connection,
-        """SELECT count(*),
+        f"""SELECT count(*),
                   count(*) FILTER (WHERE t.is_winner)
            FROM silver.team_game_statistics t
            JOIN silver.games g USING (game_pk)
-           WHERE g.game_type = 'R' AND g.abstract_game_state = 'Final'
+           WHERE g.game_type = 'R' AND {COMPLETED_GAME_PREDICATE}
              AND t.side = 'home' AND t.is_winner IS NOT NULL""",
     )[0]
     games, home_wins = row

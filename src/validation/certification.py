@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from validation.results import FAIL, PASS, CheckResult, summarize
+from validation.results import FAIL, PASS, WARN, CheckResult, summarize
 from validation.runner import run_all
 from validation.coverage import coverage_report
 
@@ -211,9 +211,7 @@ def _semantic_completeness(
     semantic_results = [
         r for r in results if r.check.startswith(_SEMANTIC_PREFIX)
     ]
-    report["status"] = FAIL if any(
-        r.status == FAIL for r in semantic_results
-    ) else PASS
+    report["status"] = _dimension_status(semantic_results)
     report["checks"] = [_result_dict(r) for r in semantic_results]
     return report
 
@@ -224,7 +222,7 @@ def _validity_dimensions(results: list[CheckResult]) -> dict[str, Any]:
     def dimension(predicate: Any) -> dict[str, Any]:
         selected = [r for r in results if predicate(r.check)]
         return {
-            "status": FAIL if any(r.status == FAIL for r in selected) else PASS,
+            "status": _dimension_status(selected),
             "checks": [r.check for r in selected],
         }
 
@@ -241,6 +239,15 @@ def _validity_dimensions(results: list[CheckResult]) -> dict[str, Any]:
             lambda c: c.startswith(_TEMPORAL_LEAKAGE_PREFIX)
         ),
     }
+
+
+def _dimension_status(results: list[CheckResult]) -> str:
+    """Aggregate a validity dimension without making WARN merge-blocking."""
+    if any(result.status == FAIL for result in results):
+        return FAIL
+    if any(result.status == WARN for result in results):
+        return WARN
+    return PASS
 
 
 # --------------------------------------------------------------------------- #

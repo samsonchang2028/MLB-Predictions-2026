@@ -56,11 +56,19 @@ def test_clean_fixture_semantic_dimension_passes_and_records_coverage(tmp_path: 
 
     assert artifact["status"] == "PASS"
 
-    # Three validity dimensions reported separately, each PASS.
+    # Three validity dimensions reported separately. The shared fixture
+    # deliberately includes a spring-training appearance (game_pk 400,
+    # game_type='S') to exercise the documented `pitching.non_regular_season`
+    # advisory (see test_dataset_validation.py), so structural correctly
+    # reports WARN, not PASS -- advisory WARN is not merge-blocking, which is
+    # why the overall artifact status above is still PASS. semantic and
+    # temporal have no advisory findings on this fixture.
     validity = artifact["validity"]
     assert set(validity) == {"structural", "semantic_completeness", "temporal_leakage"}
-    for dimension in validity.values():
-        assert dimension["status"] == "PASS"
+    assert validity["structural"]["status"] == "WARN"
+    assert "pitching.non_regular_season" in validity["structural"]["checks"]
+    assert validity["semantic_completeness"]["status"] == "PASS"
+    assert validity["temporal_leakage"]["status"] == "PASS"
 
     # Semantic completeness records per-column coverage for the artifact.
     semantic = artifact["semantic_completeness"]
