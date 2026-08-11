@@ -233,3 +233,35 @@ def test_without_invalidation_retry_unresolved_still_skips_already_payloaded_gam
         ).fetchone()[0]
     stored = json.loads(stored_json)
     assert stored["liveData"]["boxscore"]["teams"]["home"]["players"]["ID1"]["stats"] == {}
+
+
+def test_invalidate_before_detail_tables_exist_does_not_leak_a_raw_db_exception(
+    tmp_path: Path,
+) -> None:
+    """DATA-018 tester finding (P3, non-blocking for the real re-ingest).
+
+    ``invalidate_game_detail_payloads`` never calls ``_create_tables`` itself
+    (unlike ``backfill_game_details``, which self-heals at the top of every
+    call). If it is ever invoked on a storage root where
+    ``bronze.mlb_game_detail_payloads`` has never been created --
+    i.e. ``backfill_game_details`` has genuinely never run for this root --
+    it currently raises a raw ``duckdb.CatalogException`` instead of the
+    documented safe "nothing to delete" no-op.
+
+    This can NOT happen in the real DATA-018 2021-2025 re-ingest: the
+    production storage root already has 14,520 payload rows (the table has
+    existed since DATA-005/DATA-011), so the very first
+    ``invalidate_game_detail_payloads`` call in
+    ``scripts/data018_reingest.py`` always hits an existing table. It is a
+    general robustness gap in the function's contract, not a production-run
+    blocker.
+
+    Expected/desired behavior asserted below: a ``game_pk`` with no existing
+    payload row is a safe no-op (0 deleted), per the function's own
+    docstring, regardless of whether the table has been created yet.
+    Currently this test FAILS against the candidate code -- it raises
+    ``duckdb.CatalogException: Table with name mlb_game_detail_payloads does
+    not exist`` instead of returning 0.
+    """
+    _ingest_games(tmp_path, 9999)  # schedule only -- backfill_game_details never run
+    assert invalidate_game_detail_payloads(tmp_path, [9999]) == 0
