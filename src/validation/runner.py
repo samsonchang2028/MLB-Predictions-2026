@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from validation.checks import run_data_checks
+from validation.coverage import run_coverage_checks
 from validation.leakage import (
     check_chronological_folds,
     check_current_game_excluded,
@@ -26,8 +27,13 @@ from validation.results import CheckResult, summarize
 def run_all(
     connection: Any, storage_root: str | Path | None = None
 ) -> list[CheckResult]:
-    """Run data-integrity, temporal, and leakage checks in a stable order."""
+    """Run structural, semantic-completeness, temporal, and leakage checks.
+
+    Order is stable: structural Bronze/Silver checks, then semantic-completeness
+    coverage checks (DATA-017), then temporal/leakage checks.
+    """
     results = run_data_checks(connection, storage_root)
+    results.extend(run_coverage_checks(connection))
     team_rows = load_team_game_rows(connection)
     results.append(check_current_game_excluded(team_rows))
     results.append(check_future_mutation_invariance(team_rows))

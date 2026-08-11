@@ -22,6 +22,13 @@ from validation.results import CheckResult, fail, finding, ok, warn
 
 _INNINGS_RE = re.compile(r"^\d+\.[012]$")
 _KNOWN_ABSTRACT_STATES = ("Preview", "Live", "Final")
+# Shared SQL predicate for games whose outcome measurements are required.
+# MLB can label postponed/suspended/cancelled rows abstract ``Final``; those
+# lifecycle rows are retained but are not completed outcomes (DATA-012).
+COMPLETED_GAME_PREDICATE = """g.abstract_game_state = 'Final'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Postponed%'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Suspended%'
+             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Cancelled%'"""
 _PITCHING_INT_COLUMNS = (
     "outs_recorded",
     "batters_faced",
@@ -187,13 +194,10 @@ def check_results_scores(connection: Any) -> CheckResult:
     """
     bad = _fetch(
         connection,
-        """SELECT g.game_pk, t.side, t.score
+        f"""SELECT g.game_pk, t.side, t.score
            FROM silver.games g
            JOIN silver.team_game_statistics t USING (game_pk)
-           WHERE g.abstract_game_state = 'Final'
-             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Postponed%'
-             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Suspended%'
-             AND COALESCE(g.detailed_state, '') NOT ILIKE 'Cancelled%'
+           WHERE {COMPLETED_GAME_PREDICATE}
              AND (t.score IS NULL OR t.score < 0)
            ORDER BY g.game_pk, t.side""",
     )
