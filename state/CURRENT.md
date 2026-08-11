@@ -147,11 +147,12 @@ to certify cleanly.
 
 ## Recently merged
 
-All three data-integrity hardening tasks are merged to main. Reviewer + Tester
-gates all passed with zero P0/P1 findings across all three. Full repo suite
-green on main post-merge: **545 passed** (main's environment has xgboost
-installed, so no exclusions needed here, unlike the individual agent
-worktrees).
+All data-integrity hardening tasks through DATA-018 are merged to main.
+Reviewer + Tester gates passed with zero unresolved P0/P1 findings; blocking
+tester findings in OBS-001 and DATA-018 were repaired before merge. Full repo
+suite green on main post-merge after APP-001/OBS-001/DATA-018: **578 passed,
+1 xfailed** (main's environment has xgboost installed, so no exclusions needed
+here, unlike the individual agent worktrees).
 
 - DATA-016 (`210c70b`) - game-detail `fields=` projection fix + lifecycle-aware
   hollow-boxscore guard, `numberOfPitches` required, real-payload contract
@@ -168,6 +169,19 @@ worktrees).
   pre-model completeness gate blocking ML experiments on an entirely-empty
   required feature family (no auto-dropping), wired into the evaluator +
   calibration path. See `state/agents/FEAT-005-006.md`.
+- APP-001 (`19abe5d`) - Streamlit daily prediction board merged with one
+  deferred non-blocking P2 pinned by xfail: malformed/stale-schema prediction
+  records can crash the board instead of skipping a bad row. See
+  `state/agents/APP-001.md`.
+- OBS-001 - append-only prediction journal merged after repairing the tester
+  P1/P2 false-conflict path: routine result-enrichment re-runs with a fresh
+  `enrichment_timestamp` are idempotent when the substantive enrichment fact is
+  unchanged; real conflicts still raise. See `state/agents/OBS-001.md`.
+- DATA-018 - hollow game-detail invalidation + operator re-ingest entry point
+  merged after repairing the tester P2 restart risk: already-repaired payloads
+  are now guarded by `ingestion_build_id`, not `--run-id`, so a restart with a
+  different run id does not re-invalidate already-good repaired payloads. See
+  `state/agents/DATA-018.md`.
 
 **The full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer) has NOT been
 launched.** DATA-016's fix only applies to future fetches; already-stored
@@ -175,12 +189,12 @@ Bronze rows are still the pre-fix hollow pitching data. This re-ingest +
 re-certification is the next required action before FEAT-002/FEAT-003
 pitching features are real or a re-run experiment can be trusted. It is a
 long-running, single-writer, live-network operation against the real MLB API
-and requires an explicit go-ahead before launch.
+and requires an explicit go-ahead before launch. DATA-018 added the operator
+entry point: `scripts/data018_reingest.py`.
 
 ## Ready
 
-- OBS-001 + APP-001 - prediction journal and Streamlit board (parallel-safe).
-  Dispatch was deferred to run the real experiment; both remain unblocked.
+- None.
 
 ## First real experiment (2021-2025 certified build) - RESULTS
 
@@ -217,18 +231,17 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-DATA-016/DATA-017/FEAT-005/FEAT-006 are merged. The next required action is the
-full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer, live network) using
-the repaired projection, followed by re-certification (now with the DATA-017
-semantic-completeness gate active) and a Gold completeness check (FEAT-006).
-Only once that chain is PASS should the feature matrix be rebuilt and the
-experiment re-run for trustworthy metrics. This requires an explicit
+DATA-016/DATA-017/FEAT-005/FEAT-006/DATA-018 are merged. The next required
+action is the full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer, live
+network) through `scripts/data018_reingest.py`, followed by re-certification
+(DATA-017 semantic-completeness gate active) and a Gold completeness check
+(FEAT-006). Only once that chain is PASS should the feature matrix be rebuilt
+and the experiment re-run for trustworthy metrics. This requires an explicit
 Orchestrator/operator go-ahead before launch (long-running, single-writer).
 
 ## Safe parallel
 
-- OBS-001 and APP-001 remain parallel-safe with each other and with the
-  DATA-016 re-ingest (disjoint surfaces).
+- None currently dispatched.
 
 ## Blocked
 
