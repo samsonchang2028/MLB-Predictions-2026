@@ -17,6 +17,7 @@ from ingestion.mlb.game_detail import (
     _store_success,
     invalidate_game_detail_payloads,
 )
+from scripts.data018_reingest import _already_reingested_under_build_id
 from storage import connect_database, initialize_storage, storage_paths
 
 
@@ -233,6 +234,39 @@ def test_without_invalidation_retry_unresolved_still_skips_already_payloaded_gam
         ).fetchone()[0]
     stored = json.loads(stored_json)
     assert stored["liveData"]["boxscore"]["teams"]["home"]["players"]["ID1"]["stats"] == {}
+
+
+def test_operator_resume_guard_uses_build_id_not_run_id(tmp_path: Path) -> None:
+    """A restart with a different run id must not re-invalidate already-good
+    DATA-018 payload rows.
+
+    The operator script computes "already reingested" from the current
+    payload row's build id. If this were keyed by run id instead, forgetting or
+    changing ``--run-id`` mid-run would classify already-good rows as stale,
+    delete their payload pointers, and force an unnecessary re-fetch.
+    """
+    _ingest_games(tmp_path, 9101, 9102)
+    _seed_hollow_payload(tmp_path, 9101, run_id="old-run", build_id="DATA-005")
+    _seed_hollow_payload(
+        tmp_path, 9102, run_id="first-repair-run", build_id="DATA-018"
+    )
+
+    already_done = _already_reingested_under_build_id(
+        tmp_path, [9101, 9102], "DATA-018"
+    )
+    to_invalidate = [pk for pk in [9101, 9102] if pk not in already_done]
+
+    assert already_done == {9102}
+    assert to_invalidate == [9101]
+    assert invalidate_game_detail_payloads(tmp_path, to_invalidate) == 1
+
+    with connect_database(storage_paths(tmp_path)["database"]) as connection:
+        remaining = connection.execute(
+            """SELECT game_pk, ingestion_run_id, ingestion_build_id
+               FROM bronze.mlb_game_detail_payloads ORDER BY game_pk"""
+        ).fetchall()
+
+    assert remaining == [(9102, "first-repair-run", "DATA-018")]
 
 
 def test_invalidate_before_detail_tables_exist_does_not_leak_a_raw_db_exception(

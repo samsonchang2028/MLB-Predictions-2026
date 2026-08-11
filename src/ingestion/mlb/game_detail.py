@@ -239,6 +239,10 @@ def invalidate_game_detail_payloads(
     paths = initialize_storage(storage_root)
     placeholders = ", ".join("?" for _ in targets)
     with connect_database(paths["database"]) as connection:
+        # Self-heal like backfill_game_details: a storage root where detail
+        # backfill has never run yet has no payloads table, in which case
+        # there is nothing to invalidate (safe no-op), not a raw DB exception.
+        _create_tables(connection)
         connection.execute("BEGIN TRANSACTION")
         try:
             matched = connection.execute(

@@ -15,21 +15,27 @@ What this does, per DATA-018:
 1. Selects every 2021-2025 ``game_pk`` currently in ``bronze.mlb_games`` (the
    whole build is hollow -- this is not a partial-subset repair).
 2. Invalidates the stale hollow ``bronze.mlb_game_detail_payloads`` row for
-   each targeted game_pk that has not already been re-fetched under THIS
-   run_id (``invalidate_game_detail_payloads``). Raw files on disk are never
-   touched; ``bronze.mlb_game_detail_attempts`` is never touched.
+   each targeted game_pk that does not already carry a payload stored under
+   THIS SCRIPT's ``--build-id`` (``invalidate_game_detail_payloads``). Raw
+   files on disk are never touched; ``bronze.mlb_game_detail_attempts`` is
+   never touched.
 3. Re-runs ``backfill_game_details(..., retry_unresolved=True)`` with the real
    MLB-StatsAPI fetcher, processed in batches so progress prints incrementally
    (this runs for hours).
 4. Re-normalizes Silver.
 5. Re-certifies (``certify_and_write``).
 
-Resumable / restartable (DATA-010 semantics): re-run this script with the SAME
-``--run-id`` after an interruption. Step 2 only invalidates game_pks that do
-NOT already carry a payload stored under this run_id, so a game_pk this run
-already genuinely re-fetched is left alone (never re-invalidated, never
-re-fetched); a game_pk not yet reached simply has nothing to invalidate (a
-no-op) and is retried by step 3 as usual.
+Resumable / restartable, safe regardless of ``--run-id``: "already done" is
+determined by ``ingestion_build_id`` on the stored payload row, NOT by
+``ingestion_run_id``. A game_pk whose payload was already re-fetched under
+this script's ``--build-id`` (default "DATA-018") is known-good and is never
+re-invalidated or re-fetched, no matter which ``--run-id`` is passed -- so
+restarting after an interruption with the SAME run_id resumes correctly, and
+restarting with a DIFFERENT (or forgotten) run_id is ALSO safe: it will not
+destroy already-good re-fetched data. Only explicitly passing a different
+``--build-id`` changes what counts as "already done". A game_pk not yet
+reached simply has nothing to invalidate (a no-op) and is picked up by step 3
+as usual.
 
 How to run (from the repository root)::
 
@@ -80,13 +86,17 @@ def _target_game_pks(storage_root: str | Path, seasons: tuple[int, ...]) -> list
         ]
 
 
-def _already_reingested_this_run(
-    storage_root: str | Path, game_pks: list[int], run_id: str
+def _already_reingested_under_build_id(
+    storage_root: str | Path, game_pks: list[int], build_id: str
 ) -> set[int]:
-    """game_pks that already carry a payload row stored under ``run_id``.
+    """game_pks whose CURRENT payload row was already stored under ``build_id``.
 
-    These must NOT be invalidated again on a restart -- their re-fetched data
-    is already the good, current-projection data.
+    Keyed off ``ingestion_build_id``, not ``ingestion_run_id``: a payload
+    already re-fetched under the target build_id is known-good data from THIS
+    repair, no matter which run_id fetched it, so a restart is safe even if
+    the operator passes a different (or forgets to pass a) ``--run-id``. A
+    payload still carrying a stale build_id (e.g. the original pre-DATA-018
+    build) is correctly NOT considered done and gets re-invalidated.
     """
     if not game_pks:
         return set()
@@ -97,8 +107,8 @@ def _already_reingested_this_run(
             row[0]
             for row in connection.execute(
                 f"""SELECT game_pk FROM bronze.mlb_game_detail_payloads
-                    WHERE game_pk IN ({placeholders}) AND ingestion_run_id = ?""",
-                [*game_pks, run_id],
+                    WHERE game_pk IN ({placeholders}) AND ingestion_build_id = ?""",
+                [*game_pks, build_id],
             ).fetchall()
         }
 
@@ -131,11 +141,13 @@ def main(argv: list[str] | None = None) -> int:
         print("[targets] nothing to do")
         return 0
 
-    already_done = _already_reingested_this_run(args.storage_root, targets, args.run_id)
+    already_done = _already_reingested_under_build_id(
+        args.storage_root, targets, args.build_id
+    )
     to_invalidate = [pk for pk in targets if pk not in already_done]
     print(
-        f"[invalidate] {len(already_done)} already re-fetched under run_id="
-        f"{args.run_id!r} (skipped); invalidating {len(to_invalidate)} stale rows"
+        f"[invalidate] {len(already_done)} already re-fetched under build_id="
+        f"{args.build_id!r} (skipped); invalidating {len(to_invalidate)} stale rows"
     )
     if to_invalidate:
         deleted = invalidate_game_detail_payloads(args.storage_root, to_invalidate)
