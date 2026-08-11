@@ -7,7 +7,14 @@ from datetime import datetime, timezone
 import pytest
 
 from features.build import build_feature_matrix
-from features.completeness import FeatureCompletenessError
+from features.completeness import (
+    _BULLPEN_BASES,
+    _REST_BULLPEN_BASES,
+    _REST_STARTER_BASES,
+    _STARTER_BASES,
+    _TEAM_BASES,
+    FeatureCompletenessError,
+)
 
 
 def _dt(stamp: str) -> datetime:
@@ -383,3 +390,139 @@ def test_excluded_games_absent_from_feature_rows() -> None:
     excluded_pks = {e["game_pk"] for e in matrix["excluded"]}
     row_pks = {row["game_pk"] for row in matrix["rows"]}
     assert excluded_pks.isdisjoint(row_pks)
+
+
+def test_unknown_new_game_with_no_pitcher_coverage_is_excluded_generically() -> None:
+    # Tester regression check: FEAT-005's classification must NOT be a hardcoded
+    # allowlist of the four known real game_pks (632457/746577/746596/746597).
+    # A brand-new, never-before-seen game_pk with zero starter+bullpen coverage
+    # for both teams must be handled by the same observable-coverage rule --
+    # excluded and reported with a reason -- neither silently included with
+    # None-valued pitching features nor silently vanished without a trace.
+    games = [
+        _game(1, 10, 20, "2024-04-01T19:00:00"),
+        _game(919191, 55, 66, "2027-05-05T19:00:00"),  # unseen game_pk, future date
+    ]
+    team = [
+        _team_row(1, 10, win_pct=0.6, run_diff=1.5),
+        _team_row(1, 20, win_pct=0.4, run_diff=-0.5),
+        _team_row(919191, 55, win_pct=0.5, run_diff=0.0),
+        _team_row(919191, 66, win_pct=0.5, run_diff=0.0),
+    ]
+    _, _, starter, bullpen, results = _one_game_inputs()
+    results.extend(
+        [
+            _result(919191, 55, score=None, is_winner=None),
+            _result(919191, 66, score=None, is_winner=None),
+        ]
+    )
+    matrix = build_feature_matrix(
+        games,
+        team_features=team,
+        starter_features=starter,  # only covers game_pk=1
+        bullpen_features=bullpen,  # only covers game_pk=1
+        results=results,
+        certification=_cert(),
+        completeness_mode="inference",
+    )
+    assert [row["game_pk"] for row in matrix["rows"]] == [1]
+    excluded = {entry["game_pk"]: entry for entry in matrix["excluded"]}
+    assert 919191 in excluded
+    assert excluded[919191]["missing_components"] == ["starter", "bullpen"]
+    assert "starter" in excluded[919191]["reason"] and "bullpen" in excluded[919191]["reason"]
+
+
+# --- FEAT-006 tester edge case: only ONE family broken end-to-end -----------
+#
+# Builds a matrix with the full declared V1 column contract (not the minimal
+# fixtures above) so team/starter/rest are genuinely healthy and only bullpen
+# is dead, then confirms the historical gate names bullpen specifically rather
+# than failing generically.
+
+
+def _full_team_row(game_pk: int, team_id: int, base: float) -> dict:
+    row = {
+        "game_pk": game_pk, "team_id": team_id, "side": "home", "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"), "season": "2024",
+    }
+    row.update({key: base + index * 0.01 for index, key in enumerate(_TEAM_BASES)})
+    return row
+
+
+def _full_starter_row(game_pk: int, team_id: int, base: float) -> dict:
+    row = {
+        "game_pk": game_pk, "team_id": team_id, "side": "home", "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"), "season": "2024",
+    }
+    for key in (*_STARTER_BASES, *_REST_STARTER_BASES):
+        if key == "starter_pitcher_id":
+            row[key] = team_id * 1000 + game_pk
+        elif key in ("starter_known", "starter_is_probable"):
+            row[key] = True
+        else:
+            row[key] = base + hash(key) % 7 * 0.1
+    return row
+
+
+def _full_bullpen_row(game_pk: int, team_id: int, base: float, *, dead: bool) -> dict:
+    row = {
+        "game_pk": game_pk, "team_id": team_id, "side": "home", "is_home": True,
+        "game_date": _dt("2024-04-01T19:00:00"),
+    }
+    for key in (*_BULLPEN_BASES, *_REST_BULLPEN_BASES):
+        row[key] = None if dead else base + hash(key) % 7 * 0.1
+    return row
+
+
+def _full_matrix_inputs(*, bullpen_dead: bool, n_games: int = 32):
+    games, team, starter, bullpen, results = [], [], [], [], []
+    for i in range(n_games):
+        game_pk = 100 + i
+        home_id, away_id = 1000 + i, 2000 + i
+        games.append(_game(game_pk, home_id, away_id, "2024-04-01T19:00:00"))
+        team.append(_full_team_row(game_pk, home_id, 0.3 + i * 0.011))
+        team.append(_full_team_row(game_pk, away_id, 0.4 + i * 0.023))
+        # Home/away bases must NOT differ by a fixed offset, or diff_ columns
+        # (home - away) would be constant across every game and trip the
+        # unexpected_constant check for an unrelated reason.
+        starter.append(_full_starter_row(game_pk, home_id, 2.0 + i * 0.013))
+        starter.append(_full_starter_row(game_pk, away_id, 3.0 + i * 0.029))
+        bullpen.append(_full_bullpen_row(game_pk, home_id, 1.0 + i * 0.017, dead=bullpen_dead))
+        bullpen.append(_full_bullpen_row(game_pk, away_id, 1.5 + i * 0.031, dead=bullpen_dead))
+        results.append(_result(game_pk, home_id, score=5, is_winner=True))
+        results.append(_result(game_pk, away_id, score=3, is_winner=False))
+    return games, team, starter, bullpen, results
+
+
+def test_only_bullpen_broken_gate_names_bullpen_not_generic_failure() -> None:
+    games, team, starter, bullpen, results = _full_matrix_inputs(bullpen_dead=True)
+    with pytest.raises(FeatureCompletenessError) as caught:
+        build_feature_matrix(
+            games, team_features=team, starter_features=starter,
+            bullpen_features=bullpen, results=results, certification=_cert(),
+            completeness_mode="historical",
+        )
+    report = caught.value.report
+    assert report["families"]["team"]["status"] == "PASS"
+    assert report["families"]["starter"]["status"] == "PASS"
+    assert report["families"]["bullpen"]["status"] == "FAIL"
+    assert any("bullpen" in issue for issue in report["blocking_issues"])
+    # Every game still had bullpen component rows (both sides present, just
+    # dead-valued) so FEAT-005's absent-coverage exclusion does not fire here
+    # -- this is specifically the FEAT-006 dead-column gate, not FEAT-005.
+    assert len(build_feature_matrix(
+        games, team_features=team, starter_features=starter,
+        bullpen_features=bullpen, results=results, certification=_cert(),
+        completeness_mode="inference",
+    )["excluded"]) == 0
+
+
+def test_all_families_healthy_passes_full_gate() -> None:
+    games, team, starter, bullpen, results = _full_matrix_inputs(bullpen_dead=False)
+    matrix = build_feature_matrix(
+        games, team_features=team, starter_features=starter,
+        bullpen_features=bullpen, results=results, certification=_cert(),
+        completeness_mode="historical",
+    )
+    assert matrix["feature_completeness"]["status"] == "PASS"
+    assert len(matrix["rows"]) == 32

@@ -147,6 +147,50 @@ def test_ml_gate_refuses_inference_or_failed_published_matrix() -> None:
         require_historical_feature_completeness(matrix)
 
 
+# --- FEAT-005/006 tester edge cases (adversarial, not part of the original PR) --
+
+
+def test_near_zero_but_nonzero_population_is_low_not_entirely_null() -> None:
+    # Two populated rows (with different values, so this isn't ALSO flagged
+    # unexpected_constant) out of a thousand: not literally "entirely_null"
+    # (that issue requires zero populated values), but nowhere near the 50%
+    # floor.
+    columns = _columns()
+    rows = _rows(count=1000)
+    column = "home_starter_season_era_before"
+    for row in rows[2:]:
+        row["features"][column] = None
+
+    report = build_feature_completeness_report(columns, rows)
+
+    entry = report["columns"][column]
+    assert entry["non_null_count"] == 2
+    assert entry["issues"] == ["implausibly_low_population"]
+    assert "entirely_null" not in entry["issues"]
+    assert report["status"] == "FAIL"
+
+
+def test_ninety_nine_percent_null_family_fails_as_implausibly_low() -> None:
+    # Not entirely empty (so the "hollow build" all_null signature does not
+    # apply), but 1% population is far below any legitimate cold-start rate for
+    # a five-season matrix. The gate must still hard-block, not merely warn,
+    # per the documented 50% floor -- and other, healthy families must stay PASS.
+    columns = _columns()
+    rows = _rows(count=200)
+    column = "home_starter_season_era_before"
+    for row in rows[:198]:
+        row["features"][column] = None
+
+    report = build_feature_completeness_report(columns, rows)
+
+    assert report["columns"][column]["population_rate"] == pytest.approx(0.01)
+    assert report["columns"][column]["issues"] == ["implausibly_low_population"]
+    assert report["families"]["starter"]["status"] == "FAIL"
+    assert report["families"]["team"]["status"] == "PASS"
+    assert report["families"]["bullpen"]["status"] == "PASS"
+    assert report["status"] == "FAIL"
+
+
 def test_feature_completeness_error_retains_full_report() -> None:
     columns = _columns()
     rows = _rows()
