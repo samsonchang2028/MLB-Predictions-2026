@@ -8,6 +8,8 @@ No Streamlit import here -- this module is the testable half of APP-001.
 
 from __future__ import annotations
 
+import pytest
+
 from app.board import DEFAULT_EDGE_THRESHOLD, load_daily_board
 
 
@@ -83,3 +85,47 @@ def test_custom_edge_threshold_overrides_default():
 def test_rows_sorted_by_game_pk_regardless_of_store_order():
     rows = load_daily_board(_FakeStore([_record(3), _record(1), _record(2)]))
     assert [r["game_pk"] for r in rows] == [1, 2, 3]
+
+
+def test_multiple_predictions_for_same_game_pk_are_all_shown():
+    # Legitimate PIPE-001 scenario: an odds-refresh re-snapshot writes a second,
+    # distinct record for the same game_pk. The board must not silently collapse
+    # or overwrite -- both should be visible.
+    first = _record(7, edge=0.03)
+    second = dict(first, edge=0.05, odds_snapshot_timestamp="2024-04-01T15:00:00+00:00")
+    rows = load_daily_board(_FakeStore([first, second]))
+    assert len(rows) == 2
+    assert sorted(r["edge"] for r in rows) == [0.03, 0.05]
+
+
+def test_edge_is_displayed_verbatim_even_when_internally_inconsistent():
+    # Board must never recompute edge from model/market probability -- it is
+    # MARKET-001's job. An edge that does not equal model - market must still
+    # pass through unchanged, proving no recomputation happens here.
+    record = _record(1, edge=0.05)
+    record["model_probability"] = 0.55
+    record["market_probability"] = 0.50  # 0.55 - 0.50 = 0.05, but force a mismatch
+    record["edge"] = 0.99  # deliberately inconsistent with model/market
+    [row] = load_daily_board(_FakeStore([record]))
+    assert row["edge"] == 0.99
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "GAP (P2): load_daily_board indexes record['edge'], ['model_probability'], "
+        "['market_probability'], ['odds_snapshot_timestamp'], ['model_version'], and "
+        "['game_pk'] with plain __getitem__, not .get(). PIPE-001's own writer "
+        "(_assert_record_complete) guarantees these fields are non-None on write, but "
+        "load_daily_board accepts ANY object exposing .records() and JsonLinesPredictionStore "
+        "does no schema validation on read -- a hand-edited, truncated, or stale-schema "
+        "JSONL line missing one of these keys crashes the WHOLE board (KeyError, uncaught "
+        "in daily_board_page.py) instead of degrading gracefully for just that row. "
+        "Remove xfail once load_daily_board either validates/skips incomplete records with "
+        "a visible reason, or the crash-on-malformed-store behavior is deliberately documented."
+    ),
+)
+def test_record_missing_required_field_does_not_crash_whole_board():
+    record = _record(1, edge=0.03)
+    del record["edge"]
+    load_daily_board(_FakeStore([record]))
