@@ -73,6 +73,7 @@ def _matrix_with_results(results: list[dict]):
         bullpen_features=comp["bullpen"],
         results=results,
         certification=_cert(),
+        completeness_mode="inference",
     )
 
 
@@ -188,6 +189,7 @@ def _build(games, tgs, appearances):
         bullpen_features=build_bullpen_features(appearances),
         results=tgs,
         certification=_cert(),
+        completeness_mode="inference",
     )
 
 

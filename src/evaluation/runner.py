@@ -4,6 +4,11 @@ This module owns the FEAT-004 feature-dict -> numeric matrix vectorization and
 drives every model family (logistic / random forest / xgboost) uniformly over the
 :mod:`evaluation.splits` folds.
 
+Gold completeness gate (FEAT-006)
+    A published FEAT-004 matrix must carry a strict historical completeness PASS
+    before any estimator is built. Inference-mode matrices are refused. Bare row
+    sequences remain supported only for focused evaluator tests.
+
 Vectorization
     ``vectorize_matrix`` builds ``X`` from the **sorted union** of feature keys
     observed across all rows (missing values -> ``NaN``). Because the column set
@@ -43,6 +48,7 @@ from sklearn.metrics import (
 )
 
 from evaluation.splits import Fold, fold_indices
+from features.completeness import require_historical_feature_completeness
 
 # Model families expose ``build_model(random_state, **overrides) -> estimator``.
 BuildModel = Callable[..., Any]
@@ -89,6 +95,7 @@ def run_evaluation(
         where ``folds`` is a per-fold metrics list and ``aggregate`` pools all
         test-fold predictions.
     """
+    require_historical_feature_completeness(matrix)
     build = _resolve_build_model(model)
     name = model_name or _model_name(model, build)
 

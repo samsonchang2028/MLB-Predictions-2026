@@ -91,6 +91,7 @@ def test_daily_pipeline_end_to_end_with_real_model_and_json_store(tmp_path) -> N
     matrix = build_feature_matrix(
         schedule, team_features=team, starter_features=starter,
         bullpen_features=bullpen, results=[], certification=_cert(),
+        completeness_mode="inference",
     )
     training_columns = list(matrix["feature_columns"])
     model = _fit_real_model(training_columns)

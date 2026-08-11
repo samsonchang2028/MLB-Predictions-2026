@@ -66,6 +66,19 @@ def _assert_valid_metrics(block: dict) -> None:
     assert 0.0 <= block["secondary"]["accuracy"] <= 1.0
 
 
+def test_calibration_refuses_published_gold_without_historical_pass() -> None:
+    matrix = _synthetic_matrix()
+    matrix.update(
+        {
+            "build_id": "certified-build",
+            "certification_status": "PASS",
+            "feature_completeness": {"mode": "inference", "status": "WARN"},
+        }
+    )
+    with pytest.raises(ValueError, match="historical feature completeness PASS"):
+        compare_calibration(logistic, matrix, expanding_folds())
+
+
 @pytest.mark.parametrize("method", CALIBRATION_METHODS)
 def test_evaluate_calibration_valid_for_both_methods(method: str) -> None:
     matrix = _synthetic_matrix()

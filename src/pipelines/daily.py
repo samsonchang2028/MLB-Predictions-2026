@@ -37,6 +37,11 @@ emitted as ``NaN`` in the declared order; a column that appears today but is abs
 from the declared training union is treated as **schema drift and raises** (it is
 an error, not something to silently feed the model).
 
+The Gold completeness report runs in explicit ``inference`` mode here. A small
+slate's cold-start/all-missing columns are visible as non-blocking WARNs; this
+does not weaken training, because evaluation refuses anything except a strict
+historical completeness PASS and today's vector still uses the trained union.
+
 Immutability / idempotency
 --------------------------
 Records are keyed by ``(game_pk, prediction_timestamp)`` and writes are
@@ -206,6 +211,7 @@ def run_daily_predictions(
         bullpen_features=bullpen_features,
         results=list(results),
         certification=certification,
+        completeness_mode="inference",
     )
     build_id = matrix["build_id"]
     schema_version = feature_schema_version or build_id
