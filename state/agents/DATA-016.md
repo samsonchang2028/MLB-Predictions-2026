@@ -1,14 +1,13 @@
 # DATA-016 Agent Status
 
 - Task ID: DATA-016
-- Active role: Reviewer + Tester (dispatched, repair loop 2 candidate)
-- Status: REVIEWING / TESTING (implementation + focused/live smoke gates passed;
-  repair loop 2 fixed reviewer/tester findings, full suite green; re-gate in
-  progress)
-- Branch: `agent/DATA-016-pitching-stats`
+- Active role: none (gates passed, merged)
+- Status: **APPROVED / MERGED to main**
+- Branch: `agent/DATA-016-pitching-stats` (merged)
 - Worktree: `C:\Users\sfkim\OneDrive\Desktop\sideproj\predictions-1-wt-DATA-016`
-- Current activity: Awaiting required reviewer/tester re-gate and Orchestrator
-  decision on the full 2021-2025 backfill.
+  (pending Orchestrator cleanup)
+- Current activity: Merged. Full 2021-2025 re-ingest is the next gate, owned by the
+  Orchestrator/operator (long-running, single-writer, not launched automatically).
 - Verification:
   - focused ingestion/normalization suite: 56 passed
   - real Bronze -> Silver smoke: 5 completed games on five dates/seasons
@@ -69,3 +68,33 @@ result above still stands as the network-verified evidence.
 
 Handoff: ready for reviewer + tester re-gate. No known open issues in the
 completed-game guard or the fixed fixtures.
+
+## Reviewer + Tester re-gate (repair loop 2) — both PASS
+
+**Reviewer verdict: APPROVE.** No P0/P1. Re-ran the required tests (48 passed),
+traced every caller of `_validate_payload`/`_assert_pitching_stats_present`/
+`_game_lifecycle`, cross-checked lifecycle classification against `schedule.py`'s
+existing `_LIFECYCLE_RANK` table (exact match), confirmed idempotency/DATA-010
+semantics unaffected, confirmed no leakage, confirmed the integration-fixture fix
+is legitimate (not a weakened test — the non-played hollow-boxscore path is still
+exercised for games 1002/1004/1005). Findings (both non-blocking, deferred):
+- P2: 5 new validation branches (duplicate/invalid pitcher id, person-id
+  mismatch, team-identity mismatch, non-dict `players`) have no direct unit test
+  yet, though the logic reads correctly. Addressed in the same pass — see below.
+- P3: redundant `_game_lifecycle` lookup runs even for already-fetched games
+  (harmless PK lookup, discarded).
+- P3: `_is_completed_lifecycle(None)` defaults strict/completed; only reachable
+  from tests, documented in the docstring.
+
+**Tester verdict: LOOKS_SAFE_TO_MERGE.** Re-ran both required suites (58 after
+additions / 437 full repo) and confirmed the xgboost-import-blocked-modules gap
+reproduces identically on `main` (pre-existing, unrelated). Added 5 adversarial
+regression tests (partial-hollow payload, `inningsPitched` format matrix,
+cross-side duplicate pitcher id, non-completed-lifecycle-with-malformed-data,
+idempotent re-run) — committed as `11f9f0d` (test-only). All pass. One
+informational P3: duplicate pitcher id is checked per-side, not across
+home/away — unreachable with real MLB data (globally unique person ids), so
+left as documented current behavior rather than tightened.
+
+**Orchestrator decision: MERGE.** No P0/P1 from either gate; all P2/P3s are
+non-blocking and recorded here for the historical record. Merged to `main`.
