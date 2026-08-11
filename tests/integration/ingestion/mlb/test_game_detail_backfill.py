@@ -8,12 +8,25 @@ from ingestion.mlb import backfill_game_details, ingest_schedule
 from storage import connect_database, storage_paths
 
 
+# MLB coded game states recognized by ``_is_completed_lifecycle`` as genuinely
+# non-played (schedule may still carry the game as abstractGameState=Final for
+# suspended/cancelled outcomes, but the coded state is what the guard checks).
+_CODED_GAME_STATE = {
+    "Final": "F",
+    "Suspended": "U",
+    "Postponed": "D",
+    "Cancelled": "C",
+    "Rescheduled": "S",
+}
+
+
 def _schedule_game(
     game_pk: int,
     *,
     detail: str = "Final",
     game_number: int = 1,
 ) -> dict[str, object]:
+    coded = _CODED_GAME_STATE.get(detail, "S")
     return {
         "gamePk": game_pk,
         "season": "2025",
@@ -28,9 +41,9 @@ def _schedule_game(
         },
         "status": {
             "abstractGameState": "Final" if detail == "Final" else "Preview",
-            "codedGameState": "F" if detail == "Final" else "S",
+            "codedGameState": coded,
             "detailedState": detail,
-            "statusCode": "F" if detail == "Final" else "S",
+            "statusCode": coded,
         },
     }
 
@@ -39,7 +52,26 @@ def _schedule_payload(*games: dict[str, object]) -> bytes:
     return json.dumps({"dates": [{"date": "2025-04-01", "games": games}]}).encode()
 
 
-def _detail_payload(game_pk: int) -> bytes:
+def _detail_payload(game_pk: int, *, played: bool = True) -> bytes:
+    # Completed games must carry a real pitching line or the DATA-016 hollow
+    # guard rejects them; non-played games (Postponed/Cancelled/Suspended/
+    # Rescheduled) legitimately have empty boxscore pitchers.
+    if played:
+        pitching = {
+            "inningsPitched": "6.0", "outs": 18, "battersFaced": 25,
+            "numberOfPitches": 97, "hits": 6, "runs": 3, "earnedRuns": 3,
+            "baseOnBalls": 3, "strikeOuts": 3, "homeRuns": 1,
+        }
+        home_pitchers, away_pitchers = [1], [2]
+        home_players = {
+            "ID1": {"person": {"id": 1, "fullName": "Home Starter"}, "stats": {"pitching": pitching}},
+        }
+        away_players = {
+            "ID2": {"person": {"id": 2, "fullName": "Away Starter"}, "stats": {"pitching": pitching}},
+        }
+    else:
+        home_pitchers, away_pitchers = [], []
+        home_players, away_players = {}, {}
     return json.dumps(
         {
             "gamePk": game_pk,
@@ -47,8 +79,8 @@ def _detail_payload(game_pk: int) -> bytes:
             "liveData": {
                 "boxscore": {
                     "teams": {
-                        "home": {"team": {"id": 137}, "players": {}, "pitchers": []},
-                        "away": {"team": {"id": 110}, "players": {}, "pitchers": []},
+                        "home": {"team": {"id": 137}, "players": home_players, "pitchers": home_pitchers},
+                        "away": {"team": {"id": 110}, "players": away_players, "pitchers": away_pitchers},
                     }
                 }
             },
@@ -86,7 +118,7 @@ def test_restart_skips_terminal_rows_and_retry_resolves_missing_and_failed_games
             return None
         if game_pk == 1004:
             raise TimeoutError("upstream timed out")
-        return _detail_payload(game_pk)
+        return _detail_payload(game_pk, played=(game_pk == 1001))
 
     first = backfill_game_details(
         tmp_path,
@@ -122,7 +154,7 @@ def test_restart_skips_terminal_rows_and_retry_resolves_missing_and_failed_games
 
     retried = backfill_game_details(
         tmp_path,
-        lambda endpoint, _: _detail_payload(int(endpoint.split("/")[4])),
+        lambda endpoint, _: _detail_payload(int(endpoint.split("/")[4]), played=False),
         game_pks=[1004, 1003],
         retry_unresolved=True,
         fetched_at=datetime(2025, 4, 5, tzinfo=timezone.utc),
