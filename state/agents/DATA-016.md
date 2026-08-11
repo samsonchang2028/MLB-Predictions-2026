@@ -1,9 +1,10 @@
 # DATA-016 Agent Status
 
 - Task ID: DATA-016
-- Active role: Implementer (repair loop 2 complete)
-- Status: CANDIDATE (implementation + focused/live smoke gates passed; repair
-  loop 2 fixed reviewer/tester findings, full suite green)
+- Active role: Reviewer + Tester (dispatched, repair loop 2 candidate)
+- Status: REVIEWING / TESTING (implementation + focused/live smoke gates passed;
+  repair loop 2 fixed reviewer/tester findings, full suite green; re-gate in
+  progress)
 - Branch: `agent/DATA-016-pitching-stats`
 - Worktree: `C:\Users\sfkim\OneDrive\Desktop\sideproj\predictions-1-wt-DATA-016`
 - Current activity: Awaiting required reviewer/tester re-gate and Orchestrator
