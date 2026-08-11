@@ -90,3 +90,20 @@ __all__ += [
     "validate_odds_archive",
     "write_coverage_report",
 ]
+
+# --- DATA-017: semantic-completeness / measure-column coverage (append-only) ---
+from validation.coverage import (
+    PITCHER_APPEARANCE_MEASURES,
+    TEAM_OUTCOME_MEASURES,
+    MeasureColumn,
+    coverage_report,
+    run_coverage_checks,
+)
+
+__all__ += [
+    "MeasureColumn",
+    "PITCHER_APPEARANCE_MEASURES",
+    "TEAM_OUTCOME_MEASURES",
+    "coverage_report",
+    "run_coverage_checks",
+]

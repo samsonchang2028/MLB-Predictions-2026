@@ -25,6 +25,7 @@ from typing import Any
 
 from validation.results import FAIL, PASS, CheckResult, summarize
 from validation.runner import run_all
+from validation.coverage import coverage_report
 
 # Bump when the artifact schema changes in a backward-incompatible way.
 CERTIFICATION_VERSION = 1
@@ -103,6 +104,8 @@ def build_certification(
         "referential_integrity": _category(results, prefix="ref."),
         "lifecycle": _category(results, names=_LIFECYCLE_CHECKS),
         "pitcher_completeness": _pitcher_completeness(connection, results),
+        "semantic_completeness": _semantic_completeness(connection, results),
+        "validity": _validity_dimensions(results),
         "temporal": _category(results, names=_TEMPORAL_CHECKS),
         "leakage": _category(results, names=_LEAKAGE_CHECKS),
         "reconciliation": _reconciliation(connection, by_check),
@@ -182,6 +185,61 @@ def _category(
     return {
         "status": FAIL if failed else PASS,
         "checks": [_result_dict(r) for r in selected],
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Three validity dimensions (ADR-005): structural, semantic, temporal/leakage.
+# All three are required for PASS; reporting them separately makes it visible
+# which dimension failed. The overall verdict still comes from
+# ``certification_status`` over ALL results, so a merge-blocking semantic FAIL
+# forces the whole certification to FAIL.
+# --------------------------------------------------------------------------- #
+_SEMANTIC_PREFIX = "semantic."
+_TEMPORAL_LEAKAGE_PREFIX = "leakage."
+
+
+def _semantic_completeness(
+    connection: Any, results: list[CheckResult]
+) -> dict[str, Any]:
+    """Semantic-completeness dimension: coverage numbers + check statuses.
+
+    Records per-column coverage and per-family usability (DATA-017) so builds are
+    comparable over time, alongside the ``semantic.*`` check verdicts.
+    """
+    report = coverage_report(connection)
+    semantic_results = [
+        r for r in results if r.check.startswith(_SEMANTIC_PREFIX)
+    ]
+    report["status"] = FAIL if any(
+        r.status == FAIL for r in semantic_results
+    ) else PASS
+    report["checks"] = [_result_dict(r) for r in semantic_results]
+    return report
+
+
+def _validity_dimensions(results: list[CheckResult]) -> dict[str, Any]:
+    """Group every check under exactly one of the three validity dimensions."""
+
+    def dimension(predicate: Any) -> dict[str, Any]:
+        selected = [r for r in results if predicate(r.check)]
+        return {
+            "status": FAIL if any(r.status == FAIL for r in selected) else PASS,
+            "checks": [r.check for r in selected],
+        }
+
+    return {
+        "structural": dimension(
+            lambda c: not c.startswith(
+                (_SEMANTIC_PREFIX, _TEMPORAL_LEAKAGE_PREFIX)
+            )
+        ),
+        "semantic_completeness": dimension(
+            lambda c: c.startswith(_SEMANTIC_PREFIX)
+        ),
+        "temporal_leakage": dimension(
+            lambda c: c.startswith(_TEMPORAL_LEAKAGE_PREFIX)
+        ),
     }
 
 
