@@ -97,6 +97,9 @@ def attach_results(
         raise ValueError("enrichment_timestamp must be a datetime")
 
     results_index = _index_results(results)
+    # Snapshot of what the store already holds, for the idempotency check
+    # below -- keyed the same way the store keys itself.
+    existing_by_key = {_record_key(r): r for r in store.records()}
 
     records: list[dict[str, Any]] = []
     written: list[dict[str, Any]] = []
@@ -132,6 +135,20 @@ def attach_results(
         }
         _assert_enrichment_complete(record)
 
+        # Idempotency is about the *fact* enriched (actual/predicted/correct/
+        # model_version/...), not the wall-clock moment this run happened to
+        # observe it. A re-run over an already-journaled game naturally carries
+        # a fresh `enrichment_timestamp`; if the substantive content is
+        # unchanged that is a no-op, not a conflict. The store's own
+        # whole-record equality check would otherwise treat every re-run as a
+        # conflicting write, so re-observing the same fact is short-circuited
+        # here before it ever reaches `store.append`. A genuine content change
+        # still falls through to `store.append`, which raises as before.
+        prior = existing_by_key.get(_record_key(record))
+        if prior is not None and _comparable(prior) == _comparable(record):
+            records.append(prior)
+            continue
+
         outcome = store.append(record)
         records.append(record)
         if outcome == "appended":
@@ -148,6 +165,27 @@ def attach_results(
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+def _record_key(record: Mapping[str, Any]) -> tuple[Any, Any]:
+    """Same (game_pk, prediction_timestamp) key the stores key on, normalized
+    so an in-memory record (datetime) and a JSON-lines round-tripped record
+    (ISO string) compare equal."""
+    prediction_timestamp = record["prediction_timestamp"]
+    if isinstance(prediction_timestamp, datetime):
+        prediction_timestamp = prediction_timestamp.isoformat()
+    return (record["game_pk"], prediction_timestamp)
+
+
+def _comparable(record: Mapping[str, Any]) -> dict[str, Any]:
+    """JSON-safe view of a record, excluding `enrichment_timestamp`, for the
+    idempotency comparison -- WHEN a fact was observed doesn't change WHAT was
+    observed."""
+    return {
+        key: (value.isoformat() if isinstance(value, datetime) else value)
+        for key, value in record.items()
+        if key != "enrichment_timestamp"
+    }
+
+
 def _index_results(
     results: Sequence[Mapping[str, Any]],
 ) -> dict[tuple[Any, Any], Mapping[str, Any]]:
@@ -179,13 +217,15 @@ def _derive_home_win(
     home_score = home.get("score")
     away = results_index.get((game_pk, away_id))
     away_score = away.get("score") if away is not None else None
-    if (
-        isinstance(home_score, (int, float))
-        and isinstance(away_score, (int, float))
-        and home_score != away_score
-    ):
+    if _is_number(home_score) and _is_number(away_score) and home_score != away_score:
         return home_score > away_score
     return None
+
+
+def _is_number(value: Any) -> bool:
+    # Matches features.build._is_number: bool is an int subclass in Python,
+    # so it must be excluded explicitly.
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _assert_enrichment_complete(record: Mapping[str, Any]) -> None:
