@@ -40,10 +40,13 @@ format.
 | PIPE-001 | done | MARKET-001 | merged; daily pipeline (`src/pipelines/daily.py`); immutable idempotent records; PIT-guarded |
 | OBS-001 | ready | PIPE-001 | UNBLOCKED; prediction journal; parallel with APP-001 (dispatch deferred for real-data run) |
 | APP-001 | ready | PIPE-001 | UNBLOCKED; Streamlit board; parallel with OBS-001 (dispatch deferred for real-data run) |
-| DATA-016 | in-progress | DATA-011 | dispatched; P0: fields= projection dropped ALL pitching stats; fix + correct the wrong test + hollow-payload guard + real-payload contract; re-ingest |
-| DATA-017 | in-progress | DATA-007 | dispatched; certification coverage + plausibility checks (100%-NULL and degenerate columns FAIL) |
-| FEAT-005 | ready | FEAT-004 | component-coverage policy: 4 games with zero appearances hard-fail the matrix build |
-| FEAT-006 | in-progress | FEAT-004 | dispatched; feature-matrix must not publish all-empty columns (last line of defense) |
+| DATA-016 | done | DATA-011 | merged 210c70b; P0 fields= projection fix + lifecycle-aware hollow-payload guard + real-payload contract. Full 2021-2025 re-ingest NOT yet launched (see DATA-018) |
+| DATA-017 | done | DATA-007 | merged baee618; certification semantic-completeness gate (100%-NULL and degenerate/constant columns FAIL) |
+| FEAT-005 | done | FEAT-004 | merged 100c5b2; component-coverage policy: 4 games with zero appearances, general observable-coverage rule (not a game_pk allowlist) |
+| FEAT-006 | done | FEAT-004 | merged 100c5b2; Gold pre-model completeness gate blocks ML experiments on an entirely-empty required feature family; no auto-dropping |
+| DATA-018 | ready | DATA-016, DATA-010 | dispatched; invalidate stale hollow bronze.mlb_game_detail_payloads rows so retry_unresolved backfill genuinely re-fetches instead of no-op'ing; operator script for the real re-ingest chain (invalidate -> refetch -> re-normalize -> re-certify). Does NOT itself launch the 4.5h live run |
+| OBS-001 | dispatched | PIPE-001 | UNBLOCKED; prediction journal |
+| APP-001 | dispatched | PIPE-001 | UNBLOCKED; Streamlit board |
 | APP-002 | blocked | APP-001, OBS-001 | final V1 UI |
 
 ## Status transitions
