@@ -147,33 +147,38 @@ to certify cleanly.
 
 ## Recently merged
 
-- DATA-016 - game-detail `fields=` projection fix + lifecycle-aware hollow-boxscore
-  guard MERGED to main (`210c70b`, no-ff merge of `agent/DATA-016-pitching-stats`).
-  Reviewer (APPROVE) and Tester (LOOKS_SAFE_TO_MERGE) gates both passed with no
-  P0/P1; full repo suite green on main post-merge (447 passed). See
-  `state/agents/DATA-016.md` for the full re-gate record and deferred P2/P3s
-  (missing direct unit coverage for 5 validation branches — logic verified
-  correct by inspection; cross-side duplicate pitcher id not checked —
-  unreachable with real MLB data). **The full 2021-2025 game-detail RE-INGEST
-  (~4.5h, single-writer) has NOT been launched** — the fix only applies to
-  future fetches; already-stored Bronze rows are still the pre-fix hollow data.
-  This re-ingest + re-certification is the next required action before FEAT-002/
-  FEAT-003 pitching features or a re-run experiment can be trusted.
+All three data-integrity hardening tasks are merged to main. Reviewer + Tester
+gates all passed with zero P0/P1 findings across all three. Full repo suite
+green on main post-merge: **545 passed** (main's environment has xgboost
+installed, so no exclusions needed here, unlike the individual agent
+worktrees).
+
+- DATA-016 (`210c70b`) - game-detail `fields=` projection fix + lifecycle-aware
+  hollow-boxscore guard, `numberOfPitches` required, real-payload contract
+  fixture + live smoke script. See `state/agents/DATA-016.md`. Deferred P2/P3s:
+  missing direct unit coverage for 5 validation branches (logic verified
+  correct by inspection); cross-side duplicate pitcher id not checked
+  (unreachable with real MLB data).
+- DATA-017 (`baee618`) - certification semantic-completeness gate: a
+  structurally-empty or degenerate (constant-value) required measure column
+  can no longer certify PASS; fixed a WARN-collapsed-to-PASS bug in
+  certification dimension aggregation. See `state/agents/DATA-017.md`.
+- FEAT-005/006 (`100c5b2`) - explicit, general (non-allowlist) component-
+  coverage exclusion policy for the 4 known zero-appearance games; Gold
+  pre-model completeness gate blocking ML experiments on an entirely-empty
+  required feature family (no auto-dropping), wired into the evaluator +
+  calibration path. See `state/agents/FEAT-005-006.md`.
+
+**The full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer) has NOT been
+launched.** DATA-016's fix only applies to future fetches; already-stored
+Bronze rows are still the pre-fix hollow pitching data. This re-ingest +
+re-certification is the next required action before FEAT-002/FEAT-003
+pitching features are real or a re-run experiment can be trusted. It is a
+long-running, single-writer, live-network operation against the real MLB API
+and requires an explicit go-ahead before launch.
 
 ## Ready
 
-- DATA-017 - certification must FAIL on 100%-NULL declared measure columns; this
-  gap let the hollow build certify PASS. Candidate complete on
-  `agent/DATA-017-column-coverage`; Reviewer (APPROVE) and Tester
-  (LOOKS_SAFE_TO_MERGE) gates both passed with no P0/P1 findings. Awaiting merge
-  decision.
-- FEAT-005 / FEAT-006 - component-coverage policy (4 regular-season games with
-  zero parsed appearances, general observable-coverage rule not a game_pk
-  allowlist) + Gold pre-model completeness gate (blocks ML experiments when a
-  required feature family is entirely empty; no auto-dropping). Candidate
-  complete on `agent/FEAT-005-006-gold-completeness`; Reviewer (APPROVE) and
-  Tester (LOOKS_SAFE_TO_MERGE) gates both passed with no P0/P1 findings.
-  Awaiting merge decision.
 - OBS-001 + APP-001 - prediction journal and Streamlit board (parallel-safe).
   Dispatch was deferred to run the real experiment; both remain unblocked.
 
@@ -212,20 +217,23 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-Dispatch DATA-016 (pitching-stat projection fix + re-ingest) and DATA-017
-(certification coverage check) - DATA-017 can proceed in parallel since it touches
-`src/validation/` while DATA-016 touches `src/ingestion/mlb/`. Then re-certify,
-rebuild the matrix, and re-run the experiment to get trustworthy metrics.
+DATA-016/DATA-017/FEAT-005/FEAT-006 are merged. The next required action is the
+full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer, live network) using
+the repaired projection, followed by re-certification (now with the DATA-017
+semantic-completeness gate active) and a Gold completeness check (FEAT-006).
+Only once that chain is PASS should the feature matrix be rebuilt and the
+experiment re-run for trustworthy metrics. This requires an explicit
+Orchestrator/operator go-ahead before launch (long-running, single-writer).
 
 ## Safe parallel
 
-- DATA-016 (`src/ingestion/mlb/`) and DATA-017 (`src/validation/`) own disjoint
-  surfaces. FEAT-005 (`src/features/build.py`) is also disjoint. OBS-001 and
-  APP-001 remain parallel-safe with each other.
+- OBS-001 and APP-001 remain parallel-safe with each other and with the
+  DATA-016 re-ingest (disjoint surfaces).
 
 ## Blocked
 
-- Nothing structurally. Trustworthy model metrics are gated on DATA-016.
+- Nothing structurally. Trustworthy model metrics are gated on the DATA-016
+  re-ingest + re-certification (not yet launched).
 
 ## Current architecture decisions
 
