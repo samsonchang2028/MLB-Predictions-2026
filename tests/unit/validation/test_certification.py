@@ -9,7 +9,9 @@ from __future__ import annotations
 from validation.certification import (
     CERTIFICATION_VERSION,
     _category,
+    _dimension_status,
     _fingerprint,
+    _validity_dimensions,
     certification_status,
     write_certification,
 )
@@ -73,6 +75,42 @@ def test_fingerprint_ignores_timestamp_only() -> None:
     changed = dict(base, status="FAIL")
     assert _fingerprint(base) == _fingerprint(other_time)
     assert _fingerprint(base) != _fingerprint(changed)
+
+
+# --------------------------------------------------------------------------- #
+# DATA-017 repair (731833e): a validity dimension with WARN-only checks (no
+# FAIL) must report WARN, not silently collapse to PASS and not be escalated
+# to FAIL. Pre-repair, ``_semantic_completeness``/``_validity_dimensions`` used
+# ``FAIL if any FAIL else PASS`` with no WARN branch, so a WARN-only semantic
+# dimension incorrectly reported PASS.
+# --------------------------------------------------------------------------- #
+def test_dimension_status_warn_only_is_warn_not_pass() -> None:
+    results = [ok("semantic.a", "P1"), warn("semantic.b", "partial coverage")]
+    assert _dimension_status(results) == "WARN"
+
+
+def test_dimension_status_fail_beats_warn() -> None:
+    results = [warn("semantic.a", "note"), fail("semantic.b", "P1", "hard fail")]
+    assert _dimension_status(results) == "FAIL"
+
+
+def test_dimension_status_all_pass_is_pass() -> None:
+    assert _dimension_status([ok("semantic.a", "P1"), ok("semantic.b", "P1")]) == "PASS"
+
+
+def test_validity_dimensions_warn_only_semantic_not_collapsed_to_pass() -> None:
+    """Regression for the DATA-017 WARN-collapse bug at the dimension-report
+    level: a WARN-only semantic-completeness dimension must surface as WARN,
+    with structural/temporal_leakage unaffected."""
+    results = [
+        ok("identity.game_pk_unique", "P0"),
+        warn("semantic.pitcher_stat_coverage", "null_rate=0.030 (partial coverage)"),
+        ok("leakage.chronological_folds", "P0"),
+    ]
+    dims = _validity_dimensions(results)
+    assert dims["semantic_completeness"]["status"] == "WARN"
+    assert dims["structural"]["status"] == "PASS"
+    assert dims["temporal_leakage"]["status"] == "PASS"
 
 
 def test_write_certification_is_content_addressed(tmp_path) -> None:
