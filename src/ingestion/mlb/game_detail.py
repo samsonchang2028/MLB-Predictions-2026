@@ -212,6 +212,65 @@ def backfill_game_details(
     return result
 
 
+def invalidate_game_detail_payloads(
+    storage_root: str | Path, game_pks: Iterable[int]
+) -> int:
+    """Delete stale ``bronze.mlb_game_detail_payloads`` rows so ``game_pks``
+    become eligible for a genuine re-fetch (DATA-018).
+
+    Only the pointer/index row is removed. The immutable, content-addressed
+    raw file on disk under ``raw/`` is never touched -- it stays forever,
+    simply unreferenced by any current payload row -- and
+    ``bronze.mlb_game_detail_attempts`` (the honest historical audit trail) is
+    neither deleted nor rewritten. A ``game_pk`` with no existing payload row
+    is left alone (nothing to delete for it).
+
+    Deleting a row here does NOT by itself trigger a re-fetch: the most recent
+    ``bronze.mlb_game_detail_attempts`` row for the game_pk still shows
+    ``'fetched'``, so a subsequent ``backfill_game_details`` call still needs
+    ``retry_unresolved=True`` to actually re-fetch these game_pks -- that flag
+    already exists and is unchanged by this function.
+
+    Returns the number of payload rows actually deleted.
+    """
+    targets = _distinct_positive_ints(game_pks, "game_pks")
+    if not targets:
+        raise ValueError("game_pks must not be empty")
+    paths = initialize_storage(storage_root)
+    placeholders = ", ".join("?" for _ in targets)
+    with connect_database(paths["database"]) as connection:
+        connection.execute("BEGIN TRANSACTION")
+        try:
+            matched = connection.execute(
+                f"""SELECT count(*) FROM bronze.mlb_game_detail_payloads
+                    WHERE game_pk IN ({placeholders})""",
+                targets,
+            ).fetchone()[0]
+            connection.execute(
+                f"""DELETE FROM bronze.mlb_game_detail_payloads
+                    WHERE game_pk IN ({placeholders})""",
+                targets,
+            )
+            connection.execute("COMMIT")
+        except Exception:
+            connection.execute("ROLLBACK")
+            raise
+    return matched
+
+
+def _distinct_positive_ints(values: Iterable[int], name: str) -> list[int]:
+    result: list[int] = []
+    seen: set[int] = set()
+    for value in values:
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must contain positive integers")
+        if value in seen:
+            raise ValueError(f"{name} must not contain duplicates")
+        seen.add(value)
+        result.append(value)
+    return result
+
+
 def _target_game_pks(
     connection: Any,
     game_pks: Iterable[int] | None,
