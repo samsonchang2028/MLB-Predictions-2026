@@ -145,18 +145,35 @@ to certify cleanly.
 
 - None.
 
+## Recently merged
+
+- DATA-016 - game-detail `fields=` projection fix + lifecycle-aware hollow-boxscore
+  guard MERGED to main (`210c70b`, no-ff merge of `agent/DATA-016-pitching-stats`).
+  Reviewer (APPROVE) and Tester (LOOKS_SAFE_TO_MERGE) gates both passed with no
+  P0/P1; full repo suite green on main post-merge (447 passed). See
+  `state/agents/DATA-016.md` for the full re-gate record and deferred P2/P3s
+  (missing direct unit coverage for 5 validation branches — logic verified
+  correct by inspection; cross-side duplicate pitcher id not checked —
+  unreachable with real MLB data). **The full 2021-2025 game-detail RE-INGEST
+  (~4.5h, single-writer) has NOT been launched** — the fix only applies to
+  future fetches; already-stored Bronze rows are still the pre-fix hollow data.
+  This re-ingest + re-certification is the next required action before FEAT-002/
+  FEAT-003 pitching features or a re-run experiment can be trusted.
+
 ## Ready
 
-- DATA-016 (do FIRST) - game-detail `fields=` projection dropped ALL pitching
-  stats; `silver.pitcher_appearances` is 100% NULL on every stat column, so 58 of
-  211 feature columns are structurally empty and the first real experiment trained
-  on team features only. Requires a projection fix + game-detail RE-INGEST
-  (~4.5h, single-writer) + re-certification. P0 for model quality.
 - DATA-017 - certification must FAIL on 100%-NULL declared measure columns; this
-  gap let the hollow build certify PASS.
-- FEAT-005 - component-coverage policy: 4 regular-season games with zero parsed
-  appearances hard-fail `build_feature_matrix` (worked around out-of-band in the
-  experiment driver).
+  gap let the hollow build certify PASS. Candidate complete on
+  `agent/DATA-017-column-coverage`; Reviewer (APPROVE) and Tester
+  (LOOKS_SAFE_TO_MERGE) gates both passed with no P0/P1 findings. Awaiting merge
+  decision.
+- FEAT-005 / FEAT-006 - component-coverage policy (4 regular-season games with
+  zero parsed appearances, general observable-coverage rule not a game_pk
+  allowlist) + Gold pre-model completeness gate (blocks ML experiments when a
+  required feature family is entirely empty; no auto-dropping). Candidate
+  complete on `agent/FEAT-005-006-gold-completeness`; Reviewer (APPROVE) and
+  Tester (LOOKS_SAFE_TO_MERGE) gates both passed with no P0/P1 findings.
+  Awaiting merge decision.
 - OBS-001 + APP-001 - prediction journal and Streamlit board (parallel-safe).
   Dispatch was deferred to run the real experiment; both remain unblocked.
 
