@@ -1,8 +1,8 @@
 # DATA-018 Agent Status
 
 - Task ID: DATA-018
-- Active role: Implementer (complete, pending review/test gates)
-- Status: IMPLEMENTED
+- Active role: Implementer (tester repair complete; awaiting re-gate)
+- Status: REPAIRED
 - Branch: `agent/DATA-018-hollow-invalidation`
 - Worktree: `C:\Users\sfkim\OneDrive\Desktop\sideproj\predictions-1-wt-DATA-018`
 
@@ -23,10 +23,12 @@ Combined with the pre-existing `retry_unresolved=True` flag on
 Added `scripts/data018_reingest.py`: the operator entry point for the real
 multi-hour live re-ingest. Selects all 2021-2025 `game_pk`s from
 `bronze.mlb_games`, invalidates only the ones not already re-fetched under the
-given `--run-id` (so a restart with the same `--run-id` never re-invalidates
-already-good re-fetched data), re-backfills in batches (default 250, prints
-progress per batch), re-normalizes Silver, and re-certifies. Not run against
-the real network/database by this task -- that is a separate, later,
+given `--build-id` (default `DATA-018`). Restart safety is keyed by
+`ingestion_build_id`, not `ingestion_run_id`, so changing or forgetting
+`--run-id` during a restart will not re-invalidate already-good repair payloads.
+The script re-backfills in batches (default 250, prints progress per batch),
+re-normalizes Silver, and re-certifies. Not run against the real
+network/database by this task -- that is a separate, later,
 explicitly-authorized step.
 
 ## Files changed
@@ -46,17 +48,19 @@ explicitly-authorized step.
   trip, 1 regression proving un-invalidated games still no-op skip).
 - `python -m pytest -q` (full repo suite, this worktree has xgboost) -> 553
   passed (main was 545; +8 matches the new tests, zero regressions).
+- Repair pass: `python -m pytest tests/integration/ingestion/mlb/test_game_detail_invalidate.py tests/integration/ingestion/mlb/test_game_detail_backfill.py -q`
+  -> 15 passed
 - Manual smoke of `scripts/data018_reingest.py` with an injected fake fetcher
   (no network, temp storage root, monkeypatched
   `statsapi_fetchers.make_game_detail_fetcher`): seeded 3 hollow payloads,
   ran the script end-to-end (invalidate -> batched backfill -> normalize ->
   certify), confirmed all 3 came back with real (non-hollow) pitching stats
-  under the new run_id, then re-ran with the SAME run_id and confirmed it
-  invalidated 0 / re-fetched 0 (idempotent restart, all skipped via the
-  existing hash-verify skip path). The certification artifact this produced
-  (expected FAIL -- a 3-game fixture has no odds archive / real coverage) was
-  deleted afterward and is not committed; this was a manual check, not a
-  pytest test, per the task's "do NOT invoke it as a side effect of any test."
+  under the repair build id, then re-ran and confirmed it invalidated 0 /
+  re-fetched 0 (idempotent restart, all skipped via the existing hash-verify
+  skip path). The certification artifact this produced (expected FAIL -- a
+  3-game fixture has no odds archive / real coverage) was deleted afterward
+  and is not committed; this was a manual check, not a pytest test, per the
+  task's "do NOT invoke it as a side effect of any test."
 
 ## Confirmation: raw-payload immutability preserved
 
@@ -82,6 +86,18 @@ files now exist, the old hollow one and the new real one, both immutable).
   (only per-call totals); the operator script's batching (default 250) is
   what makes multi-hour progress visible, not a change to the core module.
 
+## Tester repair pass
+
+- Fixed P2 operational restart risk: the operator script now treats a current
+  payload row with `ingestion_build_id == --build-id` as already repaired,
+  independent of `--run-id`.
+- Added `test_operator_resume_guard_uses_build_id_not_run_id`, which proves a
+  stale `DATA-005` row is invalidated while an already-repaired `DATA-018` row
+  remains referenced even if a later restart uses a different run id.
+- Fixed the P3 robustness gap where invalidating before detail tables existed
+  leaked a raw DuckDB catalog exception; the function now creates the detail
+  tables first and returns 0 when nothing matches.
+
 ## Blocking issue
 
-None. Ready for reviewer + tester (task requires both).
+None. Ready for reviewer + tester re-gates (task requires both).
