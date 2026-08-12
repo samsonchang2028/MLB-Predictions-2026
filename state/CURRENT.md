@@ -144,6 +144,14 @@ to certify cleanly.
   - live timestamped odds and historical opening-odds benchmarking are separate methodologies,
   - a formal historical MLB data certification gate is required before dependent feature/model work.
 
+- PIPE-002 - local daily operator completed: `scripts/daily_predictions.py` fits the
+  ADR-006 locked tuned XGBoost model from repaired 2021-2025 data only, builds
+  today's point-in-time Gold inference rows from local Silver, fetches live MLB
+  h2h moneylines from The Odds API via `THE_ODDS_API_KEY`, maps odds to MLB
+  `game_pk` by first pitch + team names, and appends immutable records to
+  `state/predictions/daily.jsonl` for the Streamlit daily board. Focused tests
+  cover odds mapping and pregame bullpen placeholder behavior.
+
 ## In progress
 
 - None.
@@ -356,7 +364,8 @@ DATA-016 re-ingest. No 2026 data was touched.
 ## Next required action
 
 No required V1 implementation task is currently queued. The next practical step is
-to run the Streamlit dashboard locally and/or package operator instructions.
+to run the local daily operator with `THE_ODDS_API_KEY` set, then refresh the
+Streamlit dashboard.
 
 ## Safe parallel
 
@@ -387,9 +396,9 @@ to run the Streamlit dashboard locally and/or package operator instructions.
 
 ## Next implementation task
 
-None required. Optional follow-ups: run/package the Streamlit dashboard, add a
-persisted market-relative evaluation artifact, or investigate the 39 all-zero
-pitcher-line games from DATA-018.
+None required. Optional follow-ups: add scheduled automation/GitHub Actions for
+the local operator, add a persisted market-relative evaluation artifact, or
+investigate the 39 all-zero pitcher-line games from DATA-018.
 
 ## Deferred follow-ups
 
