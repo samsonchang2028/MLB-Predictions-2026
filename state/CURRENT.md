@@ -200,26 +200,35 @@ run (DATA-018 only re-ingests game-detail).
 **The 39 failed games** all failed with the SAME reason: a listed pitcher has
 a genuinely all-zero line (`outs=0, battersFaced=0`) on a real completed
 (`Final`) game — the DATA-016 hollow-payload guard correctly rejecting
-suspicious data rather than silently storing it (this is is not the
+suspicious data rather than silently storing it (this is not the
 projection defect recurring; it's the guard doing its job on a rare real MLB
 boxscore edge case). One pitcher's bad line fails ingestion for the whole
 game_pk, so these 39 games have zero Silver pitcher_appearances rows. Not
 re-attempted by this run (the fetcher deterministically returns the same
 payload for a completed historical game). FEAT-005's general (non-allowlist)
 component-coverage exclusion policy will classify/report these as
-zero-appearance games, visibly, when the feature matrix is next rebuilt --
+zero-appearance games, visibly, when the feature matrix is rebuilt --
 not silently. Investigating whether these 39 are legitimate rare MLB events
 or a residual parsing edge case is a candidate follow-up task (not filed
 yet, not blocking).
 
+**Gold feature completeness has PASSED** against the repaired certified build.
+Gold was rebuilt in historical mode from the repaired Silver inputs with
+regular-season `team_game_statistics` scope (matching starter/bullpen regular-
+season scope). Result: 12,118 rows, 32 explicitly excluded component-coverage
+gaps, 240 feature columns, FEAT-006 status **PASS** across team, starter,
+bullpen, and rest/schedule families. Durable report:
+`reports/data-quality/gold-completeness-a910017bac839af5.json`.
+
+Leakage gate rerun after the repaired build: `python -m pytest tests/leakage/
+tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
+
 ## Ready
 
-- Rebuild the Gold feature matrix (FEAT-004) against the re-certified build,
-  run the FEAT-006 completeness gate (should now show starter/bullpen/rest
-  families PASS instead of the prior all-empty FAIL), and re-run the ML
-  experiment (ML-005/006/007/008) for trustworthy metrics -- the current
-  `reports/experiments/v1-real.json` is still marked diagnostic-only per
-  ADR-005 and reflects team-features-only signal.
+- Re-run the ML experiment chain (ML-005/006/007/008) for trustworthy metrics
+  on the repaired certified build -- the current
+  `reports/experiments/v1-real.json` is still diagnostic-only per ADR-005 and
+  reflects team-features-only signal. 2026 remains untouched.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
 
@@ -258,11 +267,11 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-The re-ingest + re-certification chain is DONE (certification PASS,
-`a910017bac839af5`, real pitching stats confirmed 100% populated). The next
-required action is rebuilding the FEAT-004 Gold feature matrix against this
-build, running the FEAT-006 completeness gate, and re-running the ML
-experiment (ML-005/006/007/008) for trustworthy, non-diagnostic metrics.
+The re-ingest + re-certification + Gold completeness + leakage chain is DONE
+(certification PASS `a910017bac839af5`, real pitching stats confirmed 100%
+populated, Gold completeness PASS, leakage tests PASS). The next required
+action is re-running the ML experiment chain (ML-005/006/007/008) for
+trustworthy, non-diagnostic metrics.
 
 ## Safe parallel
 
@@ -270,8 +279,10 @@ experiment (ML-005/006/007/008) for trustworthy, non-diagnostic metrics.
 
 ## Blocked
 
-- Nothing structurally. Trustworthy model metrics are gated on the DATA-016
-  re-ingest + re-certification (not yet launched).
+- Nothing structurally for 2021-2025 ML experiment rerun. Model selection,
+  methodology lock, downstream model-dependent market decisions, and any 2026
+  holdout inspection remain blocked until the repaired experiment results are
+  regenerated and reviewed.
 
 ## Current architecture decisions
 
@@ -291,10 +302,10 @@ experiment (ML-005/006/007/008) for trustworthy, non-diagnostic metrics.
 
 ## Next implementation task
 
-The real 2021-2025 dataset is built and certified PASS (DATA-011 executed;
-DATA-013/014/015 fixed the real-data edges it surfaced). FEAT-002 (starter) and
-FEAT-003 (bullpen) are ready and may be dispatched in parallel; FEAT-004 is the
-later aggregation point.
+The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
+PASS, and leakage tests PASS. Next implementation/operator task: rerun
+ML-005/006/007/008 experiments on the repaired Gold matrix; do not inspect
+2026.
 
 ## Deferred follow-ups
 
