@@ -122,6 +122,10 @@ V1 historical data completion and certification planning.
 - ML-009 - V1 methodology locked in ADR-006: tuned shallow XGBoost, expanding
   training window, uncalibrated probabilities, selected on repaired certified
   build `a910017bac839af5` without inspecting 2026.
+- APP-002 - performance dashboard completed: Streamlit page now separates final
+  2026 holdout evidence from repaired 2021-2025 development/tuning evidence,
+  displays model quality, calibration, prediction history, and omits market/ROI
+  rather than recomputing unavailable metrics.
 
 ## Real-path validation (smoke)
 
@@ -253,9 +257,6 @@ test: `tests/unit/evaluation/test_holdout_runner_inputs.py`.
 
 ## Ready
 
-- APP-002 - performance dashboard is dependency-ready. ML-010 has produced the
-  one-time 2026 final holdout report, so the dashboard may include final
-  holdout metrics with explicit V1/holdout labeling.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
 
@@ -354,9 +355,10 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-ML-010 is complete. Next required implementation task: APP-002 performance
-Streamlit dashboard / reporting layer using the repaired development evidence
-and the final 2026 holdout report with clear labels.## Safe parallel
+No required V1 implementation task is currently queued. The next practical step is
+to run the Streamlit dashboard locally and/or package operator instructions.
+
+## Safe parallel
 
 - None currently dispatched.
 
@@ -385,10 +387,9 @@ and the final 2026 holdout report with clear labels.## Safe parallel
 
 ## Next implementation task
 
-APP-002 performance Streamlit dashboard / reporting layer. It may now consume
-`reports/experiments/v1-holdout-2026.json` as final V1 holdout evidence and
-must continue labeling pre-ML-010 development/tuning results separately from
-final holdout results.
+None required. Optional follow-ups: run/package the Streamlit dashboard, add a
+persisted market-relative evaluation artifact, or investigate the 39 all-zero
+pitcher-line games from DATA-018.
 
 ## Deferred follow-ups
 
