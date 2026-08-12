@@ -225,12 +225,38 @@ tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 
 ## Ready
 
-- Re-run the ML experiment chain (ML-005/006/007/008) for trustworthy metrics
-  on the repaired certified build -- the current
-  `reports/experiments/v1-real.json` is still diagnostic-only per ADR-005 and
-  reflects team-features-only signal. 2026 remains untouched.
+- Review the repaired ML experiment evidence and decide whether to lock the
+  model/window/calibration methodology. 2026 remains untouched until that
+  methodology decision is accepted.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
+
+## Repaired ML experiment (2021-2025 certified build) - RESULTS
+
+Executed on repaired certified build `a910017bac839af5`: 12,118 regular-season
+Gold rows, 240 feature columns, 32 explicit FEAT-005 component-coverage
+exclusions, Gold completeness PASS, leakage PASS, 2026 not inspected. Report:
+`reports/experiments/v1-repaired-a910017bac839af5.json`.
+
+Ranking on the common test seasons {2024, 2025} (primary: log loss -> Brier ->
+ECE), 4,847 test games per combination:
+
+| # | model | window | log loss | Brier | ECE | AUC | acc |
+|---|-------|--------|----------|-------|-----|-----|-----|
+| 1 | xgboost | expanding | 0.68551 | 0.24616 | 0.0298 | 0.5695 | 0.5457 |
+| 2 | random_forest | expanding | 0.68613 | 0.24641 | 0.0231 | 0.5703 | 0.5544 |
+| 3 | xgboost | rolling_3 | 0.68669 | 0.24671 | 0.0251 | 0.5673 | 0.5509 |
+| 4 | logistic | expanding | 0.68711 | 0.24679 | 0.0329 | 0.5692 | 0.5560 |
+| 5 | random_forest | rolling_2 | 0.68841 | 0.24757 | 0.0252 | 0.5613 | 0.5478 |
+
+Candidate best by ML-007 primary ordering: **XGBoost + expanding window**.
+This is repaired experiment evidence, not yet a locked methodology decision.
+
+Calibration (ML-008, XGBoost/expanding, pooled over its folds, fair base-fit
+comparison): uncalibrated 0.68756 log loss / 0.24697 Brier / 0.0350 ECE;
+**sigmoid 0.68385 / 0.24538 / 0.00554** (best); isotonic 0.72223 / 0.24718 /
+0.0274 (overfits on log loss). Candidate calibration method: sigmoid/Platt,
+pending methodology review.
 
 ## First real experiment (2021-2025 certified build) - RESULTS
 
@@ -267,11 +293,11 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-The re-ingest + re-certification + Gold completeness + leakage chain is DONE
-(certification PASS `a910017bac839af5`, real pitching stats confirmed 100%
-populated, Gold completeness PASS, leakage tests PASS). The next required
-action is re-running the ML experiment chain (ML-005/006/007/008) for
-trustworthy, non-diagnostic metrics.
+The re-ingest + re-certification + Gold completeness + leakage + repaired ML
+experiment chain is DONE for 2021-2025. The next required action is reviewing
+the repaired experiment evidence and deciding whether to lock the
+model/window/calibration methodology. Do not inspect 2026 until that decision
+is accepted.
 
 ## Safe parallel
 
@@ -279,10 +305,9 @@ trustworthy, non-diagnostic metrics.
 
 ## Blocked
 
-- Nothing structurally for 2021-2025 ML experiment rerun. Model selection,
-  methodology lock, downstream model-dependent market decisions, and any 2026
-  holdout inspection remain blocked until the repaired experiment results are
-  regenerated and reviewed.
+- Model selection/methodology lock, downstream model-dependent market
+  decisions, and any 2026 holdout inspection remain blocked until the repaired
+  experiment evidence is reviewed and the methodology decision is accepted.
 
 ## Current architecture decisions
 
@@ -303,9 +328,9 @@ trustworthy, non-diagnostic metrics.
 ## Next implementation task
 
 The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
-PASS, and leakage tests PASS. Next implementation/operator task: rerun
-ML-005/006/007/008 experiments on the repaired Gold matrix; do not inspect
-2026.
+PASS, leakage tests PASS, and repaired ML-005/006/007/008 evidence has been
+generated. Next implementation/operator task: methodology review/lock decision
+for model family, training window, and calibration method; do not inspect 2026.
 
 ## Deferred follow-ups
 
