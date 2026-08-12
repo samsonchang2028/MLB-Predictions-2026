@@ -229,6 +229,12 @@ tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 ## Ready
 
 - ML-010 - 2026 final holdout evaluation using the locked ADR-006 methodology.
+  The evaluator (`src/evaluation/holdout.py`), operator entry point
+  (`scripts/holdout_2026.py`), and tests (`tests/unit/evaluation/
+  test_holdout.py`) are code-complete and pass against synthetic data, but
+  the task is still NOT done: this checkout has no certified 2026 dataset, so
+  the evaluation has not been run against real data. See
+  `state/agents/ML-010.md` for the full handoff.
 - APP-002 - performance dashboard is dependency-ready because APP-001 and
   OBS-001 are merged, but it must label any pre-ML-010 results as development
   evidence only.
