@@ -183,18 +183,45 @@ here, unlike the individual agent worktrees).
   different run id does not re-invalidate already-good repaired payloads. See
   `state/agents/DATA-018.md`.
 
-**The full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer) has NOT been
-launched.** DATA-016's fix only applies to future fetches; already-stored
-Bronze rows are still the pre-fix hollow pitching data. This re-ingest +
-re-certification is the next required action before FEAT-002/FEAT-003
-pitching features are real or a re-run experiment can be trusted. It is a
-long-running, single-writer, live-network operation against the real MLB API
-and requires an explicit go-ahead before launch. DATA-018 added the operator
-entry point: `scripts/data018_reingest.py`.
+**The full 2021-2025 game-detail RE-INGEST HAS RUN (via `scripts/data018_reingest.py`,
+run_id `DATA-018-reingest-2021-2025`, build_id `DATA-018`).** 59/59 batches,
+fetched=14,481, missing=0, failed=39, skipped=0. Re-certified: **PASS**, 0
+merge-blocking, 1 advisory WARN (`pitching.non_regular_season`, same as
+before). Artifact: `state/data-certifications/certification-PASS-a910017bac839af5.json`.
+
+Verified directly against `data/mlb.duckdb`: every pitching stat column in
+`silver.pitcher_appearances` (132,448 rows) is now **100% non-null**
+(`outs_recorded`, `batters_faced`, `hits_allowed`, `earned_runs`, `walks`,
+`strikeouts`, `pitches_thrown`, `innings_pitched`) — the DATA-016 defect is
+genuinely fixed in production, not just in tests. The historical odds archive
+(`bronze.historical_odds_moneylines`, 69,901 rows) was untouched by this
+run (DATA-018 only re-ingests game-detail).
+
+**The 39 failed games** all failed with the SAME reason: a listed pitcher has
+a genuinely all-zero line (`outs=0, battersFaced=0`) on a real completed
+(`Final`) game — the DATA-016 hollow-payload guard correctly rejecting
+suspicious data rather than silently storing it (this is is not the
+projection defect recurring; it's the guard doing its job on a rare real MLB
+boxscore edge case). One pitcher's bad line fails ingestion for the whole
+game_pk, so these 39 games have zero Silver pitcher_appearances rows. Not
+re-attempted by this run (the fetcher deterministically returns the same
+payload for a completed historical game). FEAT-005's general (non-allowlist)
+component-coverage exclusion policy will classify/report these as
+zero-appearance games, visibly, when the feature matrix is next rebuilt --
+not silently. Investigating whether these 39 are legitimate rare MLB events
+or a residual parsing edge case is a candidate follow-up task (not filed
+yet, not blocking).
 
 ## Ready
 
-- None.
+- Rebuild the Gold feature matrix (FEAT-004) against the re-certified build,
+  run the FEAT-006 completeness gate (should now show starter/bullpen/rest
+  families PASS instead of the prior all-empty FAIL), and re-run the ML
+  experiment (ML-005/006/007/008) for trustworthy metrics -- the current
+  `reports/experiments/v1-real.json` is still marked diagnostic-only per
+  ADR-005 and reflects team-features-only signal.
+- Optional: investigate the 39 all-zero-pitcher-line games found by the real
+  re-ingest (candidate for a new DATA-01x task, not filed).
 
 ## First real experiment (2021-2025 certified build) - RESULTS
 
@@ -231,13 +258,11 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-DATA-016/DATA-017/FEAT-005/FEAT-006/DATA-018 are merged. The next required
-action is the full 2021-2025 game-detail RE-INGEST (~4.5h, single-writer, live
-network) through `scripts/data018_reingest.py`, followed by re-certification
-(DATA-017 semantic-completeness gate active) and a Gold completeness check
-(FEAT-006). Only once that chain is PASS should the feature matrix be rebuilt
-and the experiment re-run for trustworthy metrics. This requires an explicit
-Orchestrator/operator go-ahead before launch (long-running, single-writer).
+The re-ingest + re-certification chain is DONE (certification PASS,
+`a910017bac839af5`, real pitching stats confirmed 100% populated). The next
+required action is rebuilding the FEAT-004 Gold feature matrix against this
+build, running the FEAT-006 completeness gate, and re-running the ML
+experiment (ML-005/006/007/008) for trustworthy, non-diagnostic metrics.
 
 ## Safe parallel
 
