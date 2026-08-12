@@ -2,7 +2,7 @@
 
 ## Status
 
-ready
+done
 
 ## Dependencies
 
@@ -83,3 +83,21 @@ training-window, and calibration methodology before any 2026 holdout evaluation.
 
 Record methodology status, selected model/window/calibration if locked, evidence
 files reviewed, commands/checks run, and whether ML-010 is ready.
+
+## Completion handoff
+
+- Methodology status: LOCKED.
+- Added ADR-006 selecting tuned shallow XGBoost + expanding window +
+  uncalibrated probabilities on repaired certified build `a910017bac839af5`.
+- Selected hyperparameters:
+  `max_depth=2`, `learning_rate=0.03`, `n_estimators=300`, `reg_lambda=10.0`,
+  `min_child_weight=3.0`, `subsample=0.8`, `colsample_bytree=0.8`.
+- Evidence reviewed:
+  `reports/experiments/v1-repaired-a910017bac839af5.json`,
+  `reports/experiments/v1-repaired-xgboost-tuning-a910017bac839af5.json`,
+  `reports/data-quality/gold-completeness-a910017bac839af5.json`,
+  ADR-003, and ADR-005.
+- 2026 was not inspected.
+- Reviewer verdict: APPROVE, no P0/P1 findings. One P2 stale roadmap ready-batch
+  guidance finding was repaired before commit.
+- ML-010 is now ready for implementation/review/test gates.

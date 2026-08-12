@@ -97,46 +97,47 @@ APP-002 Performance dashboard
 ```
 
 Note: MARKET-001 and PIPE-001 are already implemented in the current mainline.
-The current orchestration gate is ML-009, because 2026 must remain untouched
-until the repaired 2021-2025 methodology is explicitly locked.
+The current orchestration gate is ML-010. ADR-006 has locked the repaired
+2021-2025 methodology, so ML-010 is the first task allowed to inspect 2026.
 
 ## Parallel execution groups
 
 ### Current ready batch
 
-May run in parallel:
+Critical path:
 
-- DATA-005
-- DATA-008
+- ML-010
 
-These own mostly separate MLB and odds ingestion surfaces. DATA-009 should wait
-for DATA-008 and can use existing DATA-004 game candidates.
+Parallel-safe non-critical task:
 
-### After DATA-001
+- APP-002
 
-May run in parallel:
+APP-002 must not present final holdout conclusions until ML-010 artifacts exist.
+
+### Historical parallel examples
+
+After DATA-001, the following were safe to run in parallel:
 
 - DATA-002
 - DATA-003
 - DATA-008
 
-### After DATA-007
-
-May run in parallel:
+After DATA-007, the following were safe to run in parallel:
 
 - FEAT-002
 - FEAT-003
 
-FEAT-001 is already complete, but model-critical downstream use should be
-revalidated against the certified real historical dataset.
+These are historical examples now; all listed tasks are complete.
 
-### After FEAT-004
+### Historical ML parallel example
 
-May run in parallel:
+After FEAT-004, the following were safe to run in parallel:
 
 - ML-001
 - ML-002
 - ML-003
+
+These are complete.
 
 ## Integration principle
 
@@ -181,10 +182,10 @@ completeness, and leakage checks. Repaired ML experiments and the first XGBoost
 tuning pass are available. The next critical path is:
 
 ```text
-ML-009 Methodology lock
+ML-009 Methodology lock (done; ADR-006)
   |
   v
-ML-010 2026 final holdout
+ML-010 2026 final holdout (ready)
 ```
 
 APP-002 is dependency-ready from the app graph but must not present final

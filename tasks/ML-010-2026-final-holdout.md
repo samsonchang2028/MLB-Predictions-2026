@@ -2,7 +2,7 @@
 
 ## Status
 
-blocked
+ready
 
 ## Dependencies
 
@@ -25,12 +25,12 @@ once, preserving traceability and preventing post-hoc methodology changes.
 - `AGENTS.md`
 - `state/CURRENT.md`
 - `docs/decisions/ADR-003-validation.md`
-- the methodology-lock ADR/decision from ML-009
+- `docs/decisions/ADR-006-v1-methodology-lock.md`
 - `tasks/ML-009-methodology-lock.md`
 
 ## Inputs
 
-- Locked ML-009 methodology.
+- Locked ML-009 methodology from ADR-006.
 - Certified 2021-2025 development build.
 - 2026 holdout data, ingested and certified under the same point-in-time and
   leakage rules before evaluation.

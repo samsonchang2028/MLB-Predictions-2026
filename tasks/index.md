@@ -41,8 +41,8 @@ format.
 | ML-006 | done | ML-004A | rolling 2/3-season experiments |
 | ML-007 | done | ML-005/006 | model x window comparison; 2026 unused |
 | ML-008 | done | ML-007 | calibration with inner calibration split |
-| ML-009 | ready | ML-008, FEAT-006 | methodology lock decision; must not inspect 2026 |
-| ML-010 | blocked | ML-009 | untouched 2026 final holdout evaluation |
+| ML-009 | done | ML-008, FEAT-006 | ADR-006 locks tuned shallow XGBoost + expanding + uncalibrated; 2026 unused |
+| ML-010 | ready | ML-009 | untouched 2026 final holdout evaluation using ADR-006 |
 | MARKET-001 | done | DATA-009, ML-008 | no-vig, edge, EV; timestamp-guarded; opening benchmark labeled |
 | PIPE-001 | done | MARKET-001 | daily pipeline |
 | OBS-001 | done | PIPE-001 | append-only prediction journal merged |
@@ -51,11 +51,11 @@ format.
 
 ## Current orchestration gate
 
-ML-009 is the critical next task. ML-010 and any 2026 inspection remain blocked
-until ML-009 records a locked methodology decision.
+ML-010 is the critical next task. It is the first task allowed to inspect 2026,
+and it must use ADR-006 without post-holdout methodology changes.
 
 APP-002 is dependency-ready from an application graph perspective, but it should
-not present final model conclusions until ML-009/ML-010 artifacts exist.
+not present final holdout conclusions until ML-010 artifacts exist.
 
 ## Status transitions
 

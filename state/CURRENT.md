@@ -119,6 +119,9 @@ V1 historical data completion and certification planning.
 - DATA-012 - fix `results.valid_scores` so postponed/suspended/cancelled games
   that MLB reports with abstractGameState='Final' are not flagged (found via the
   DATA-011 real smoke test; game_pk 747139 on 2024-04-10). Completed (merged).
+- ML-009 - V1 methodology locked in ADR-006: tuned shallow XGBoost, expanding
+  training window, uncalibrated probabilities, selected on repaired certified
+  build `a910017bac839af5` without inspecting 2026.
 
 ## Real-path validation (smoke)
 
@@ -225,16 +228,10 @@ tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 
 ## Ready
 
-- ML-009 - methodology lock decision for repaired/tuned 2021-2025 evidence.
-  This is the critical next gate before any 2026 inspection.
+- ML-010 - 2026 final holdout evaluation using the locked ADR-006 methodology.
 - APP-002 - performance dashboard is dependency-ready because APP-001 and
   OBS-001 are merged, but it must label any pre-ML-010 results as development
   evidence only.
-- Review the repaired ML experiment evidence and decide whether to lock the
-  model/window/calibration methodology. 2026 remains untouched until that
-  methodology decision is accepted.
-- Optional: run a second, narrower XGBoost tuning pass around the shallow
-  regularized candidate if methodology review wants more evidence before lock.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
 
@@ -257,13 +254,15 @@ ECE), 4,847 test games per combination:
 | 5 | random_forest | rolling_2 | 0.68841 | 0.24757 | 0.0252 | 0.5613 | 0.5478 |
 
 Candidate best by ML-007 primary ordering: **XGBoost + expanding window**.
-This is repaired experiment evidence, not yet a locked methodology decision.
+ADR-006 supersedes this candidate wording and locks tuned shallow XGBoost +
+expanding window + uncalibrated probabilities.
 
 Calibration (ML-008, XGBoost/expanding, pooled over its folds, fair base-fit
 comparison): uncalibrated 0.68756 log loss / 0.24697 Brier / 0.0350 ECE;
 **sigmoid 0.68385 / 0.24538 / 0.00554** (best); isotonic 0.72223 / 0.24718 /
 0.0274 (overfits on log loss). Candidate calibration method: sigmoid/Platt,
-pending methodology review.
+reviewed during ML-009; ADR-006 locks the uncalibrated tuned model because it
+preserves the best strict log-loss/Brier ordering.
 
 ## XGBoost tuning pass (2021-2025 repaired build) - RESULTS
 
@@ -293,10 +292,8 @@ This improves materially over the untuned repaired XGBoost/expanding evidence
 Calibration on the tuned candidate: sigmoid/Platt improves the fair base-fit
 comparison (0.68271 -> 0.68150 log loss; ECE 0.01966 -> 0.00582), but the
 raw full-train tuned model remains best by primary log loss/Brier. Isotonic
-again overfits on log loss (0.70829). Candidate methodology for review:
-**tuned shallow XGBoost + expanding window, likely uncalibrated if strict
-primary-metric ordering dominates; sigmoid only if calibration reliability is
-weighted more heavily than the small log-loss/Brier cost.**
+again overfits on log loss (0.70829). ADR-006 locks:
+**tuned shallow XGBoost + expanding window + uncalibrated probabilities.**
 
 ## First real experiment (2021-2025 certified build) - RESULTS
 
@@ -334,10 +331,9 @@ DATA-016 re-ingest. No 2026 data was touched.
 ## Next required action
 
 The re-ingest + re-certification + Gold completeness + leakage + repaired ML
-experiment + first XGBoost tuning chain is DONE for 2021-2025. The next
-required action is reviewing the repaired/tuned evidence and deciding whether
-to lock the model/window/calibration methodology or run one narrower tuning
-pass. Do not inspect 2026 until that decision is accepted.
+experiment + first XGBoost tuning chain is DONE for 2021-2025. ADR-006 locks
+the V1 methodology. The next required action is ML-010: evaluate the untouched
+2026 final holdout using the locked ADR-006 methodology.
 
 ## Safe parallel
 
@@ -345,10 +341,8 @@ pass. Do not inspect 2026 until that decision is accepted.
 
 ## Blocked
 
-- ML-010 - 2026 final holdout evaluation waits for ML-009 methodology lock.
-- Model selection/methodology lock, downstream model-dependent market
-  decisions, and any 2026 holdout inspection remain blocked until the repaired
-  experiment evidence is reviewed and the methodology decision is accepted.
+- Post-holdout methodology changes are blocked by ADR-006 unless treated as a
+  new post-V1/V2 methodology with a new untouched evaluation policy.
 
 ## Current architecture decisions
 
@@ -364,16 +358,16 @@ pass. Do not inspect 2026 until that decision is accepted.
 - The model target is binary home-team win probability.
 - Model quality is judged primarily by probability quality, not raw accuracy.
 - Betting-style ROI is secondary evaluation.
+- V1 locked methodology is tuned shallow XGBoost + expanding window +
+  uncalibrated probabilities, per ADR-006.
 - Fliff is not part of the core system.
 
 ## Next implementation task
 
 The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
 PASS, leakage tests PASS, and repaired ML-005/006/007/008 evidence has been
-generated. A first XGBoost tuning pass improved the repaired expanding-window
-evidence. Next task: ML-009 methodology review/lock decision, or a deliberate
-ML-009 decision to run one narrower XGBoost tuning pass before locking. Do not
-inspect 2026 until ML-009 records a locked methodology.
+generated. ADR-006 locks the V1 methodology. Next task: ML-010 2026 final
+holdout evaluation.
 
 ## Deferred follow-ups
 
