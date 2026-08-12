@@ -20,6 +20,13 @@ ENDPOINT_TEMPLATE = "/api/v1.1/game/{game_pk}/feed/live"
 DEFAULT_SEASONS = (2021, 2022, 2023, 2024, 2025)
 BUILD_ID = "DATA-016"
 
+# DATA-005's original scope was 2021-2025 (development seasons). ADR-006 +
+# ML-010 add 2026 as the one explicitly authorized exception -- the untouched
+# final holdout, ingested only by scripts/ingest_holdout_2026.py. This gates
+# the `seasons=` validation below; DEFAULT_SEASONS itself is left unchanged so
+# a caller that omits `seasons=` still backfills only 2021-2025.
+ALLOWED_SEASONS = DEFAULT_SEASONS + (2026,)
+
 # One filtered live-feed request provides probable starters and boxscore pitching
 # lines without retaining play-by-play or pitch-level content.
 #
@@ -300,8 +307,11 @@ def _target_game_pks(
     requested_seasons = _positive_ints(seasons, "seasons")
     if not requested_seasons:
         raise ValueError("seasons must not be empty")
-    if any(season not in DEFAULT_SEASONS for season in requested_seasons):
-        raise ValueError("seasons must be within the DATA-005 2021-2025 scope")
+    if any(season not in ALLOWED_SEASONS for season in requested_seasons):
+        raise ValueError(
+            "seasons must be within the DATA-005 2021-2025 scope "
+            "(2026 allowed only for the ML-010 holdout)"
+        )
     placeholders = ", ".join("?" for _ in requested_seasons)
     return [
         row[0]
