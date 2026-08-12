@@ -73,6 +73,12 @@ FEAT-004 Feature matrix
                 ML-008 Probability calibration
                   |
                   v
+                ML-009 Methodology lock
+                  |
+                  v
+                ML-010 2026 final holdout
+                  |
+                  v
                 MARKET-001 Market/no-vig/edge engine
                   ^
                   |
@@ -87,8 +93,12 @@ PIPE-001 Daily prediction pipeline
   +--> OBS-001 Prediction journal
           |
           v
-        APP-002 Performance dashboard
+APP-002 Performance dashboard
 ```
+
+Note: MARKET-001 and PIPE-001 are already implemented in the current mainline.
+The current orchestration gate is ML-009, because 2026 must remain untouched
+until the repaired 2021-2025 methodology is explicitly locked.
 
 ## Parallel execution groups
 
@@ -163,6 +173,22 @@ Historical opening-odds benchmarking and live timestamped odds are intentionally
 separate methodologies. Historical archive results support "model edge versus
 opening market" and "simulated ROI at opening prices"; live predictions require
 an exact odds snapshot timestamp before first pitch.
+
+## Current Post-Repair Gate
+
+The repaired certified build `a910017bac839af5` has passed certification, Gold
+completeness, and leakage checks. Repaired ML experiments and the first XGBoost
+tuning pass are available. The next critical path is:
+
+```text
+ML-009 Methodology lock
+  |
+  v
+ML-010 2026 final holdout
+```
+
+APP-002 is dependency-ready from the app graph but must not present final
+holdout conclusions until ML-010 exists.
 
 ## V1 non-goals
 

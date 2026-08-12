@@ -1,8 +1,8 @@
-# APP-001 — Streamlit Daily Board
+# APP-001 - Streamlit Daily Board
 
 ## Status
 
-blocked
+done
 
 ## Dependencies
 
@@ -10,9 +10,9 @@ blocked
 
 ## Execution
 
-Primary role: implementer  
-Review required: yes  
-Tester required: yes  
+Primary role: implementer
+Review required: yes
+Tester required: yes
 Worktree required: yes
 
 ## Goal
@@ -35,3 +35,15 @@ Show at minimum:
 
 Keep business/model logic outside Streamlit modules.
 Do not duplicate feature or market calculations in the UI.
+
+## Completion handoff
+
+- Added `src/app/board.py`, `src/app/daily_board_page.py`, and focused board
+  tests.
+- Board reads PIPE-001 immutable prediction records and displays model
+  probability, market probability, edge, odds timestamp, model version, matchup,
+  and display-only play indicator.
+- Reviewer approved and tester passed with one deferred P2 pinned by xfail:
+  malformed/stale-schema prediction records can crash the board instead of
+  skipping only the bad row.
+- Merged to main; see `state/agents/APP-001.md`.

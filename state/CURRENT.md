@@ -225,6 +225,11 @@ tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 
 ## Ready
 
+- ML-009 - methodology lock decision for repaired/tuned 2021-2025 evidence.
+  This is the critical next gate before any 2026 inspection.
+- APP-002 - performance dashboard is dependency-ready because APP-001 and
+  OBS-001 are merged, but it must label any pre-ML-010 results as development
+  evidence only.
 - Review the repaired ML experiment evidence and decide whether to lock the
   model/window/calibration methodology. 2026 remains untouched until that
   methodology decision is accepted.
@@ -340,6 +345,7 @@ pass. Do not inspect 2026 until that decision is accepted.
 
 ## Blocked
 
+- ML-010 - 2026 final holdout evaluation waits for ML-009 methodology lock.
 - Model selection/methodology lock, downstream model-dependent market
   decisions, and any 2026 holdout inspection remain blocked until the repaired
   experiment evidence is reviewed and the methodology decision is accepted.
@@ -365,8 +371,9 @@ pass. Do not inspect 2026 until that decision is accepted.
 The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
 PASS, leakage tests PASS, and repaired ML-005/006/007/008 evidence has been
 generated. A first XGBoost tuning pass improved the repaired expanding-window
-evidence. Next implementation/operator task: methodology review/lock decision
-or one narrower XGBoost tuning pass; do not inspect 2026.
+evidence. Next task: ML-009 methodology review/lock decision, or a deliberate
+ML-009 decision to run one narrower XGBoost tuning pass before locking. Do not
+inspect 2026 until ML-009 records a locked methodology.
 
 ## Deferred follow-ups
 

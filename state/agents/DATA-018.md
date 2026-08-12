@@ -1,8 +1,8 @@
 # DATA-018 Agent Status
 
 - Task ID: DATA-018
-- Active role: Implementer (tester repair complete; awaiting re-gate)
-- Status: REPAIRED
+- Active role: none (gates passed, merged)
+- Status: **APPROVED / MERGED to main**
 - Branch: `agent/DATA-018-hollow-invalidation`
 - Worktree: `C:\Users\sfkim\OneDrive\Desktop\sideproj\predictions-1-wt-DATA-018`
 
@@ -98,6 +98,8 @@ files now exist, the old hollow one and the new real one, both immutable).
   leaked a raw DuckDB catalog exception; the function now creates the detail
   tables first and returns 0 when nothing matches.
 
-## Blocking issue
+## Final gate
 
-None. Ready for reviewer + tester re-gates (task requires both).
+Reviewer and tester gates passed after repair; merged to main. The real
+2021-2025 re-ingest has since run and certified PASS as recorded in
+`state/CURRENT.md`.
