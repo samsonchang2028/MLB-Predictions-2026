@@ -37,6 +37,7 @@ from evaluation.holdout import (  # noqa: E402
     run_holdout_evaluation,
 )
 from rerun_repaired_experiment import _build_matrix  # noqa: E402
+from validation.checks import COMPLETED_GAME_PREDICATE  # noqa: E402
 
 DEFAULT_OUTPUT = Path("reports") / "experiments" / "v1-holdout-2026.json"
 SEASONS: tuple[str, ...] = ("2021", "2022", "2023", "2024", "2025", "2026")
@@ -54,16 +55,21 @@ def _load_inputs(database: str, certification_path: Path) -> dict[str, Any]:
     hardcodes 2021-2025) to include the 2026 holdout season."""
     certification = json.loads(certification_path.read_text(encoding="utf-8"))
     season_list = ", ".join(f"'{season}'" for season in SEASONS)
+    completed_regular_filter = f"""
+            g.season IN ({season_list})
+              AND g.game_type = 'R'
+              AND {COMPLETED_GAME_PREDICATE}
+            """
     with duckdb.connect(database, read_only=True) as connection:
         games = _dict_rows(
             connection,
             f"""
-            SELECT game_pk, season, game_type, game_date, home_team_id,
-                   away_team_id, game_number
-            FROM silver.games
-            WHERE season IN ({season_list})
+            SELECT g.game_pk, g.season, g.game_type, g.game_date, g.home_team_id,
+                   g.away_team_id, g.game_number
+            FROM silver.games g
+            WHERE {completed_regular_filter}
             ORDER BY game_pk
-            """,
+            """
         )
         team_stats = _dict_rows(
             connection,
@@ -72,8 +78,7 @@ def _load_inputs(database: str, certification_path: Path) -> dict[str, Any]:
                    t.game_date, g.season
             FROM silver.team_game_statistics t
             JOIN silver.games g USING (game_pk)
-            WHERE g.season IN ({season_list})
-              AND g.game_type = 'R'
+            WHERE {completed_regular_filter}
             ORDER BY t.game_pk, t.team_id
             """,
         )
@@ -87,7 +92,7 @@ def _load_inputs(database: str, certification_path: Path) -> dict[str, Any]:
                    p.strikeouts, p.home_runs_allowed
             FROM silver.pitcher_appearances p
             JOIN silver.games g USING (game_pk)
-            WHERE g.season IN ({season_list})
+            WHERE {completed_regular_filter}
             ORDER BY p.game_pk, p.team_id, p.appearance_order
             """,
         )
@@ -98,7 +103,7 @@ def _load_inputs(database: str, certification_path: Path) -> dict[str, Any]:
                    ps.probable_pitcher_id
             FROM silver.pitcher_starters ps
             JOIN silver.games g USING (game_pk)
-            WHERE g.season IN ({season_list})
+            WHERE {completed_regular_filter}
             ORDER BY ps.game_pk, ps.team_id
             """,
         )

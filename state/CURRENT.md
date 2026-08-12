@@ -226,22 +226,36 @@ bullpen, and rest/schedule families. Durable report:
 Leakage gate rerun after the repaired build: `python -m pytest tests/leakage/
 tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 
+## ML-010 2026 final holdout result
+
+ML-010 is complete. The sanctioned 2026 ingestion/certification run produced
+`state/data-certifications/certification-PASS-db7dbc8b8a1c5ae9.json`
+(status **PASS**, build_id `db7dbc8b8a1c5ae9`) over the combined 2021-2026
+Silver contents.
+
+The one-time ADR-006 locked holdout evaluation was then run with:
+
+`python scripts/holdout_2026.py --certification state/data-certifications/certification-PASS-db7dbc8b8a1c5ae9.json`
+
+Report: `reports/experiments/v1-holdout-2026.json`.
+
+Metrics: log loss **0.688780**, Brier **0.247810**, ECE **0.022241**,
+ROC-AUC **0.549682**, accuracy **0.538119**, n_train **12,118**, n_test
+**1,797**. Gold feature completeness status: **PASS**. Matrix rows **13,915**,
+excluded games **34**, feature columns **240**.
+
+A production bug was found and fixed before the successful run: the holdout
+loader originally included scheduled future 2026 games from `silver.games`,
+which cannot have actual pitcher appearances yet and caused Gold build failure
+on `game_pk=823588` (`2026-08-15`, Scheduled). `scripts/holdout_2026.py` now
+uses the existing completed regular-game predicate before Gold build. Regression
+test: `tests/unit/evaluation/test_holdout_runner_inputs.py`.
+
 ## Ready
 
-- ML-010 - 2026 final holdout evaluation using the locked ADR-006 methodology.
-  The evaluator (`src/evaluation/holdout.py`), operator entry point
-  (`scripts/holdout_2026.py`), and tests (`tests/unit/evaluation/
-  test_holdout.py`) are code-complete and pass against synthetic data, but
-  the task is still NOT done: this checkout has no certified 2026 dataset, so
-  the evaluation has not been run against real data.
-  `scripts/ingest_holdout_2026.py` (new) ingests + certifies the 2026 season
-  as a precondition, the one sanctioned place 2026 is ingested; it required
-  widening a DATA-005 season guard in `src/ingestion/mlb/game_detail.py`
-  (`ALLOWED_SEASONS` now includes 2026 for validation only, default
-  unchanged). See `state/agents/ML-010.md` for the full handoff.
-- APP-002 - performance dashboard is dependency-ready because APP-001 and
-  OBS-001 are merged, but it must label any pre-ML-010 results as development
-  evidence only.
+- APP-002 - performance dashboard is dependency-ready. ML-010 has produced the
+  one-time 2026 final holdout report, so the dashboard may include final
+  holdout metrics with explicit V1/holdout labeling.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
 
@@ -340,12 +354,9 @@ DATA-016 re-ingest. No 2026 data was touched.
 
 ## Next required action
 
-The re-ingest + re-certification + Gold completeness + leakage + repaired ML
-experiment + first XGBoost tuning chain is DONE for 2021-2025. ADR-006 locks
-the V1 methodology. The next required action is ML-010: evaluate the untouched
-2026 final holdout using the locked ADR-006 methodology.
-
-## Safe parallel
+ML-010 is complete. Next required implementation task: APP-002 performance
+Streamlit dashboard / reporting layer using the repaired development evidence
+and the final 2026 holdout report with clear labels.## Safe parallel
 
 - None currently dispatched.
 
@@ -374,10 +385,10 @@ the V1 methodology. The next required action is ML-010: evaluate the untouched
 
 ## Next implementation task
 
-The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
-PASS, leakage tests PASS, and repaired ML-005/006/007/008 evidence has been
-generated. ADR-006 locks the V1 methodology. Next task: ML-010 2026 final
-holdout evaluation.
+APP-002 performance Streamlit dashboard / reporting layer. It may now consume
+`reports/experiments/v1-holdout-2026.json` as final V1 holdout evidence and
+must continue labeling pre-ML-010 development/tuning results separately from
+final holdout results.
 
 ## Deferred follow-ups
 
