@@ -1,0 +1,2534 @@
+{
+  "best": {
+    "aggregate": {
+      "brier": 0.24408365828875142,
+      "degenerate_single_class": false,
+      "ece": 0.015781569041577716,
+      "log_loss": 0.6812369055020037,
+      "n_folds": 4,
+      "n_test": 9694,
+      "secondary": {
+        "accuracy": 0.5639570868578502,
+        "roc_auc": 0.5844580618112455
+      },
+      "test_positive_rate": 0.5297090984113885
+    },
+    "candidate_id": 19,
+    "folds": [
+      {
+        "brier": 0.24249750798505249,
+        "degenerate_single_class": false,
+        "ece": 0.019198585246311534,
+        "log_loss": 0.6782277745189268,
+        "n_test": 2424,
+        "n_train": 2424,
+        "secondary": {
+          "accuracy": 0.5804455445544554,
+          "roc_auc": 0.5975365527464472
+        },
+        "test_positive_rate": 0.533003300330033,
+        "test_season": 2022,
+        "train_seasons": [
+          2021
+        ]
+      },
+      {
+        "brier": 0.24441444472365,
+        "degenerate_single_class": false,
+        "ece": 0.019080142491718886,
+        "log_loss": 0.6818879380930433,
+        "n_test": 2423,
+        "n_train": 4848,
+        "secondary": {
+          "accuracy": 0.5621130829550145,
+          "roc_auc": 0.5870327150636695
+        },
+        "test_positive_rate": 0.520016508460586,
+        "test_season": 2023,
+        "train_seasons": [
+          2021,
+          2022
+        ]
+      },
+      {
+        "brier": 0.24331648556451013,
+        "degenerate_single_class": false,
+        "ece": 0.015000940771953365,
+        "log_loss": 0.6795587050594826,
+        "n_test": 2422,
+        "n_train": 7271,
+        "secondary": {
+          "accuracy": 0.5606936416184971,
+          "roc_auc": 0.5884842563396544
+        },
+        "test_positive_rate": 0.5222956234516928,
+        "test_season": 2024,
+        "train_seasons": [
+          2021,
+          2022,
+          2023
+        ]
+      },
+      {
+        "brier": 0.24610486453308927,
+        "degenerate_single_class": false,
+        "ece": 0.03601292345941683,
+        "log_loss": 0.6852704242676428,
+        "n_test": 2425,
+        "n_train": 9693,
+        "secondary": {
+          "accuracy": 0.5525773195876289,
+          "roc_auc": 0.5645327773459828
+        },
+        "test_positive_rate": 0.5435051546391753,
+        "test_season": 2025,
+        "train_seasons": [
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      }
+    ],
+    "params": {
+      "colsample_bytree": 0.8,
+      "learning_rate": 0.03,
+      "max_depth": 2,
+      "min_child_weight": 3.0,
+      "n_estimators": 300,
+      "reg_lambda": 10.0,
+      "subsample": 0.8
+    }
+  },
+  "build_id": "a910017bac839af5",
+  "calibration": {
+    "calibration_fraction": 0.2,
+    "methods": [
+      "sigmoid",
+      "isotonic"
+    ],
+    "model": "xgboost_tuned",
+    "n_features": 240,
+    "random_state": 0,
+    "variants": {
+      "isotonic": {
+        "aggregate": {
+          "brier": 0.24547185352735384,
+          "degenerate_single_class": false,
+          "ece": 0.020645838867518303,
+          "log_loss": 0.7082935773069012,
+          "n_folds": 4,
+          "n_test": 9694,
+          "secondary": {
+            "accuracy": 0.5529193315452857,
+            "roc_auc": 0.5751291142657781
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.243624594162012,
+            "degenerate_single_class": false,
+            "ece": 0.02230288540357013,
+            "log_loss": 0.7082850698458719,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_test": 2424,
+            "secondary": {
+              "accuracy": 0.5775577557755776,
+              "roc_auc": 0.5862517640494919
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.2458842213983507,
+            "degenerate_single_class": false,
+            "ece": 0.04255853335824431,
+            "log_loss": 0.6848976524840088,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_test": 2423,
+            "secondary": {
+              "accuracy": 0.5385885266198926,
+              "roc_auc": 0.5808319343787961
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24500412993136858,
+            "degenerate_single_class": false,
+            "ece": 0.028522424073687255,
+            "log_loss": 0.6828886891092137,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_test": 2422,
+            "secondary": {
+              "accuracy": 0.5487200660611066,
+              "roc_auc": 0.5833862278415283
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24737346833132895,
+            "degenerate_single_class": false,
+            "ece": 0.023760599828628888,
+            "log_loss": 0.7570521699445109,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_test": 2425,
+            "secondary": {
+              "accuracy": 0.5468041237113402,
+              "roc_auc": 0.5522163415867848
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      },
+      "sigmoid": {
+        "aggregate": {
+          "brier": 0.24424875419546677,
+          "degenerate_single_class": false,
+          "ece": 0.005821776675580876,
+          "log_loss": 0.6815030117404531,
+          "n_folds": 4,
+          "n_test": 9694,
+          "secondary": {
+            "accuracy": 0.5584897874974211,
+            "roc_auc": 0.5792426164965113
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.24310714286665505,
+            "degenerate_single_class": false,
+            "ece": 0.007474843919771878,
+            "log_loss": 0.6792683470711941,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_test": 2424,
+            "secondary": {
+              "accuracy": 0.5705445544554455,
+              "roc_auc": 0.588750150422825
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24495112447581832,
+            "degenerate_single_class": false,
+            "ece": 0.02709174376136059,
+            "log_loss": 0.6829029829486599,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_test": 2423,
+            "secondary": {
+              "accuracy": 0.5538588526619893,
+              "roc_auc": 0.5832794224023803
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24387668361952325,
+            "degenerate_single_class": false,
+            "ece": 0.017741138660957216,
+            "log_loss": 0.6807235078081703,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_test": 2422,
+            "secondary": {
+              "accuracy": 0.5511973575557391,
+              "roc_auc": 0.5847404183505795
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24505971403327415,
+            "degenerate_single_class": false,
+            "ece": 0.018863855182692398,
+            "log_loss": 0.6831164779032521,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_test": 2425,
+            "secondary": {
+              "accuracy": 0.5583505154639176,
+              "roc_auc": 0.5665676965317958
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      },
+      "uncalibrated": {
+        "aggregate": {
+          "brier": 0.24477968285327992,
+          "degenerate_single_class": false,
+          "ece": 0.01965602736651886,
+          "log_loss": 0.6827118354091807,
+          "n_folds": 4,
+          "n_test": 9694,
+          "secondary": {
+            "accuracy": 0.5631318341242005,
+            "roc_auc": 0.581049586157302
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.2443146486837216,
+            "degenerate_single_class": false,
+            "ece": 0.026467629914285716,
+            "log_loss": 0.6821426506910604,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_test": 2424,
+            "secondary": {
+              "accuracy": 0.5771452145214522,
+              "roc_auc": 0.588750150422825
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24473235129030635,
+            "degenerate_single_class": false,
+            "ece": 0.021812184482775974,
+            "log_loss": 0.6825283662929993,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_test": 2423,
+            "secondary": {
+              "accuracy": 0.5588113908378044,
+              "roc_auc": 0.5832794224023803
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24398877032263763,
+            "degenerate_single_class": false,
+            "ece": 0.02333343766082127,
+            "log_loss": 0.6809311465320954,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_test": 2422,
+            "secondary": {
+              "accuracy": 0.5561519405450042,
+              "roc_auc": 0.5847404183505795
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24608175186495396,
+            "degenerate_single_class": false,
+            "ece": 0.03229138553757031,
+            "log_loss": 0.6852425891764105,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_test": 2425,
+            "secondary": {
+              "accuracy": 0.5604123711340206,
+              "roc_auc": 0.5665676965317958
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      },
+      "uncalibrated_full_train": {
+        "aggregate": {
+          "brier": 0.24408365828875142,
+          "degenerate_single_class": false,
+          "ece": 0.015781569041577716,
+          "log_loss": 0.6812369055020037,
+          "n_folds": 4,
+          "n_test": 9694,
+          "secondary": {
+            "accuracy": 0.5639570868578502,
+            "roc_auc": 0.5844580618112455
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.24249750798505249,
+            "degenerate_single_class": false,
+            "ece": 0.019198585246311534,
+            "log_loss": 0.6782277745189268,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_test": 2424,
+            "secondary": {
+              "accuracy": 0.5804455445544554,
+              "roc_auc": 0.5975365527464472
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24441444472365,
+            "degenerate_single_class": false,
+            "ece": 0.019080142491718886,
+            "log_loss": 0.6818879380930433,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_test": 2423,
+            "secondary": {
+              "accuracy": 0.5621130829550145,
+              "roc_auc": 0.5870327150636695
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24331648556451013,
+            "degenerate_single_class": false,
+            "ece": 0.015000940771953365,
+            "log_loss": 0.6795587050594826,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_test": 2422,
+            "secondary": {
+              "accuracy": 0.5606936416184971,
+              "roc_auc": 0.5884842563396544
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24610486453308927,
+            "degenerate_single_class": false,
+            "ece": 0.03601292345941683,
+            "log_loss": 0.6852704242676428,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_test": 2425,
+            "secondary": {
+              "accuracy": 0.5525773195876289,
+              "roc_auc": 0.5645327773459828
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "candidate_count": 20,
+  "certification_artifact": "state\\data-certifications\\certification-PASS-a910017bac839af5.json",
+  "folds": "expanding",
+  "generated_at": "2026-08-12T03:18:47.595822+00:00",
+  "holdout_2026": "not inspected",
+  "input_counts": {
+    "bullpen_features": 24236,
+    "games": 14520,
+    "pitcher_appearances": 132448,
+    "pitcher_starters": 28941,
+    "starter_features": 24240,
+    "team_features": 24300,
+    "team_game_statistics_regular": 24300
+  },
+  "n_feature_columns": 240,
+  "n_rows": 12118,
+  "random_state": 0,
+  "ranking": [
+    {
+      "aggregate": {
+        "brier": 0.24408365828875142,
+        "degenerate_single_class": false,
+        "ece": 0.015781569041577716,
+        "log_loss": 0.6812369055020037,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5639570868578502,
+          "roc_auc": 0.5844580618112455
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 19,
+      "folds": [
+        {
+          "brier": 0.24249750798505249,
+          "degenerate_single_class": false,
+          "ece": 0.019198585246311534,
+          "log_loss": 0.6782277745189268,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5804455445544554,
+            "roc_auc": 0.5975365527464472
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24441444472365,
+          "degenerate_single_class": false,
+          "ece": 0.019080142491718886,
+          "log_loss": 0.6818879380930433,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5621130829550145,
+            "roc_auc": 0.5870327150636695
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24331648556451013,
+          "degenerate_single_class": false,
+          "ece": 0.015000940771953365,
+          "log_loss": 0.6795587050594826,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5606936416184971,
+            "roc_auc": 0.5884842563396544
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24610486453308927,
+          "degenerate_single_class": false,
+          "ece": 0.03601292345941683,
+          "log_loss": 0.6852704242676428,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5525773195876289,
+            "roc_auc": 0.5645327773459828
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 0.8,
+        "learning_rate": 0.03,
+        "max_depth": 2,
+        "min_child_weight": 3.0,
+        "n_estimators": 300,
+        "reg_lambda": 10.0,
+        "subsample": 0.8
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24415633782768462,
+        "degenerate_single_class": false,
+        "ece": 0.013802367054065855,
+        "log_loss": 0.6813630136346454,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5593150402310708,
+          "roc_auc": 0.5821546902208051
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 2,
+      "folds": [
+        {
+          "brier": 0.2419199853993027,
+          "degenerate_single_class": false,
+          "ece": 0.014490536066761883,
+          "log_loss": 0.6770078863919172,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.568069306930693,
+            "roc_auc": 0.6005624446170508
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24423845547984344,
+          "degenerate_single_class": false,
+          "ece": 0.021763765573304762,
+          "log_loss": 0.6814825410406524,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5674783326454808,
+            "roc_auc": 0.5871825055616973
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24412247837083478,
+          "degenerate_single_class": false,
+          "ece": 0.01680772706657079,
+          "log_loss": 0.6812195670332759,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5561519405450042,
+            "roc_auc": 0.5825786328961706
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2463435356914814,
+          "degenerate_single_class": false,
+          "ece": 0.02858438355406537,
+          "log_loss": 0.6857401852635668,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5455670103092783,
+            "roc_auc": 0.5590352742171832
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24435064453715077,
+        "degenerate_single_class": false,
+        "ece": 0.014210732199124058,
+        "log_loss": 0.6817754559601478,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5581803177223025,
+          "roc_auc": 0.5807736625479246
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 1,
+      "folds": [
+        {
+          "brier": 0.24258080249807926,
+          "degenerate_single_class": false,
+          "ece": 0.01940623188864668,
+          "log_loss": 0.6783504535822334,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5631188118811881,
+            "roc_auc": 0.595860021989082
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2442363070510896,
+          "degenerate_single_class": false,
+          "ece": 0.019450000001042998,
+          "log_loss": 0.681553797549455,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5711927362773421,
+            "roc_auc": 0.5886800693335517
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24444025260181937,
+          "degenerate_single_class": false,
+          "ece": 0.01956563229456507,
+          "log_loss": 0.6818514552598497,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5520231213872833,
+            "roc_auc": 0.5795890967849933
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24614450272222646,
+          "degenerate_single_class": false,
+          "ece": 0.029426332970255424,
+          "log_loss": 0.6853446162856304,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5463917525773195,
+            "roc_auc": 0.5605047476878411
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24447620331635495,
+        "degenerate_single_class": false,
+        "ece": 0.01582142323630605,
+        "log_loss": 0.682051237828308,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5598308231896019,
+          "roc_auc": 0.5808350453525806
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 4,
+      "folds": [
+        {
+          "brier": 0.24275119605745596,
+          "degenerate_single_class": false,
+          "ece": 0.021269035872944875,
+          "log_loss": 0.6787623223486959,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5651815181518152,
+            "roc_auc": 0.5962480445032765
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24451238054817367,
+          "degenerate_single_class": false,
+          "ece": 0.024614272435440607,
+          "log_loss": 0.6820930211044477,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.567891044160132,
+            "roc_auc": 0.586414445399828
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2441144955821552,
+          "degenerate_single_class": false,
+          "ece": 0.0187108847078068,
+          "log_loss": 0.6812143693888107,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5569777043765483,
+            "roc_auc": 0.5832953563290642
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24652561209784227,
+          "degenerate_single_class": false,
+          "ece": 0.02923251062324371,
+          "log_loss": 0.6861328813767433,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5492783505154639,
+            "roc_auc": 0.5593046319942208
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24455362701722327,
+        "degenerate_single_class": false,
+        "ece": 0.017963916012582667,
+        "log_loss": 0.6822384392346955,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5593150402310708,
+          "roc_auc": 0.5811957387433355
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 6,
+      "folds": [
+        {
+          "brier": 0.2430373057145678,
+          "degenerate_single_class": false,
+          "ece": 0.02678161013023099,
+          "log_loss": 0.6793766528869537,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5614686468646864,
+            "roc_auc": 0.5946381784069402
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24467390455319615,
+          "degenerate_single_class": false,
+          "ece": 0.02389420559718205,
+          "log_loss": 0.6824730919626081,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5691291787040859,
+            "roc_auc": 0.5864785925834937
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24449599710415026,
+          "degenerate_single_class": false,
+          "ece": 0.01860093852638903,
+          "log_loss": 0.6820106927072686,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5549132947976878,
+            "roc_auc": 0.5809333802494526
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24600670331307378,
+          "degenerate_single_class": false,
+          "ece": 0.03210248695206397,
+          "log_loss": 0.6850920510436116,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5517525773195876,
+            "roc_auc": 0.5637096254624661
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.2446459407152873,
+        "degenerate_single_class": false,
+        "ece": 0.016312608432715665,
+        "log_loss": 0.6824474775510646,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5591087270476583,
+          "roc_auc": 0.5799541145380923
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 3,
+      "folds": [
+        {
+          "brier": 0.24344160245165758,
+          "degenerate_single_class": false,
+          "ece": 0.024132924799871884,
+          "log_loss": 0.6802583677606696,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5622937293729373,
+            "roc_auc": 0.5920721017624087
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24449058671913362,
+          "degenerate_single_class": false,
+          "ece": 0.024373798037283803,
+          "log_loss": 0.6821707514718397,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.572430870821296,
+            "roc_auc": 0.5883774174616823
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24438313645759896,
+          "degenerate_single_class": false,
+          "ece": 0.020629500673390193,
+          "log_loss": 0.6817364881604079,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5520231213872833,
+            "roc_auc": 0.5802487693059261
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2462674873527471,
+          "degenerate_single_class": false,
+          "ece": 0.02857602996924488,
+          "log_loss": 0.6856222922834562,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5496907216494845,
+            "roc_auc": 0.5607583415237288
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24504729931559194,
+        "degenerate_single_class": false,
+        "ece": 0.01935984633904478,
+        "log_loss": 0.6832912010321168,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5570455952135341,
+          "roc_auc": 0.5776927967898118
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 5,
+      "folds": [
+        {
+          "brier": 0.24408989151228905,
+          "degenerate_single_class": false,
+          "ece": 0.03018434472357475,
+          "log_loss": 0.6816254994624549,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.556930693069307,
+            "roc_auc": 0.5888974964172018
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2454364472929792,
+          "degenerate_single_class": false,
+          "ece": 0.02351360156474109,
+          "log_loss": 0.684125723470264,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.561287659925712,
+            "roc_auc": 0.5820763215002251
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2443396283989485,
+          "degenerate_single_class": false,
+          "ece": 0.01604051256750756,
+          "log_loss": 0.681658945945038,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.555739058629232,
+            "roc_auc": 0.5818133991069995
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2463222807284198,
+          "degenerate_single_class": false,
+          "ece": 0.03476111759844515,
+          "log_loss": 0.6857526173447498,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5542268041237114,
+            "roc_auc": 0.5608974754390943
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 2,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24512706650768554,
+        "degenerate_single_class": false,
+        "ece": 0.019726286692018747,
+        "log_loss": 0.6834498954275278,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5600371363730142,
+          "roc_auc": 0.5787620621803112
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 8,
+      "folds": [
+        {
+          "brier": 0.24389524672268129,
+          "degenerate_single_class": false,
+          "ece": 0.021848535183632747,
+          "log_loss": 0.6811699718689439,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5701320132013201,
+            "roc_auc": 0.5901087420275903
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24475341214756655,
+          "degenerate_single_class": false,
+          "ece": 0.01967206717865849,
+          "log_loss": 0.6826761998994156,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5621130829550145,
+            "roc_auc": 0.5858671470881273
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24494791551019815,
+          "degenerate_single_class": false,
+          "ece": 0.01584901239240003,
+          "log_loss": 0.682995209542105,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5623451692815855,
+            "roc_auc": 0.5804749232204045
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24691065388473005,
+          "degenerate_single_class": false,
+          "ece": 0.03808157635103794,
+          "log_loss": 0.6869560596275761,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5455670103092783,
+            "roc_auc": 0.5594550748238893
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24523637376310578,
+        "degenerate_single_class": false,
+        "ece": 0.022559875356848526,
+        "log_loss": 0.6836470338705996,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5562203424798845,
+          "roc_auc": 0.5771536148470352
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 7,
+      "folds": [
+        {
+          "brier": 0.24387628910042136,
+          "degenerate_single_class": false,
+          "ece": 0.025451472791360535,
+          "log_loss": 0.6810293548263715,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.566006600660066,
+            "roc_auc": 0.5888051915019309
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2455781878924246,
+          "degenerate_single_class": false,
+          "ece": 0.02723694870381427,
+          "log_loss": 0.6844136607114331,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5538588526619893,
+            "roc_auc": 0.5816559527221609
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24487112366143854,
+          "degenerate_single_class": false,
+          "ece": 0.015510392006914264,
+          "log_loss": 0.6827801157302342,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5578034682080925,
+            "roc_auc": 0.5790366936434352
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24661916359124808,
+          "degenerate_single_class": false,
+          "ece": 0.03273344855947594,
+          "log_loss": 0.6863634845525929,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5472164948453608,
+            "roc_auc": 0.560800150237213
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24574666498428896,
+        "degenerate_single_class": false,
+        "ece": 0.025740963218751713,
+        "log_loss": 0.6847773556286778,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5563234990715906,
+          "roc_auc": 0.5761141011082009
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 10,
+      "folds": [
+        {
+          "brier": 0.245427207640958,
+          "degenerate_single_class": false,
+          "ece": 0.03645242347378936,
+          "log_loss": 0.6844289634448015,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5598184818481848,
+            "roc_auc": 0.5838367939699591
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24504357992797768,
+          "degenerate_single_class": false,
+          "ece": 0.024470591638583124,
+          "log_loss": 0.6832724205418935,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5579859678085018,
+            "roc_auc": 0.5830849336008408
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24511351088251468,
+          "degenerate_single_class": false,
+          "ece": 0.02105826513517207,
+          "log_loss": 0.6833958300114144,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.55532617671346,
+            "roc_auc": 0.5800690760143618
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24740086660332983,
+          "degenerate_single_class": false,
+          "ece": 0.038826809187525325,
+          "log_loss": 0.6880091145622886,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5521649484536082,
+            "roc_auc": 0.5589064211330024
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24574363155601284,
+        "degenerate_single_class": false,
+        "ece": 0.023690981325818938,
+        "log_loss": 0.6847786949031531,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5586961006808335,
+          "roc_auc": 0.5757221610079083
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 9,
+      "folds": [
+        {
+          "brier": 0.24540052781141528,
+          "degenerate_single_class": false,
+          "ece": 0.03556610601447005,
+          "log_loss": 0.6844232003452553,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5610561056105611,
+            "roc_auc": 0.5831701473596692
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2455752063920969,
+          "degenerate_single_class": false,
+          "ece": 0.024201721309680742,
+          "log_loss": 0.6845368898486061,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5608749484110607,
+            "roc_auc": 0.5833988453506941
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24527027546373906,
+          "degenerate_single_class": false,
+          "ece": 0.017363649363068917,
+          "log_loss": 0.6835878296220653,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5578034682080925,
+            "roc_auc": 0.5763816056927927
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24672765056820214,
+          "degenerate_single_class": false,
+          "ece": 0.03719484621102048,
+          "log_loss": 0.6865650405387438,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5550515463917526,
+            "roc_auc": 0.5613258434051209
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24595398379183192,
+        "degenerate_single_class": false,
+        "ece": 0.0330700954690972,
+        "log_loss": 0.685268144709184,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5503404167526305,
+          "roc_auc": 0.575387695203833
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 20,
+      "folds": [
+        {
+          "brier": 0.24581274159315664,
+          "degenerate_single_class": false,
+          "ece": 0.0480012133557706,
+          "log_loss": 0.6852636092092544,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5507425742574258,
+            "roc_auc": 0.5811066196982793
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2456835548648794,
+          "degenerate_single_class": false,
+          "ece": 0.025613681785685415,
+          "log_loss": 0.6847849752345355,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5592241023524557,
+            "roc_auc": 0.5836793186750195
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24514319511274008,
+          "degenerate_single_class": false,
+          "ece": 0.02536434430435217,
+          "log_loss": 0.6834811628290656,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5540875309661437,
+            "roc_auc": 0.5807051766016105
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24717515928063802,
+          "degenerate_single_class": false,
+          "ece": 0.03550665280868098,
+          "log_loss": 0.6875402205040494,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.537319587628866,
+            "roc_auc": 0.558098005107517
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {}
+    },
+    {
+      "aggregate": {
+        "brier": 0.24618190001696647,
+        "degenerate_single_class": false,
+        "ece": 0.029548077399653948,
+        "log_loss": 0.6857601497461476,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5561171858881783,
+          "roc_auc": 0.5751655509619309
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 14,
+      "folds": [
+        {
+          "brier": 0.2461717236684062,
+          "degenerate_single_class": false,
+          "ece": 0.031458621217620296,
+          "log_loss": 0.6861478213937388,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5684818481848185,
+            "roc_auc": 0.5813917393254494
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24583018554250438,
+          "degenerate_single_class": false,
+          "ece": 0.02854816777323377,
+          "log_loss": 0.6850947176821653,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5592241023524557,
+            "roc_auc": 0.5825826748010755
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24495159875281308,
+          "degenerate_single_class": false,
+          "ece": 0.026647679673847742,
+          "log_loss": 0.6830053554705884,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5540875309661437,
+            "roc_auc": 0.5809395294495441
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24777227581173394,
+          "degenerate_single_class": false,
+          "ece": 0.040544900218236056,
+          "log_loss": 0.6887889074998272,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5426804123711341,
+            "roc_auc": 0.5558516434936731
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.2463135808580572,
+        "degenerate_single_class": false,
+        "ece": 0.03332670171475544,
+        "log_loss": 0.6860177716386082,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5516814524448113,
+          "roc_auc": 0.5740969903844285
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 12,
+      "folds": [
+        {
+          "brier": 0.24587567417377082,
+          "degenerate_single_class": false,
+          "ece": 0.036884767854764536,
+          "log_loss": 0.6855769366253306,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5639438943894389,
+            "roc_auc": 0.5842504567383956
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24603325751629998,
+          "degenerate_single_class": false,
+          "ece": 0.02814723334797543,
+          "log_loss": 0.6853988403899518,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5583986793231531,
+            "roc_auc": 0.579718571292088
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2454831886229102,
+          "degenerate_single_class": false,
+          "ece": 0.030660543655384485,
+          "log_loss": 0.6841469802020337,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5466556564822461,
+            "roc_auc": 0.5771762189935126
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2478607640553002,
+          "degenerate_single_class": false,
+          "ece": 0.04260510633901223,
+          "log_loss": 0.688945322709562,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5377319587628866,
+            "roc_auc": 0.5557745372597884
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.2463607576830289,
+        "degenerate_single_class": false,
+        "ece": 0.03203167176219588,
+        "log_loss": 0.6861821971750036,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5524035485867547,
+          "roc_auc": 0.5737195737034698
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 11,
+      "folds": [
+        {
+          "brier": 0.24683513613540636,
+          "degenerate_single_class": false,
+          "ece": 0.03917528087697405,
+          "log_loss": 0.687702353729134,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5606435643564357,
+            "roc_auc": 0.5776756118106532
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24596684552255005,
+          "degenerate_single_class": false,
+          "ece": 0.03238224494914791,
+          "log_loss": 0.68545964565258,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5542715641766405,
+            "roc_auc": 0.5829395788123217
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24545976102374173,
+          "degenerate_single_class": false,
+          "ece": 0.02420707590859548,
+          "log_loss": 0.6840470799301193,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5540875309661437,
+            "roc_auc": 0.5766456796745023
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24718004415934675,
+          "degenerate_single_class": false,
+          "ece": 0.040234897837196415,
+          "log_loss": 0.6875170989559234,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5406185567010309,
+            "roc_auc": 0.5587926466012257
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 3,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24636733187311186,
+        "degenerate_single_class": false,
+        "ece": 0.0322474116409147,
+        "log_loss": 0.6861966304262577,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5533319579121105,
+          "roc_auc": 0.5746315162898303
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 13,
+      "folds": [
+        {
+          "brier": 0.24780346742436654,
+          "degenerate_single_class": false,
+          "ece": 0.047995384493627564,
+          "log_loss": 0.6894519497332406,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5536303630363036,
+            "roc_auc": 0.5726179861939196
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24603286936197685,
+          "degenerate_single_class": false,
+          "ece": 0.025144516868233113,
+          "log_loss": 0.6856460146450012,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5617003714403632,
+            "roc_auc": 0.5831456687002688
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.24454120348149574,
+          "degenerate_single_class": false,
+          "ece": 0.02753044405227651,
+          "log_loss": 0.6822302268779448,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5524360033030553,
+            "roc_auc": 0.5848073763071321
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24708984447217705,
+          "degenerate_single_class": false,
+          "ece": 0.03970288896683563,
+          "log_loss": 0.6874543118414624,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5455670103092783,
+            "roc_auc": 0.561249079865609
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.03,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 200,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.2471118200397248,
+        "degenerate_single_class": false,
+        "ece": 0.03703438757786387,
+        "log_loss": 0.6878279810074087,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5532288013204044,
+          "roc_auc": 0.5724603291732991
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 16,
+      "folds": [
+        {
+          "brier": 0.24875387327631435,
+          "degenerate_single_class": false,
+          "ece": 0.04483840486692517,
+          "log_loss": 0.6918472594593015,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5618811881188119,
+            "roc_auc": 0.5721342400638887
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.2467021314138777,
+          "degenerate_single_class": false,
+          "ece": 0.03767456167181119,
+          "log_loss": 0.6869915734563203,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.555096987205943,
+            "roc_auc": 0.579495762191377
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2449389476775393,
+          "degenerate_single_class": false,
+          "ece": 0.03411126228450842,
+          "log_loss": 0.6830522480861813,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5528488852188275,
+            "roc_auc": 0.5823490627594194
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24804997894947636,
+          "degenerate_single_class": false,
+          "ece": 0.04554220817138238,
+          "log_loss": 0.6894159025183828,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5430927835051547,
+            "roc_auc": 0.5569948719214052
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24735496419892083,
+        "degenerate_single_class": false,
+        "ece": 0.04125788022844921,
+        "log_loss": 0.6883737592918543,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5489993810604498,
+          "roc_auc": 0.5710691351068848
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 15,
+      "folds": [
+        {
+          "brier": 0.24932557471740352,
+          "degenerate_single_class": false,
+          "ece": 0.06258494879669285,
+          "log_loss": 0.6930900632961707,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5462046204620462,
+            "roc_auc": 0.5706809504534565
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24654053481107122,
+          "degenerate_single_class": false,
+          "ece": 0.03579283774120473,
+          "log_loss": 0.6867086842115036,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.555096987205943,
+            "roc_auc": 0.5811086544104601
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2454053508236053,
+          "degenerate_single_class": false,
+          "ece": 0.026689565318315893,
+          "log_loss": 0.684094286833829,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5561519405450042,
+            "roc_auc": 0.5813433269222228
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.24814612547932152,
+          "degenerate_single_class": false,
+          "ece": 0.041317293551779315,
+          "log_loss": 0.6895972802430145,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5385567010309278,
+            "roc_auc": 0.5547173251196347
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.05,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 150,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24777778388423638,
+        "degenerate_single_class": false,
+        "ece": 0.03978419562904326,
+        "log_loss": 0.6893361671082331,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5527130183618734,
+          "roc_auc": 0.5707709992091143
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 18,
+      "folds": [
+        {
+          "brier": 0.2500691501851278,
+          "degenerate_single_class": false,
+          "ece": 0.055159148019384985,
+          "log_loss": 0.6948644383621213,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5565181518151815,
+            "roc_auc": 0.56943175726679
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24643356859085683,
+          "degenerate_single_class": false,
+          "ece": 0.03418812869109747,
+          "log_loss": 0.6866289763479111,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5592241023524557,
+            "roc_auc": 0.5828290272830255
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2461294364862939,
+          "degenerate_single_class": false,
+          "ece": 0.03882652682942069,
+          "log_loss": 0.6854600202449108,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5470685383980182,
+            "roc_auc": 0.575872588574103
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2484767773441596,
+          "degenerate_single_class": false,
+          "ece": 0.046857714351919474,
+          "log_loss": 0.6903864852095943,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.548041237113402,
+            "roc_auc": 0.5563012585108147
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 5.0,
+        "subsample": 1.0
+      }
+    },
+    {
+      "aggregate": {
+        "brier": 0.24815227098464274,
+        "degenerate_single_class": false,
+        "ece": 0.046563044195018305,
+        "log_loss": 0.6902254841615078,
+        "n_folds": 4,
+        "n_test": 9694,
+        "secondary": {
+          "accuracy": 0.5463173096760883,
+          "roc_auc": 0.568692505680686
+        },
+        "test_positive_rate": 0.5297090984113885
+      },
+      "candidate_id": 17,
+      "folds": [
+        {
+          "brier": 0.2500252449533539,
+          "degenerate_single_class": false,
+          "ece": 0.06191838704811858,
+          "log_loss": 0.6951460580998963,
+          "n_test": 2424,
+          "n_train": 2424,
+          "secondary": {
+            "accuracy": 0.5490924092409241,
+            "roc_auc": 0.5702877998884136
+          },
+          "test_positive_rate": 0.533003300330033,
+          "test_season": 2022,
+          "train_seasons": [
+            2021
+          ]
+        },
+        {
+          "brier": 0.24736725946810506,
+          "degenerate_single_class": false,
+          "ece": 0.04781596899475385,
+          "log_loss": 0.6885513868707798,
+          "n_test": 2423,
+          "n_train": 4848,
+          "secondary": {
+            "accuracy": 0.5464300453982666,
+            "roc_auc": 0.5768421842798455
+          },
+          "test_positive_rate": 0.520016508460586,
+          "test_season": 2023,
+          "train_seasons": [
+            2021,
+            2022
+          ]
+        },
+        {
+          "brier": 0.2469253406582923,
+          "degenerate_single_class": false,
+          "ece": 0.03569668624934631,
+          "log_loss": 0.6872098898537381,
+          "n_test": 2422,
+          "n_train": 7271,
+          "secondary": {
+            "accuracy": 0.5495458298926507,
+            "roc_auc": 0.5731566918669997
+          },
+          "test_positive_rate": 0.5222956234516928,
+          "test_season": 2024,
+          "train_seasons": [
+            2021,
+            2022,
+            2023
+          ]
+        },
+        {
+          "brier": 0.2482898459350904,
+          "degenerate_single_class": false,
+          "ece": 0.04597904602891391,
+          "log_loss": 0.6899915195933419,
+          "n_test": 2425,
+          "n_train": 9693,
+          "secondary": {
+            "accuracy": 0.5402061855670103,
+            "roc_auc": 0.5570325683024153
+          },
+          "test_positive_rate": 0.5435051546391753,
+          "test_season": 2025,
+          "train_seasons": [
+            2021,
+            2022,
+            2023,
+            2024
+          ]
+        }
+      ],
+      "params": {
+        "colsample_bytree": 1.0,
+        "learning_rate": 0.08,
+        "max_depth": 4,
+        "min_child_weight": 1.0,
+        "n_estimators": 100,
+        "reg_lambda": 1.0,
+        "subsample": 1.0
+      }
+    }
+  ],
+  "runtime_seconds": 218.199,
+  "selection_metric_order": [
+    "log_loss",
+    "brier",
+    "ece"
+  ],
+  "status": "REPAIRED_XGBOOST_TUNING_EVIDENCE"
+}

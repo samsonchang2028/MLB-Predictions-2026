@@ -228,6 +228,8 @@ tests/unit/validation/test_leakage_checks.py -q` -> **51 passed**.
 - Review the repaired ML experiment evidence and decide whether to lock the
   model/window/calibration methodology. 2026 remains untouched until that
   methodology decision is accepted.
+- Optional: run a second, narrower XGBoost tuning pass around the shallow
+  regularized candidate if methodology review wants more evidence before lock.
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
   re-ingest (candidate for a new DATA-01x task, not filed).
 
@@ -257,6 +259,39 @@ comparison): uncalibrated 0.68756 log loss / 0.24697 Brier / 0.0350 ECE;
 **sigmoid 0.68385 / 0.24538 / 0.00554** (best); isotonic 0.72223 / 0.24718 /
 0.0274 (overfits on log loss). Candidate calibration method: sigmoid/Platt,
 pending methodology review.
+
+## XGBoost tuning pass (2021-2025 repaired build) - RESULTS
+
+Executed a modest 20-candidate XGBoost grid on repaired build
+`a910017bac839af5`, expanding folds only, selection order log loss -> Brier ->
+ECE, 2026 not inspected. Report:
+`reports/experiments/v1-repaired-xgboost-tuning-a910017bac839af5.json`.
+
+Best tuned candidate:
+
+```text
+max_depth=2
+learning_rate=0.03
+n_estimators=300
+reg_lambda=10.0
+min_child_weight=3.0
+subsample=0.8
+colsample_bytree=0.8
+```
+
+Raw/full-train expanding-fold aggregate: log loss **0.68124**, Brier **0.24408**,
+ECE **0.01578**, AUC **0.58446**, accuracy **0.56396** over 9,694 test games.
+This improves materially over the untuned repaired XGBoost/expanding evidence
+(0.68551 / 0.24616 / 0.02976 on the common 2024-2025 comparison; 0.68527 /
+0.24595 / 0.03307 as the ML-008 full-train reference over all expanding folds).
+
+Calibration on the tuned candidate: sigmoid/Platt improves the fair base-fit
+comparison (0.68271 -> 0.68150 log loss; ECE 0.01966 -> 0.00582), but the
+raw full-train tuned model remains best by primary log loss/Brier. Isotonic
+again overfits on log loss (0.70829). Candidate methodology for review:
+**tuned shallow XGBoost + expanding window, likely uncalibrated if strict
+primary-metric ordering dominates; sigmoid only if calibration reliability is
+weighted more heavily than the small log-loss/Brier cost.**
 
 ## First real experiment (2021-2025 certified build) - RESULTS
 
@@ -294,10 +329,10 @@ DATA-016 re-ingest. No 2026 data was touched.
 ## Next required action
 
 The re-ingest + re-certification + Gold completeness + leakage + repaired ML
-experiment chain is DONE for 2021-2025. The next required action is reviewing
-the repaired experiment evidence and deciding whether to lock the
-model/window/calibration methodology. Do not inspect 2026 until that decision
-is accepted.
+experiment + first XGBoost tuning chain is DONE for 2021-2025. The next
+required action is reviewing the repaired/tuned evidence and deciding whether
+to lock the model/window/calibration methodology or run one narrower tuning
+pass. Do not inspect 2026 until that decision is accepted.
 
 ## Safe parallel
 
@@ -329,8 +364,9 @@ is accepted.
 
 The repaired 2021-2025 dataset is built and certified PASS, Gold completeness
 PASS, leakage tests PASS, and repaired ML-005/006/007/008 evidence has been
-generated. Next implementation/operator task: methodology review/lock decision
-for model family, training window, and calibration method; do not inspect 2026.
+generated. A first XGBoost tuning pass improved the repaired expanding-window
+evidence. Next implementation/operator task: methodology review/lock decision
+or one narrower XGBoost tuning pass; do not inspect 2026.
 
 ## Deferred follow-ups
 
