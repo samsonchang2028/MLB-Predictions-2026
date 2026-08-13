@@ -51,6 +51,8 @@ DEFAULT_CERTIFICATION = (
 )
 DEFAULT_DATABASE = Path("data") / "mlb.duckdb"
 DEFAULT_OUTPUT = Path("state") / "predictions" / "daily.jsonl"
+DEFAULT_FEATURES_OUTPUT = Path("state") / "predictions" / "game_features.jsonl"
+DEFAULT_ODDS_BOOKS_OUTPUT = Path("state") / "predictions" / "odds_books.jsonl"
 DEFAULT_MODEL_VERSION = "v1-adr-006-tuned-xgboost-expanding-uncalibrated"
 DEFAULT_BOOKMAKER = "draftkings"
 ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/"
@@ -361,6 +363,74 @@ def odds_snapshots_for_schedule(
     return snapshots, dict(stats)
 
 
+def all_book_snapshots_for_schedule(
+    payload: Any,
+    schedule: Sequence[Mapping[str, Any]],
+    *,
+    source: str = "the_odds_api",
+) -> tuple[dict[tuple[Any, str], dict[str, Any]], dict[str, int]]:
+    """Map every bookmaker's moneyline to ``game_pk``, keyed by ``(game_pk, bookmaker)``.
+
+    Display/comparison only -- unlike :func:`odds_snapshots_for_schedule`, this
+    keeps every book instead of filtering to one, and is never used to build the
+    canonical immutable prediction record.
+    """
+    parsed = parse_the_odds_api_moneylines(payload, source=source)
+    matchup_index = _schedule_matchup_index(schedule)
+    grouped: dict[tuple[str, str, datetime, str, str], dict[str, Any]] = {}
+    for row in parsed:
+        key = (
+            row["source_event_id"],
+            row["bookmaker"],
+            row["commence_time"],
+            _normalize_team_name(row["home_team"]),
+            _normalize_team_name(row["away_team"]),
+        )
+        group = grouped.setdefault(
+            key,
+            {
+                "bookmaker": row["bookmaker"],
+                "commence_time": row["commence_time"],
+                "home_team": row["home_team"],
+                "away_team": row["away_team"],
+                "snapshot_timestamp": row["snapshot_timestamp"],
+            },
+        )
+        if row["snapshot_timestamp"] > group["snapshot_timestamp"]:
+            group["snapshot_timestamp"] = row["snapshot_timestamp"]
+        if row["outcome"] == "home":
+            group["home_american"] = row["american_price"]
+        else:
+            group["away_american"] = row["american_price"]
+
+    snapshots: dict[tuple[Any, str], dict[str, Any]] = {}
+    stats = Counter()
+    for group in grouped.values():
+        if "home_american" not in group or "away_american" not in group:
+            stats["incomplete_bookmaker_markets"] += 1
+            continue
+        game, reason = _match_schedule_game(group, matchup_index)
+        if game is None:
+            stats[f"unmatched_events.{reason}"] += 1
+            continue
+        key = (game["game_pk"], group["bookmaker"])
+        current = snapshots.get(key)
+        candidate = {
+            "game_pk": game["game_pk"],
+            "bookmaker": group["bookmaker"],
+            "home_american": group["home_american"],
+            "away_american": group["away_american"],
+            "snapshot_timestamp": group["snapshot_timestamp"],
+            "source": source,
+        }
+        if current is None or candidate["snapshot_timestamp"] > current["snapshot_timestamp"]:
+            snapshots[key] = candidate
+            stats["matched_events"] += 1
+    stats["parsed_moneyline_rows"] = len(parsed)
+    stats["mapped_game_books"] = len(snapshots)
+    return snapshots, dict(stats)
+
+
 def _schedule_matchup_index(schedule: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], list[Mapping[str, Any]]]:
     index: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for game in schedule:
@@ -425,12 +495,63 @@ def summarize_skips(skipped: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     return dict(Counter(str(row.get("reason")) for row in skipped))
 
 
+def _serialize_detail_record(record: Mapping[str, Any]) -> dict[str, Any]:
+    """JSON-safe copy of a record (dates/datetimes -> ISO-8601 strings)."""
+    serial: dict[str, Any] = {}
+    for key, value in record.items():
+        if isinstance(value, (datetime, date)):
+            serial[key] = value.isoformat()
+        else:
+            serial[key] = value
+    return serial
+
+
+def append_jsonl_records(
+    path: Path,
+    records: Iterable[Mapping[str, Any]],
+    *,
+    key_fields: Sequence[str],
+) -> int:
+    """Append-only JSONL write for detail artifacts, deduped/conflict-checked by
+    ``key_fields``. Mirrors ``JsonLinesPredictionStore``'s idempotency contract
+    (src/pipelines/daily.py) without its prediction-specific required-field
+    schema: identical re-writes for an existing key are no-ops, conflicting
+    re-writes raise. Returns the number of newly written lines.
+    """
+    existing: dict[tuple[Any, ...], dict[str, Any]] = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            serial = json.loads(line)
+            existing[tuple(serial[field] for field in key_fields)] = serial
+
+    written = 0
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        for record in records:
+            serial = _serialize_detail_record(record)
+            key = tuple(serial[field] for field in key_fields)
+            prior = existing.get(key)
+            if prior is not None:
+                if prior == serial:
+                    continue
+                raise ValueError(f"conflicting re-write for key {key} in {path}")
+            handle.write(json.dumps(serial, sort_keys=True) + "\n")
+            existing[key] = serial
+            written += 1
+    return written
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run real local MLB daily predictions.")
     parser.add_argument("--date", default=None, help="Official MLB date YYYY-MM-DD; default local today.")
     parser.add_argument("--database", default=str(DEFAULT_DATABASE))
     parser.add_argument("--certification", default=str(DEFAULT_CERTIFICATION))
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--features-output", default=str(DEFAULT_FEATURES_OUTPUT))
+    parser.add_argument("--odds-books-output", default=str(DEFAULT_ODDS_BOOKS_OUTPUT))
     parser.add_argument("--bookmaker", default=DEFAULT_BOOKMAKER)
     parser.add_argument("--regions", default="us")
     parser.add_argument("--odds-json", default=None, help="Optional saved The Odds API payload for offline replay/tests.")
@@ -500,11 +621,18 @@ def main(argv: list[str] | None = None) -> int:
         payload = json.loads(Path(args.odds_json).read_text(encoding="utf-8"))
         print(f"[odds] loaded payload={args.odds_json}", flush=True)
     else:
-        print(f"[odds] fetching bookmaker={args.bookmaker} regions={args.regions}", flush=True)
-        payload = fetch_odds_payload(api_key, regions=args.regions, bookmakers=args.bookmaker, timeout=args.timeout)
+        print(
+            f"[odds] fetching regions={args.regions} (all books; "
+            f"canonical bookmaker={args.bookmaker})",
+            flush=True,
+        )
+        payload = fetch_odds_payload(api_key, regions=args.regions, bookmakers=None, timeout=args.timeout)
 
     odds_snapshots, odds_stats = odds_snapshots_for_schedule(payload, inputs["schedule"], bookmaker=args.bookmaker)
     print(f"[odds] {json.dumps(odds_stats, sort_keys=True)}", flush=True)
+
+    all_books, all_books_stats = all_book_snapshots_for_schedule(payload, inputs["schedule"])
+    print(f"[odds-books] {json.dumps(all_books_stats, sort_keys=True)}", flush=True)
 
     store = JsonLinesPredictionStore(args.output)
     result = run_daily_predictions(
@@ -529,6 +657,51 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     print(f"[skips] {json.dumps(summarize_skips(result.skipped), sort_keys=True)}", flush=True)
+
+    features_records = [
+        {
+            "run_date": run_date,
+            "game_pk": row["game_pk"],
+            "build_id": today_matrix["build_id"],
+            "prediction_timestamp": prediction_timestamp,
+            "features": row["features"],
+        }
+        for row in today_matrix["rows"]
+    ]
+    features_written = append_jsonl_records(
+        Path(args.features_output),
+        features_records,
+        key_fields=("run_date", "game_pk", "build_id"),
+    )
+    print(
+        f"[features] written={features_written} output={args.features_output}",
+        flush=True,
+    )
+
+    # key includes snapshot_timestamp (not just bookmaker) so a same-day re-run
+    # with fresh line movement appends a new observation instead of conflicting
+    # with the immutability check on a price that has since moved.
+    odds_book_records = [
+        {
+            "run_date": run_date,
+            "game_pk": game_pk,
+            "bookmaker": bookmaker,
+            "home_american": snapshot["home_american"],
+            "away_american": snapshot["away_american"],
+            "snapshot_timestamp": snapshot["snapshot_timestamp"],
+            "source": snapshot["source"],
+        }
+        for (game_pk, bookmaker), snapshot in all_books.items()
+    ]
+    odds_books_written = append_jsonl_records(
+        Path(args.odds_books_output),
+        odds_book_records,
+        key_fields=("run_date", "game_pk", "bookmaker", "snapshot_timestamp"),
+    )
+    print(
+        f"[odds-books] written={odds_books_written} output={args.odds_books_output}",
+        flush=True,
+    )
     return 0
 
 

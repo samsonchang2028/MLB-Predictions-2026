@@ -1,8 +1,12 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from scripts.daily_predictions import (
     _bullpen_placeholder_rows,
     _starter_placeholder_rows,
+    all_book_snapshots_for_schedule,
+    append_jsonl_records,
     odds_snapshots_for_schedule,
 )
 from features.bullpen import build_bullpen_features
@@ -150,6 +154,122 @@ def test_odds_snapshots_leave_unmatched_events_visible():
 
     assert snapshots == {}
     assert stats["unmatched_events.time_out_of_tolerance"] == 1
+
+
+def test_all_book_snapshots_keeps_every_bookmaker_unlike_the_single_book_filter():
+    payload = [
+        {
+            "id": "event-1",
+            "commence_time": "2026-08-12T23:05:00Z",
+            "home_team": "Minnesota Twins",
+            "away_team": "Baltimore Orioles",
+            "bookmakers": [
+                {
+                    "key": "fanduel",
+                    "last_update": "2026-08-12T20:00:00Z",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Minnesota Twins", "price": -105},
+                                {"name": "Baltimore Orioles", "price": -115},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "key": "draftkings",
+                    "last_update": "2026-08-12T20:01:00Z",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Minnesota Twins", "price": -110},
+                                {"name": "Baltimore Orioles", "price": -110},
+                            ],
+                        }
+                    ],
+                },
+            ],
+        }
+    ]
+
+    snapshots, stats = all_book_snapshots_for_schedule(payload, [_schedule_row(823672)])
+
+    assert stats["mapped_game_books"] == 2
+    assert snapshots[(823672, "fanduel")]["home_american"] == -105
+    assert snapshots[(823672, "draftkings")]["home_american"] == -110
+    assert snapshots[(823672, "fanduel")]["source"] == "the_odds_api"
+
+
+def test_all_book_snapshots_latest_timestamp_wins_per_book():
+    payload = [
+        {
+            "id": "event-1",
+            "commence_time": "2026-08-12T23:05:00Z",
+            "home_team": "Minnesota Twins",
+            "away_team": "Baltimore Orioles",
+            "bookmakers": [
+                {
+                    "key": "draftkings",
+                    "last_update": "2026-08-12T19:00:00Z",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Minnesota Twins", "price": -108},
+                                {"name": "Baltimore Orioles", "price": -112},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+        {
+            "id": "event-1",
+            "commence_time": "2026-08-12T23:05:00Z",
+            "home_team": "Minnesota Twins",
+            "away_team": "Baltimore Orioles",
+            "bookmakers": [
+                {
+                    "key": "draftkings",
+                    "last_update": "2026-08-12T20:01:00Z",
+                    "markets": [
+                        {
+                            "key": "h2h",
+                            "outcomes": [
+                                {"name": "Minnesota Twins", "price": -110},
+                                {"name": "Baltimore Orioles", "price": -110},
+                            ],
+                        }
+                    ],
+                }
+            ],
+        },
+    ]
+
+    snapshots, _stats = all_book_snapshots_for_schedule(payload, [_schedule_row(823672)])
+
+    assert snapshots[(823672, "draftkings")]["home_american"] == -110
+    assert snapshots[(823672, "draftkings")]["snapshot_timestamp"] == datetime(
+        2026, 8, 12, 20, 1, tzinfo=timezone.utc
+    )
+
+
+def test_append_jsonl_records_is_idempotent_and_conflict_checked(tmp_path):
+    path = tmp_path / "detail.jsonl"
+    record = {"run_date": "2026-08-12", "game_pk": 1, "bookmaker": "draftkings", "price": -110}
+
+    written_first = append_jsonl_records(path, [record], key_fields=("run_date", "game_pk", "bookmaker"))
+    written_second = append_jsonl_records(path, [record], key_fields=("run_date", "game_pk", "bookmaker"))
+
+    assert written_first == 1
+    assert written_second == 0
+    assert len(path.read_text(encoding="utf-8").splitlines()) == 1
+
+    conflicting = {**record, "price": -120}
+    with pytest.raises(ValueError, match="conflicting re-write"):
+        append_jsonl_records(path, [conflicting], key_fields=("run_date", "game_pk", "bookmaker"))
 
 
 def test_bullpen_placeholders_emit_current_pregame_rows_without_current_bullpen_stats():
