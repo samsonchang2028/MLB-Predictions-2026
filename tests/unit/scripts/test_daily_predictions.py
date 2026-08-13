@@ -161,3 +161,15 @@ def test_bullpen_placeholders_emit_current_pregame_rows_without_current_bullpen_
     assert current_home["bullpen_outs_prior_3d"] == 3
     assert current_away["bullpen_games_L7"] == 0
     assert current_away["bullpen_era_L7"] is None
+
+
+def test_schedule_match_keeps_naive_game_date_but_pipeline_start_is_aware():
+    row = _schedule_row(823672)
+    # Feature builders consume naive DuckDB game_date values; the daily pipeline
+    # cutoff comparison needs game_start_timestamp normalized to UTC-aware.
+    from scripts.daily_predictions import _utc_instant
+
+    row["game_start_timestamp"] = _utc_instant(row["game_start_timestamp"])
+
+    assert row["game_date"].tzinfo is None
+    assert row["game_start_timestamp"].tzinfo is timezone.utc

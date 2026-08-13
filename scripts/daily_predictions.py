@@ -110,6 +110,8 @@ def load_prediction_inputs(database: str, run_date: date, certification_path: Pa
             """,
             [run_date],
         )
+        for row in schedule:
+            row["game_start_timestamp"] = _utc_instant(row["game_start_timestamp"])
         games_for_features = _dict_rows(
             connection,
             """
