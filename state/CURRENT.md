@@ -213,6 +213,26 @@ to certify cleanly.
   entire board, and Streamlit displays skipped-record diagnostics. The APP-001
   xfail-pinned P2 is resolved.
 
+- PIPE-004 + APP-005 - prediction detail artifacts + Streamlit game detail
+  page merged. `scripts/daily_predictions.py` now fetches every US bookmaker
+  (not just DraftKings) for comparison and persists the per-game
+  starter/bullpen/team feature breakdown it already computed but previously
+  discarded, as two new artifacts (`state/predictions/game_features.jsonl`,
+  `state/predictions/odds_books.jsonl`); the canonical DraftKings-pinned
+  prediction record (`daily.jsonl`, edge, market_probability) is unchanged. A
+  new "Game Detail" page (`pages/3_Game_Detail.py`), reached by clicking a row
+  on the daily board, shows the feature breakdown grouped by component plus a
+  multi-book odds comparison table; works without DuckDB access, same
+  artifact-backed deployment story as the rest of `app/`. An 8-angle
+  multi-agent self-review (not an independent reviewer/tester pass) found and
+  fixed 3 real bugs before merge: a same-day-rerun crash, an odds-fetch
+  fail-fast blast-radius regression, and unbounded artifact growth — see
+  `tasks/PIPE-004-prediction-detail-artifacts.md` and
+  `tasks/APP-005-game-detail-page.md` Handoff sections for detail. **Merged to
+  main without the repo's normal independent reviewer/tester gate** (self-
+  reviewed only, at the requesting orchestrator's direction); flag for a real
+  review pass if one becomes available. Full suite: 632 passed.
+
 ## In progress
 
 - None.

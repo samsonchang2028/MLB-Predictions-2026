@@ -68,8 +68,8 @@ state source of truth.
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | backlog | - | update git remote to moved GitHub repository URL |
-| PIPE-004 | candidate | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
-| APP-005 | candidate | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
+| PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
+| APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
 
 ## Safe parallel guidance
 
