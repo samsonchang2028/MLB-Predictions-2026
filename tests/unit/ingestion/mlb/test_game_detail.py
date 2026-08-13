@@ -164,12 +164,44 @@ def test_malformed_required_pitching_stat_is_rejected(
         _validate_payload(_completed_game(pitching), 123)
 
 
-def test_all_zero_pitching_line_is_rejected() -> None:
+def test_completed_side_with_only_all_zero_pitching_lines_is_rejected() -> None:
     pitching = {key: (0 if key != "inningsPitched" else "0.0") for key in _full_pitching()}
     payload = _completed_game(pitching)
 
-    with pytest.raises(ValueError, match="all-zero pitching line"):
+    with pytest.raises(ValueError, match="no pitcher with recorded activity"):
         _validate_payload(payload, 123)
+
+
+def test_inactive_listed_pitcher_with_real_sibling_is_accepted() -> None:
+    # DATA-019: real MLB boxscores can list an inactive pitcher in the pitchers
+    # array with a complete 0 IP / 0 BF / 0 pitch line. That is not the DATA-016
+    # hollow projection shape when another pitcher on the same side has activity.
+    zero = {key: (0 if key != "inningsPitched" else "0.0") for key in _full_pitching()}
+    real = _full_pitching()
+    payload = json.dumps(
+        {
+            "gamePk": 123,
+            "liveData": {"boxscore": {"teams": {
+                "home": {
+                    "team": {"id": 1},
+                    "pitchers": [10, 11],
+                    "players": {
+                        "ID10": {"person": {"id": 10, "fullName": "Inactive"}, "stats": {"pitching": zero}},
+                        "ID11": {"person": {"id": 11, "fullName": "Starter"}, "stats": {"pitching": real}},
+                    },
+                },
+                "away": {
+                    "team": {"id": 2},
+                    "pitchers": [20],
+                    "players": {
+                        "ID20": {"person": {"id": 20, "fullName": "Starter"}, "stats": {"pitching": real}},
+                    },
+                },
+            }}},
+        }
+    ).encode()
+
+    assert _validate_payload(payload, 123) == payload.decode()
 
 
 def test_game_without_boxscore_pitchers_is_accepted() -> None:

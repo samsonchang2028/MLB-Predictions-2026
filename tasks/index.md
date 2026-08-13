@@ -54,6 +54,7 @@ state source of truth.
 | APP-003 | done | APP-001, PIPE-002 | daily board Pacific time/model-side display |
 | DATA-019 | done | DATA-018 | zero pitcher-line local investigation report |
 | DOCS-001 | done | V1 completion | README/task-index status cleanup |
+| DATA-020 | done | DATA-019 | inactive zero-line pitcher handling; no re-fetch performed |
 
 ## Current optional graph candidates
 
@@ -61,6 +62,7 @@ state source of truth.
 |---|---|---|---|
 | APP-004 | done | APP-003 | Streamlit deployment packaging |
 | ML-011 | in progress | ML-010 | model diagnostics report for underfit/overfit evidence |
+| DATA-021 | backlog | DATA-020 | targeted retry/normalization of the 39 DATA-018 games |
 | OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
 | OBS-002 | backlog | OBS-001, PIPE-003 | result enrichment for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |

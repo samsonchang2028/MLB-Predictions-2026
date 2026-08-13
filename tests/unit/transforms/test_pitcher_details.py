@@ -78,6 +78,28 @@ def _player(pitcher_id: int, innings: str, pitches: int) -> dict[str, object]:
     }
 
 
+
+def _inactive_player(pitcher_id: int) -> dict[str, object]:
+    return {
+        "person": {"id": pitcher_id, "fullName": f"Pitcher {pitcher_id}"},
+        "stats": {
+            "pitching": {
+                "inningsPitched": "0.0",
+                "outs": 0,
+                "battersFaced": 0,
+                "numberOfPitches": 0,
+                "strikes": 0,
+                "balls": 0,
+                "hits": 0,
+                "runs": 0,
+                "earnedRuns": 0,
+                "baseOnBalls": 0,
+                "strikeOuts": 0,
+                "homeRuns": 0,
+            }
+        },
+    }
+
 def _detail(
     connection: duckdb.DuckDBPyConnection,
     game_pk: int,
@@ -151,6 +173,51 @@ def test_extracts_actual_starter_change_missing_probable_and_bullpen_order() -> 
         ("home", 137, 11, 99, "detail-sha-4001"),
     ]
 
+
+
+def test_inactive_listed_pitcher_is_skipped_and_first_active_pitcher_is_starter() -> None:
+    connection = duckdb.connect()
+    _bronze(connection)
+    _game(connection, 4002)
+    payload = {
+        "gamePk": 4002,
+        "gameData": {"probablePitchers": {}},
+        "liveData": {"boxscore": {"teams": {
+            "home": {
+                "team": {"id": 137},
+                "pitchers": [10, 11, 12],
+                "players": {
+                    "ID10": _inactive_player(10),
+                    "ID11": _player(11, "5.0", 80),
+                    "ID12": _player(12, "1.0", 20),
+                },
+            },
+            "away": {
+                "team": {"id": 110},
+                "pitchers": [21],
+                "players": {"ID21": _player(21, "6.0", 90)},
+            },
+        }}},
+    }
+    connection.execute(
+        "INSERT INTO bronze.mlb_game_detail_payloads VALUES (4002, 'sha-4002', ?, ?)",
+        [datetime(2025, 4, 2, 13), json.dumps(payload)],
+    )
+
+    counts = normalize_silver(connection)
+
+    assert counts["pitcher_appearances"] == 3
+    assert connection.execute(
+        """SELECT pitcher_id, appearance_order, is_actual_starter
+           FROM silver.pitcher_appearances
+           WHERE game_pk = 4002 AND side = 'home'
+           ORDER BY appearance_order"""
+    ).fetchall() == [(11, 1, True), (12, 2, False)]
+    assert connection.execute(
+        """SELECT actual_pitcher_id
+           FROM silver.pitcher_starters
+           WHERE game_pk = 4002 AND side = 'home'"""
+    ).fetchone() == (11,)
 
 def test_field_filtered_style_dynamic_id_keyed_players_extracts_stats() -> None:
     # Mirrors a feed/live?fields=... response after DATA-005 stopped filtering the

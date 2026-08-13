@@ -271,14 +271,19 @@ def _pitcher_data(
                     )
                 _assert_detail_team_id(side_boxscore, team_id, game_pk, side)
                 pitcher_ids = _pitcher_ids(side_boxscore, game_pk, side)
-                actual_pitcher_id = pitcher_ids[0] if pitcher_ids else None
                 players = side_boxscore.get("players", {})
                 if pitcher_ids and not isinstance(players, dict):
                     raise NormalizationError(
                         f"game_pk {game_pk} {side} players must be an object"
                     )
-                for order, pitcher_id in enumerate(pitcher_ids, start=1):
+                active_order = 0
+                for pitcher_id in pitcher_ids:
                     pitching = _pitching_stats(players, pitcher_id, game_pk, side)
+                    if not _has_pitching_activity(pitching):
+                        continue
+                    active_order += 1
+                    if actual_pitcher_id is None:
+                        actual_pitcher_id = pitcher_id
                     field_context = f"game_pk {game_pk} pitcher {pitcher_id}"
                     appearances.append(
                         (
@@ -286,8 +291,8 @@ def _pitcher_data(
                             team_id,
                             side,
                             pitcher_id,
-                            order,
-                            order == 1,
+                            active_order,
+                            active_order == 1,
                             _optional_text(
                                 pitching.get("inningsPitched"),
                                 f"{field_context} inningsPitched",
@@ -421,6 +426,17 @@ def _pitching_stats(
         )
     return pitching
 
+
+
+def _has_pitching_activity(pitching: dict[str, Any]) -> bool:
+    innings = pitching.get("inningsPitched")
+    if isinstance(innings, str) and innings != "0.0":
+        return True
+    for key in _PITCHING_INT_FIELDS:
+        value = pitching.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return True
+    return False
 
 def _probable_pitcher_id(value: object, game_pk: int, side: str) -> int | None:
     if value is None:

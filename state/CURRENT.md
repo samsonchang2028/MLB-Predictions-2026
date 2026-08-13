@@ -188,6 +188,16 @@ to certify cleanly.
   artifact-backed: local DuckDB/raw data and `.env` are not deployed unless a
   later automation task publishes artifacts.
 
+
+- DATA-020 - inactive zero-line pitcher handling completed: the DATA-016
+  hollow-payload guard now permits MLB boxscores that list an inactive 0 IP /
+  0 BF pitcher when another same-side pitcher has real activity, while still
+  rejecting completed sides with no active pitchers. Silver normalization now
+  skips inactive zero-activity pitcher rows and assigns starter order from the
+  first active pitcher. No network re-fetch or DuckDB mutation was performed;
+  the 39 DATA-018 games require a later targeted retry if we want them
+  republished into Bronze/Silver.
+
 ## In progress
 
 - None.
@@ -433,7 +443,7 @@ Streamlit dashboard.
 ## Next implementation task
 
 None required for V1. Optional follow-ups currently in flight or queued:
-ML-011 model diagnostics, OPS-001
+ML-011 model diagnostics, DATA-021 targeted retry of the 39 DATA-018 games, OPS-001
 scheduled daily operator/GitHub Actions, OBS-002 result enrichment, and
 MARKET-002 persisted market-relative reporting.
 

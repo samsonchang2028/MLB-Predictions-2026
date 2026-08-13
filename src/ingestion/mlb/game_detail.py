@@ -437,6 +437,7 @@ def _assert_pitching_stats_present(
         if not isinstance(players, dict):
             raise _hollow_structure(game_pk, f"{side} players object")
         seen: set[int] = set()
+        active_pitchers = 0
         for pitcher_id in pitchers:
             if (
                 isinstance(pitcher_id, bool)
@@ -493,17 +494,24 @@ def _assert_pitching_stats_present(
                     f"game-detail game_pk {game_pk} {side} pitcher {pitcher_id} "
                     f"pitching stats must be non-negative integers {malformed}"
                 )
-            outs = pitching.get("outs")
-            faced = pitching.get("battersFaced")
-            recorded_activity = (
-                (isinstance(outs, int) and not isinstance(outs, bool) and outs > 0)
-                or (isinstance(faced, int) and not isinstance(faced, bool) and faced > 0)
+            if _has_pitching_activity(pitching):
+                active_pitchers += 1
+        if completed and active_pitchers == 0:
+            raise ValueError(
+                f"game-detail game_pk {game_pk} {side} has no pitcher with recorded "
+                "activity: hollow boxscore payload"
             )
-            if not recorded_activity:
-                raise ValueError(
-                    f"game-detail game_pk {game_pk} {side} pitcher {pitcher_id} has an "
-                    f"all-zero pitching line (no outs or batters faced): hollow payload"
-                )
+
+
+def _has_pitching_activity(pitching: Mapping[str, Any]) -> bool:
+    innings = pitching.get("inningsPitched")
+    if isinstance(innings, str) and innings != "0.0":
+        return True
+    for key in _PITCHING_INT_STATS:
+        value = pitching.get(key)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return True
+    return False
 
 
 def _game_lifecycle(connection: Any, game_pk: int) -> dict[str, object]:
