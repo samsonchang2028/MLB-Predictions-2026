@@ -117,6 +117,9 @@ UI `PLAY` / `PASS` is a display threshold only — not a staking system.
 
 Base-rate reference (home wins ~53%): log loss ≈ **0.691**, Brier ≈ **0.249**. Anything below that is a real (often small) probability edge.
 
+Charts below are generated from the committed experiment JSONs via
+`scripts/generate_readme_charts.py`.
+
 ---
 
 ### Head-to-head: models × windows (repaired 2021–2025)
@@ -124,6 +127,12 @@ Base-rate reference (home wins ~53%): log loss ≈ **0.691**, Brier ≈ **0.249*
 Certified build `a910017bac839af5` — full team + starter + bullpen features.  
 Ranked on common test seasons **{2024, 2025}** (~4,847 games each).  
 Primary order: log loss → Brier → ECE. Report: `reports/experiments/v1-repaired-a910017bac839af5.json`.
+
+![ROC-AUC by model and training window](docs/images/roc_auc_by_model_window.png)
+
+![ROC-AUC leaderboard](docs/images/roc_auc_leaderboard.png)
+
+![Log loss and Brier by model and window](docs/images/logloss_brier_by_model_window.png)
 
 | Rank | Model | Window | Log loss ↓ | Brier ↓ | ECE ↓ | **ROC-AUC ↑** | Accuracy |
 |------|-------|--------|------------|---------|-------|---------------|----------|
@@ -177,6 +186,8 @@ Report: `reports/experiments/v1-repaired-xgboost-tuning-a910017bac839af5.json`.
 
 Trained on 2021–2025 only (`n_train = 12,118`), tested on completed 2026 regular-season games (`n_test = 1,797`).  
 Report: `reports/experiments/v1-holdout-2026.json`.
+
+![Locked V1 development vs 2026 holdout](docs/images/v1_dev_vs_holdout.png)
 
 | Metric | Holdout 2026 | Tuned expanding (dev) |
 |--------|--------------|------------------------|
@@ -233,8 +244,9 @@ src/
   app/           Streamlit pages
   validation/    Certification & leakage checks
 scripts/
-  daily_predictions.py   Live daily operator
-  holdout_2026.py        One-shot holdout evaluation
+  daily_predictions.py          Live daily operator
+  holdout_2026.py               One-shot holdout evaluation
+  generate_readme_charts.py     Rebuild docs/images/*.png from experiment JSON
 state/
   CURRENT.md             Project status
   data-certifications/   PASS/FAIL artifacts
@@ -243,6 +255,7 @@ reports/
   experiments/           Model comparison + holdout JSON
 docs/
   decisions/             ADRs
+  images/                README charts
 tasks/                   Task graph for agents / contributors
 ```
 
