@@ -59,7 +59,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -480,10 +480,10 @@ def _assert_record_complete(record: Mapping[str, Any]) -> None:
 
 
 def _serialize_record(record: Mapping[str, Any]) -> dict[str, Any]:
-    """JSON-safe copy of a record (datetimes -> ISO-8601 strings)."""
+    """JSON-safe copy of a record (dates/datetimes -> ISO-8601 strings)."""
     serial: dict[str, Any] = {}
     for key, value in record.items():
-        if isinstance(value, datetime):
+        if isinstance(value, (datetime, date)):
             serial[key] = value.isoformat()
         else:
             serial[key] = value

@@ -9,7 +9,7 @@ byte-identical).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import numpy as np
 
@@ -100,7 +100,7 @@ def test_daily_pipeline_end_to_end_with_real_model_and_json_store(tmp_path) -> N
     store = JsonLinesPredictionStore(store_path)
 
     result = run_daily_predictions(
-        run_date="2024-04-01",
+        run_date=date(2024, 4, 1),
         schedule=schedule,
         team_features=team,
         starter_features=starter,
@@ -123,6 +123,7 @@ def test_daily_pipeline_end_to_end_with_real_model_and_json_store(tmp_path) -> N
         assert 0.0 <= record["model_probability"] <= 1.0
 
     # Persisted to disk.
+    assert store.records()[0]["run_date"] == "2024-04-01"
     assert store_path.exists()
     first_bytes = store_path.read_bytes()
     assert len(store) == 2
@@ -131,7 +132,7 @@ def test_daily_pipeline_end_to_end_with_real_model_and_json_store(tmp_path) -> N
     # appends nothing; the file is byte-identical afterwards.
     reopened = JsonLinesPredictionStore(store_path)
     rerun = run_daily_predictions(
-        run_date="2024-04-01",
+        run_date=date(2024, 4, 1),
         schedule=schedule,
         team_features=team,
         starter_features=starter,
