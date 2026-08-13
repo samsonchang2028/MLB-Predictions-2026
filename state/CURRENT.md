@@ -161,6 +161,13 @@ to certify cleanly.
   2026-08-13 operator path with empty odds payload built 9 Gold rows, 0
   exclusions, 2 unknown-starter placeholders, and skipped only for missing odds.
 
+- APP-003 - daily board display clarity completed: Streamlit daily board now
+  filters by slate `run_date`, defaults to the latest slate, displays first
+  pitch / odds snapshot / prediction timestamps in Pacific time
+  (`America/Los_Angeles`), and adds `Model Side` plus clearer action labels
+  such as `PLAY LAD` or `PASS`. The synthetic threshold caveat remains; no
+  staking policy or model logic changed.
+
 ## In progress
 
 - None.

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.board import DEFAULT_EDGE_THRESHOLD, load_daily_board
+from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board
 
 
 class _FakeStore:
@@ -30,6 +30,8 @@ def _record(game_pk, *, home_id=147, away_id=111, edge=0.05, run_date="2024-04-0
         "market_probability": 0.55 - edge,
         "edge": edge,
         "odds_snapshot_timestamp": "2024-04-01T14:00:00+00:00",
+        "prediction_timestamp": "2024-04-01T15:00:00+00:00",
+        "game_start_timestamp": "2024-04-02T02:10:00+00:00",
         "model_version": "v1",
         "home_team_id": home_id,
         "away_team_id": away_id,
@@ -53,6 +55,39 @@ def test_matchup_uses_known_abbreviations_and_falls_back_for_unknown():
     rows = load_daily_board(_FakeStore([known, unknown]))
     assert rows[0]["matchup"] == "BOS @ NYY"
     assert rows[1]["matchup"] == "NYY @ Team 999"
+
+
+def test_model_side_points_to_home_for_positive_edge_and_away_for_negative_edge():
+    positive = _record(1, home_id=119, away_id=118, edge=0.03)
+    negative = _record(2, home_id=119, away_id=118, edge=-0.03)
+    rows = load_daily_board(_FakeStore([positive, negative]))
+    by_pk = {row["game_pk"]: row for row in rows}
+    assert by_pk[1]["model_side_detail"] == "LAD (home)"
+    assert by_pk[1]["action_label"] == "PLAY LAD"
+    assert by_pk[2]["model_side_detail"] == "KC (away)"
+    assert by_pk[2]["action_label"] == "PLAY KC"
+
+
+def test_action_label_pass_when_edge_below_display_threshold():
+    [row] = load_daily_board(_FakeStore([_record(1, home_id=119, away_id=118, edge=0.001)]))
+    assert row["model_side_detail"] == "LAD (home)"
+    assert row["action_label"] == "PASS"
+
+
+def test_timestamps_display_in_pacific_time_not_raw_utc_date():
+    [row] = load_daily_board(_FakeStore([_record(1)]))
+    assert row["game_start_pacific"] == "2024-04-01 07:10 PM PDT"
+    assert row["odds_snapshot_pacific"] == "2024-04-01 07:00 AM PDT"
+    assert row["prediction_timestamp_pacific"] == "2024-04-01 08:00 AM PDT"
+
+
+def test_available_and_latest_run_dates_for_sidebar_filter():
+    store = _FakeStore([
+        _record(1, run_date="2026-08-12"),
+        _record(2, run_date="2026-08-13"),
+    ])
+    assert available_run_dates(store) == ["2026-08-12", "2026-08-13"]
+    assert latest_run_date(store) == "2026-08-13"
 
 
 def test_run_date_filters_to_one_slate():

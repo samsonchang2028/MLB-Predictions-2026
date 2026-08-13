@@ -21,7 +21,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.board import DEFAULT_EDGE_THRESHOLD, load_daily_board
+from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board
 from pipelines.daily import JsonLinesPredictionStore
 
 DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
@@ -38,29 +38,47 @@ path = _store_path()
 if not path.exists():
     st.info(f"No predictions found at {path}. Run the daily pipeline first.")
 else:
-    rows = load_daily_board(JsonLinesPredictionStore(path))
-    if not rows:
+    store = JsonLinesPredictionStore(path)
+    dates = available_run_dates(store)
+    if not dates:
         st.info("No predictions in the store yet.")
     else:
+        default_date = latest_run_date(store)
+        selected_date = st.sidebar.selectbox(
+            "Slate date",
+            options=dates,
+            index=dates.index(default_date) if default_date in dates else len(dates) - 1,
+            help="Filters by the operator run_date / MLB official slate date.",
+        )
+        rows = load_daily_board(store, run_date=selected_date)
         st.caption(
-            "Indicator uses a synthetic, display-only edge threshold "
+            "Times are displayed in Pacific time (America/Los_Angeles). "
+            "Model side is the team whose price the model prefers relative to the "
+            "no-vig market probability. PLAY/PASS still uses a synthetic, "
+            "display-only edge threshold "
             f"(|edge| >= {DEFAULT_EDGE_THRESHOLD:.0%}); no real staking policy "
-            "exists in this codebase yet -- treat PLAY/PASS as a label, not "
-            "a recommendation."
+            "exists in this codebase yet."
         )
-        st.dataframe(
-            [
-                {
-                    "Matchup": row["matchup"],
-                    "Model P(home)": round(row["model_probability"], 4),
-                    "Market P(home)": round(row["market_probability"], 4),
-                    "Edge": round(row["edge"], 4),
-                    "Odds Snapshot": str(row["odds_snapshot_timestamp"]),
-                    "Model Version": row["model_version"],
-                    "Indicator": "PLAY" if row["play"] else "PASS",
-                }
-                for row in rows
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        if not rows:
+            st.info(f"No predictions found for slate date {selected_date}.")
+        else:
+            st.dataframe(
+                [
+                    {
+                        "Slate Date": row["run_date"],
+                        "First Pitch (Pacific)": row["game_start_pacific"],
+                        "Matchup": row["matchup"],
+                        "Model Side": row["model_side_detail"],
+                        "Action Label": row["action_label"],
+                        "Model P(home)": round(row["model_probability"], 4),
+                        "Market P(home)": round(row["market_probability"], 4),
+                        "Edge": round(row["edge"], 4),
+                        "Odds Snapshot (Pacific)": row["odds_snapshot_pacific"],
+                        "Prediction Time (Pacific)": row["prediction_timestamp_pacific"],
+                        "Model Version": row["model_version"],
+                    }
+                    for row in rows
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
