@@ -8,9 +8,7 @@ No Streamlit import here -- this module is the testable half of APP-001.
 
 from __future__ import annotations
 
-import pytest
-
-from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board
+from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board, load_daily_board_with_diagnostics
 
 
 class _FakeStore:
@@ -145,22 +143,38 @@ def test_edge_is_displayed_verbatim_even_when_internally_inconsistent():
     assert row["edge"] == 0.99
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "GAP (P2): load_daily_board indexes record['edge'], ['model_probability'], "
-        "['market_probability'], ['odds_snapshot_timestamp'], ['model_version'], and "
-        "['game_pk'] with plain __getitem__, not .get(). PIPE-001's own writer "
-        "(_assert_record_complete) guarantees these fields are non-None on write, but "
-        "load_daily_board accepts ANY object exposing .records() and JsonLinesPredictionStore "
-        "does no schema validation on read -- a hand-edited, truncated, or stale-schema "
-        "JSONL line missing one of these keys crashes the WHOLE board (KeyError, uncaught "
-        "in daily_board_page.py) instead of degrading gracefully for just that row. "
-        "Remove xfail once load_daily_board either validates/skips incomplete records with "
-        "a visible reason, or the crash-on-malformed-store behavior is deliberately documented."
-    ),
-)
 def test_record_missing_required_field_does_not_crash_whole_board():
-    record = _record(1, edge=0.03)
-    del record["edge"]
-    load_daily_board(_FakeStore([record]))
+    good = _record(1, edge=0.03)
+    bad = _record(2, edge=0.04)
+    del bad["edge"]
+
+    rows = load_daily_board(_FakeStore([bad, good]))
+
+    assert [row["game_pk"] for row in rows] == [1]
+
+
+def test_diagnostics_report_skipped_malformed_records():
+    bad = _record(2, edge=0.04)
+    del bad["edge"]
+
+    report = load_daily_board_with_diagnostics(_FakeStore([bad]))
+
+    assert report["rows"] == []
+    assert report["skipped"] == [
+        {
+            "position": 0,
+            "game_pk": 2,
+            "run_date": "2024-04-01",
+            "reason": "missing required field(s): edge",
+        }
+    ]
+
+
+def test_non_numeric_probability_record_is_skipped_with_reason():
+    bad = _record(2, edge=0.04)
+    bad["model_probability"] = "0.55"
+
+    report = load_daily_board_with_diagnostics(_FakeStore([bad]))
+
+    assert report["rows"] == []
+    assert report["skipped"][0]["reason"] == "model_probability must be numeric"

@@ -66,7 +66,8 @@ state source of truth.
 | OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
 | OBS-002 | backlog | OBS-001, PIPE-003 | result enrichment for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
-| APP-001A | backlog | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
+| APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
+| OPS-002 | backlog | - | update git remote to moved GitHub repository URL |
 
 ## Safe parallel guidance
 

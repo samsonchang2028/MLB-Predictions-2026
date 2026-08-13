@@ -21,7 +21,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board
+from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board_with_diagnostics
 from pipelines.daily import JsonLinesPredictionStore
 
 DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
@@ -50,7 +50,9 @@ else:
             index=dates.index(default_date) if default_date in dates else len(dates) - 1,
             help="Filters by the operator run_date / MLB official slate date.",
         )
-        rows = load_daily_board(store, run_date=selected_date)
+        board_report = load_daily_board_with_diagnostics(store, run_date=selected_date)
+        rows = board_report["rows"]
+        skipped = board_report["skipped"]
         st.caption(
             "Times are displayed in Pacific time (America/Los_Angeles). "
             "Model side is the team whose price the model prefers relative to the "
@@ -59,8 +61,15 @@ else:
             f"(|edge| >= {DEFAULT_EDGE_THRESHOLD:.0%}); no real staking policy "
             "exists in this codebase yet."
         )
+        if skipped:
+            st.warning(
+                f"Skipped {len(skipped)} malformed prediction record(s) for "
+                f"slate date {selected_date}. Valid records are still shown."
+            )
+            with st.expander("Skipped malformed records"):
+                st.dataframe(skipped, use_container_width=True, hide_index=True)
         if not rows:
-            st.info(f"No predictions found for slate date {selected_date}.")
+            st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
             st.dataframe(
                 [

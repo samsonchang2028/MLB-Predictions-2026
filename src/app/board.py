@@ -24,6 +24,7 @@ ADR before it is used for anything beyond a dashboard indicator.
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from collections.abc import Mapping
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -42,6 +43,14 @@ TEAM_ABBREVIATIONS: dict[int, str] = {
 
 DEFAULT_EDGE_THRESHOLD = 0.02
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
+DAILY_BOARD_REQUIRED_FIELDS = (
+    "game_pk",
+    "model_probability",
+    "market_probability",
+    "edge",
+    "odds_snapshot_timestamp",
+    "model_version",
+)
 
 
 def load_daily_board(
@@ -52,16 +61,40 @@ def load_daily_board(
 ) -> list[dict[str, Any]]:
     """Shape PIPE-001 prediction records into display rows, sorted by game_pk.
 
-    ``store`` is anything exposing ``.records()`` -> a sequence of prediction
-    record mappings (PIPE-001's schema). ``run_date`` filters to one day's
-    slate when given; ``None`` returns every record in the store. All
-    probability/market/edge values are passed through unchanged.
+    Malformed records are skipped rather than crashing the whole board. Use
+    :func:`load_daily_board_with_diagnostics` when the caller needs skipped-row
+    reasons for display.
     """
+    return load_daily_board_with_diagnostics(
+        store, run_date=run_date, edge_threshold=edge_threshold
+    )["rows"]
+
+
+def load_daily_board_with_diagnostics(
+    store: Any,
+    *,
+    run_date: Any = None,
+    edge_threshold: float = DEFAULT_EDGE_THRESHOLD,
+) -> dict[str, list[dict[str, Any]]]:
+    """Return display rows plus skipped malformed-record diagnostics."""
     rows: list[dict[str, Any]] = []
-    for record in store.records():
-        if run_date is not None and record.get("run_date") != run_date:
+    skipped: list[dict[str, Any]] = []
+    for position, record in enumerate(store.records()):
+        if run_date is not None and isinstance(record, Mapping) and record.get("run_date") != run_date:
             continue
-        edge = record["edge"]
+        problem = _record_problem(record)
+        if problem is not None:
+            skipped.append(
+                {
+                    "position": position,
+                    "game_pk": record.get("game_pk") if isinstance(record, Mapping) else None,
+                    "run_date": record.get("run_date") if isinstance(record, Mapping) else None,
+                    "reason": problem,
+                }
+            )
+            continue
+        assert isinstance(record, Mapping)
+        edge = float(record["edge"])
         home_team_id = record.get("home_team_id")
         away_team_id = record.get("away_team_id")
         model_side_id = home_team_id if edge >= 0 else away_team_id
@@ -91,7 +124,7 @@ def load_daily_board(
             }
         )
     rows.sort(key=lambda r: r["game_pk"])
-    return rows
+    return {"rows": rows, "skipped": skipped}
 
 
 def _team_label(team_id: Any) -> str:
@@ -139,3 +172,16 @@ def _parse_datetime(value: Any) -> datetime | None:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed
+
+
+def _record_problem(record: Any) -> str | None:
+    if not isinstance(record, Mapping):
+        return "record is not an object"
+    missing = [field for field in DAILY_BOARD_REQUIRED_FIELDS if record.get(field) is None]
+    if missing:
+        return "missing required field(s): " + ", ".join(missing)
+    for field in ("model_probability", "market_probability", "edge"):
+        value = record.get(field)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return f"{field} must be numeric"
+    return None

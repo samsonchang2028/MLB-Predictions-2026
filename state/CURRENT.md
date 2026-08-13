@@ -207,6 +207,12 @@ to certify cleanly.
   degradation / AUC drop and weak absolute edge indicate mild overfit, season
   drift, weak signal, or a combination.
 
+
+- APP-001A - malformed prediction-record hardening completed: daily board
+  loading now skips malformed/stale prediction records instead of crashing the
+  entire board, and Streamlit displays skipped-record diagnostics. The APP-001
+  xfail-pinned P2 is resolved.
+
 ## In progress
 
 - None.
@@ -453,8 +459,7 @@ Streamlit dashboard.
 
 None required for V1. Optional follow-ups currently in flight or queued:
 DATA-021 targeted retry of the 39 DATA-018 games, OPS-001
-scheduled daily operator/GitHub Actions, OBS-002 result enrichment, and
-MARKET-002 persisted market-relative reporting.
+scheduled daily operator/GitHub Actions, OBS-002 result enrichment, MARKET-002 persisted market-relative reporting, and OPS-002 git remote cleanup.
 
 ## Deferred follow-ups
 
