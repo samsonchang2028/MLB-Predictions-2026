@@ -71,7 +71,8 @@ else:
         if not rows:
             st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
-            st.dataframe(
+            st.caption("Select a row to open its detail page (pitcher/bullpen stats, multi-book odds).")
+            selection = st.dataframe(
                 [
                     {
                         "Slate Date": row["run_date"],
@@ -90,4 +91,12 @@ else:
                 ],
                 use_container_width=True,
                 hide_index=True,
+                on_select="rerun",
+                selection_mode="single-row",
             )
+            selected_rows = selection.selection.rows if selection is not None else []
+            if selected_rows:
+                selected_game_pk = rows[selected_rows[0]]["game_pk"]
+                st.query_params["game_pk"] = str(selected_game_pk)
+                st.query_params["run_date"] = str(selected_date)
+                st.switch_page("pages/3_Game_Detail.py")
