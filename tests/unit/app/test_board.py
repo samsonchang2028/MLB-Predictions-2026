@@ -74,9 +74,26 @@ def test_action_label_pass_when_edge_below_display_threshold():
 
 def test_timestamps_display_in_pacific_time_not_raw_utc_date():
     [row] = load_daily_board(_FakeStore([_record(1)]))
-    assert row["game_start_pacific"] == "2024-04-01 07:10 PM PDT"
-    assert row["odds_snapshot_pacific"] == "2024-04-01 07:00 AM PDT"
-    assert row["prediction_timestamp_pacific"] == "2024-04-01 08:00 AM PDT"
+    assert row["game_start_pacific"] == "2024-04-01 19:10 PDT"
+    assert row["odds_snapshot_pacific"] == "2024-04-01 07:00 PDT"
+    assert row["prediction_timestamp_pacific"] == "2024-04-01 08:00 PDT"
+
+
+def test_pacific_timestamps_are_24_hour_so_text_sort_matches_chronological_order():
+    # 12-hour "01:05 PM" would sort before "10:35 AM" as plain text; 24-hour
+    # "13:05"/"10:35" sorts correctly. Cover an afternoon time whose 12-hour
+    # form would have broken a lexicographic sort against a morning time.
+    afternoon = _record(1, run_date="2024-04-01")
+    afternoon["game_start_timestamp"] = "2024-04-02T00:05:00+00:00"  # 2024-04-01 17:05 PDT
+    morning = _record(2, run_date="2024-04-01")
+    morning["game_start_timestamp"] = "2024-04-01T17:35:00+00:00"  # 2024-04-01 10:35 PDT
+
+    rows = load_daily_board(_FakeStore([afternoon, morning]))
+    by_pk = {row["game_pk"]: row for row in rows}
+    assert sorted(row["game_start_pacific"] for row in rows) == [
+        by_pk[2]["game_start_pacific"],
+        by_pk[1]["game_start_pacific"],
+    ]
 
 
 def test_available_and_latest_run_dates_for_sidebar_filter():

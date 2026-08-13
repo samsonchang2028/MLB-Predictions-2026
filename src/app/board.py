@@ -154,7 +154,11 @@ def _format_pacific(value: Any) -> str | None:
     if parsed is None:
         return None
     local = parsed.astimezone(PACIFIC_TZ)
-    return local.strftime("%Y-%m-%d %I:%M %p %Z")
+    # 24-hour time, not 12-hour + AM/PM: Streamlit's dataframe sorts this
+    # column as plain text, and "01:05 PM" vs "10:35 AM" sorts as strings
+    # ("0" < "1"), not chronologically. Zero-padded 24-hour time sorts
+    # correctly as text because it IS chronological order.
+    return local.strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _parse_datetime(value: Any) -> datetime | None:
