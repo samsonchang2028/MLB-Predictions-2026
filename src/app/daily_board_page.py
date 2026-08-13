@@ -5,9 +5,16 @@ figures are read verbatim from PIPE-001 prediction records via
 :func:`app.board.load_daily_board`, which itself does no probability/edge
 math (see that module's docstring for the pass/play threshold caveat).
 
-Run with:
+Run via the multipage root entrypoint (required for the row click-through to
+``pages/3_Game_Detail.py`` to resolve correctly -- ``st.switch_page`` paths
+are relative to whatever script ``streamlit run`` was pointed at, not to this
+file):
 
-    streamlit run src/app/daily_board_page.py
+    streamlit run streamlit_app.py
+
+then open "Daily Predictions" from the sidebar. Running this file directly
+(``streamlit run src/app/daily_board_page.py``) still renders the board, but
+clicking a row will fail to find ``pages/3_Game_Detail.py``.
 
 The prediction store path defaults to ``state/predictions/daily.jsonl``
 (same convention as ``state/data-certifications/``); override with the

@@ -7,9 +7,10 @@ breakdown, multi-book odds comparison) for one game, reached by clicking a
 row on the daily board or by loading directly with
 ``?game_pk=...&run_date=...``.
 
-Run with:
+Normally reached by clicking a row on the daily board, which requires
+running via the multipage root entrypoint:
 
-    streamlit run src/app/game_detail_page.py
+    streamlit run streamlit_app.py
 
 Store/artifact paths default alongside ``state/predictions/``; override with
 the same ``PREDICTIONS_STORE_PATH`` env var as the daily board, plus
