@@ -228,7 +228,8 @@ Reviewer + Tester gates passed with zero unresolved P0/P1 findings; blocking
 tester findings in OBS-001 and DATA-018 were repaired before merge. Full repo
 suite green on main post-merge after APP-001/OBS-001/DATA-018: **578 passed,
 1 xfailed** (main's environment has xgboost installed, so no exclusions needed
-here, unlike the individual agent worktrees).
+here, unlike the individual agent worktrees). APP-001A merged: **623 passed,
+0 xfailed** (APP-001 malformed-record xfail resolved).
 
 - DATA-016 (`210c70b`) - game-detail `fields=` projection fix + lifecycle-aware
   hollow-boxscore guard, `numberOfPitches` required, real-payload contract
@@ -248,7 +249,8 @@ here, unlike the individual agent worktrees).
 - APP-001 (`19abe5d`) - Streamlit daily prediction board merged with one
   deferred non-blocking P2 pinned by xfail: malformed/stale-schema prediction
   records can crash the board instead of skipping a bad row. See
-  `state/agents/APP-001.md`.
+  `state/agents/APP-001.md`. **P2 resolved by APP-001A** (read-side skip +
+  Streamlit diagnostics).
 - OBS-001 - append-only prediction journal merged after repairing the tester
   P1/P2 false-conflict path: routine result-enrichment re-runs with a fresh
   `enrichment_timestamp` are idempotent when the substantive enrichment fact is
