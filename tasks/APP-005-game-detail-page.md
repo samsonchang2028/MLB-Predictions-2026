@@ -141,11 +141,19 @@ Streamlit Cloud app, artifact-backed like the rest of `app/`).
   since APP-001A's own in-flight work briefly collided with a first attempt
   directly on `main` (see PIPE-004's handoff); no functional loss, just a
   redo in isolation.
-- Known limitations: no live `streamlit run` click-through verified in a
-  browser this session (headless environment); verified end-to-end via unit
-  tests and manual code review of the `on_select`/`switch_page` wiring
-  against Streamlit 1.61's documented API only. Recommend a manual
-  `streamlit run src/app/daily_board_page.py` click-through pass before
-  merging.
+- Additionally smoke-tested both pages with `streamlit.testing.v1.AppTest`
+  (headless script execution, no browser extension available this session):
+  the daily board renders with zero exceptions; the detail page loaded via
+  `?game_pk=...&run_date=...` against synthetic artifacts renders the
+  matchup header, all three metrics, and 4 dataframes (3 feature-component
+  tables + 1 odds-by-book table) with zero exceptions; the detail page with
+  no query params shows the correct fallback info message. Synthetic
+  fixtures were deleted afterward, not committed.
+- Known limitations: no literal mouse-click browser verification this
+  session (no browser extension connected); the `on_select`/`switch_page`
+  click-through wiring itself is exercised only by code review against
+  Streamlit 1.61's documented API, not by AppTest (which doesn't simulate
+  dataframe row selection). Recommend one manual click-through pass in a
+  real browser before merging.
 - No ADR change required. No `state/CURRENT.md` update yet — pending review
   gate per repo convention.
