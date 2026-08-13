@@ -54,6 +54,12 @@ def _format_american(value: int | None) -> str:
     return f"{value:+d}" if isinstance(value, int) else "n/a"
 
 
+def _canonical_book_label(source: str | None) -> str:
+    # source is "the_odds_api:draftkings" -- the book name is what a reader
+    # recognizes, the provider prefix is internal plumbing.
+    return source.rsplit(":", 1)[-1].capitalize() if source else "the canonical book"
+
+
 st.set_page_config(page_title="MLB Game Detail", layout="wide")
 st.title("MLB Game Detail")
 
@@ -88,6 +94,45 @@ else:
             st.subheader(detail["matchup"])
             st.caption(f"First pitch (Pacific): {detail['game_start_pacific']}")
 
+            book_label = _canonical_book_label(detail["canonical_source"])
+            verdict = (
+                f"**PLAY {detail['model_side_team']}** — model gives "
+                f"{detail['model_side_team']} a {detail['model_probability_favored']:.1%} "
+                f"chance to win vs. {book_label}'s {detail['market_probability_favored']:.1%} "
+                f"(no-vig), a {abs(detail['edge']):.1%} edge."
+            )
+            best_price = detail["best_price"]
+            if best_price is not None:
+                verdict += (
+                    f" Best price found for {detail['model_side_team']}: "
+                    f"{best_price['bookmaker']} {_format_american(best_price['price'])}."
+                )
+            if detail["play"]:
+                st.success(verdict)
+            else:
+                st.info(
+                    f"**PASS** — model's edge vs. {book_label} is only "
+                    f"{abs(detail['edge']):.1%}, below the "
+                    f"{detail['edge_threshold']:.0%} display threshold used across "
+                    "this app. Not enough disagreement with the market to flag as a play."
+                )
+
+            gaps = detail["notable_stat_gaps"]
+            if gaps:
+                st.markdown("**Why:** the biggest stat gaps behind this matchup —")
+                for gap in gaps:
+                    st.markdown(
+                        f"- {gap['label']}: **{gap['home_team']}** {gap['home_value']:g} "
+                        f"vs **{gap['away_team']}** {gap['away_value']:g}"
+                    )
+                st.caption(
+                    "Context, not the model's literal reasoning -- this codebase has "
+                    "no feature-importance/SHAP layer, so these are just the largest "
+                    "raw differences between the two teams, for you to sanity-check "
+                    "the verdict above against."
+                )
+
+            st.divider()
             col1, col2, col3 = st.columns(3)
             col1.metric("Model P(home)", f"{detail['model_probability']:.1%}")
             col2.metric("Market P(home) (no-vig)", f"{detail['market_probability']:.1%}")
@@ -100,12 +145,11 @@ else:
             )
 
             st.divider()
-            st.subheader("Why the model said what it said")
+            st.subheader("Full stat breakdown")
             st.caption(
-                "Point-in-time starter/bullpen/team features FEAT-004 built for "
-                "this prediction, grouped by component. Raw values, not "
-                "per-feature model attribution -- no SHAP/feature-importance "
-                "explainability exists in this codebase yet."
+                "Every point-in-time starter/bullpen/team feature FEAT-004 built "
+                "for this prediction, grouped by component -- the \"Why\" gaps "
+                "above are the biggest few of these; this is all of them."
             )
             features = detail["features"]
             if not features:

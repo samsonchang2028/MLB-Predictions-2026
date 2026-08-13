@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 
+from app.board import DEFAULT_EDGE_THRESHOLD
 from app.game_detail import load_game_detail
 
 
@@ -121,6 +122,142 @@ def test_features_grouped_by_component(tmp_path):
     }
     assert result["features"]["bullpen"] == {"home_bullpen_era_L7": 3.0}
     assert result["features"]["team"] == {"diff_team_win_pct_before": 0.05}
+
+
+def test_verdict_favors_home_and_is_a_play_when_edge_meets_threshold(tmp_path):
+    edge = DEFAULT_EDGE_THRESHOLD + 0.01
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=edge)]),
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=tmp_path / "odds_books.jsonl",
+    )
+
+    assert result["play"] is True
+    assert result["model_side_team"] == "NYY"  # home_id=147
+    assert result["action_label"] == "PLAY NYY"
+    assert result["model_probability_favored"] == result["model_probability"]
+    assert result["market_probability_favored"] == result["market_probability"]
+
+
+def test_verdict_favors_away_and_flips_probabilities_when_edge_negative(tmp_path):
+    edge = -(DEFAULT_EDGE_THRESHOLD + 0.01)
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=edge)]),
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=tmp_path / "odds_books.jsonl",
+    )
+
+    assert result["play"] is True
+    assert result["model_side_team"] == "BOS"  # away_id=111
+    assert result["action_label"] == "PLAY BOS"
+    assert result["model_probability_favored"] == 1 - result["model_probability"]
+    assert result["market_probability_favored"] == 1 - result["market_probability"]
+
+
+def test_verdict_is_pass_when_edge_below_display_threshold(tmp_path):
+    edge = DEFAULT_EDGE_THRESHOLD - 0.005
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=edge)]),
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=tmp_path / "odds_books.jsonl",
+    )
+
+    assert result["play"] is False
+    assert result["action_label"] == "PASS"
+
+
+def test_notable_stat_gaps_ranked_by_magnitude_and_capped_at_three(tmp_path):
+    features_path = tmp_path / "game_features.jsonl"
+    _write_jsonl(
+        features_path,
+        [
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "build_id": "b1",
+                "features": {
+                    "home_starter_season_era_before": 3.5,
+                    "away_starter_season_era_before": 4.1,
+                    "diff_starter_season_era_before": -0.6,
+                    "home_bullpen_era_L7": 3.0,
+                    "away_bullpen_era_L7": 3.05,
+                    "diff_bullpen_era_L7": -0.05,
+                    "home_team_win_pct_before": 0.6,
+                    "away_team_win_pct_before": 0.4,
+                    "diff_team_win_pct_before": 0.2,
+                    "diff_starter_days_rest": 1,  # no matching home_/away_ pair -> excluded
+                },
+            }
+        ],
+    )
+
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1)]),
+        features_path=features_path,
+        odds_books_path=tmp_path / "odds_books.jsonl",
+    )
+
+    gaps = result["notable_stat_gaps"]
+    assert len(gaps) == 3
+    # ranked by |diff| descending: team win pct (0.2) > starter era (-0.6 is
+    # actually largest magnitude) -- assert the ranking, not a guessed order.
+    assert [round(abs(g["diff"]), 3) for g in gaps] == sorted(
+        (round(abs(g["diff"]), 3) for g in gaps), reverse=True
+    )
+    assert {g["label"] for g in gaps} == {
+        "Starter season era before",
+        "Bullpen era l7",
+        "Team win pct before",
+    }
+    top = gaps[0]
+    assert top["home_team"] == "NYY"
+    assert top["away_team"] == "BOS"
+
+
+def test_best_price_picks_highest_payout_for_favored_side(tmp_path):
+    odds_path = tmp_path / "odds_books.jsonl"
+    _write_jsonl(
+        odds_path,
+        [
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "draftkings",
+                "home_american": -150,
+                "away_american": 130,
+                "snapshot_timestamp": "2026-08-12T14:00:00+00:00",
+                "source": "the_odds_api",
+            },
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "fanduel",
+                # less negative than draftkings' home price -> better payout for home
+                "home_american": -120,
+                "away_american": 105,
+                "snapshot_timestamp": "2026-08-12T14:00:00+00:00",
+                "source": "the_odds_api",
+            },
+        ],
+    )
+
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=0.05)]),  # favors home
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=odds_path,
+    )
+
+    assert result["best_price"] == {"bookmaker": "fanduel", "price": -120}
 
 
 def test_odds_books_computes_implied_probability_per_book(tmp_path):
