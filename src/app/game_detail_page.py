@@ -57,8 +57,12 @@ def _format_american(value: int | None) -> str:
 st.set_page_config(page_title="MLB Game Detail", layout="wide")
 st.title("MLB Game Detail")
 
-game_pk = st.query_params.get("game_pk")
-run_date = st.query_params.get("run_date")
+# session_state carries the selection across the daily board's st.switch_page
+# click-through (query params set just before switch_page do not reliably
+# survive the navigation); query params remain supported for a direct or
+# bookmarked ?game_pk=...&run_date=... URL.
+game_pk = st.session_state.get("selected_game_pk") or st.query_params.get("game_pk")
+run_date = st.session_state.get("selected_run_date") or st.query_params.get("run_date")
 
 if not game_pk or not run_date:
     st.info(

@@ -104,6 +104,9 @@ else:
             selected_rows = selection.selection.rows if selection is not None else []
             if selected_rows:
                 selected_game_pk = rows[selected_rows[0]]["game_pk"]
-                st.query_params["game_pk"] = str(selected_game_pk)
-                st.query_params["run_date"] = str(selected_date)
+                # st.query_params set right before st.switch_page does not
+                # reliably survive the navigation; session_state is the
+                # documented way to pass data across a page switch.
+                st.session_state["selected_game_pk"] = str(selected_game_pk)
+                st.session_state["selected_run_date"] = str(selected_date)
                 st.switch_page("pages/3_Game_Detail.py")
