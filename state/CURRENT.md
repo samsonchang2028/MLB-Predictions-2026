@@ -152,6 +152,15 @@ to certify cleanly.
   `state/predictions/daily.jsonl` for the Streamlit daily board. Focused tests
   cover odds mapping and pregame bullpen placeholder behavior.
 
+- PIPE-003 - live daily operator hardening completed: The Odds API mapping now
+  matches by exact normalized home/away teams with nearest-start-time tolerance
+  instead of exact timestamp only, reporting explicit unmatched reasons. Live
+  inference now adds unknown-starter placeholders when MLB has not announced one
+  or both probable starters, preserving missingness without inventing pitcher
+  identity/stats. Historical/certification strictness is unchanged. Smoke: local
+  2026-08-13 operator path with empty odds payload built 9 Gold rows, 0
+  exclusions, 2 unknown-starter placeholders, and skipped only for missing odds.
+
 ## In progress
 
 - None.
@@ -364,7 +373,7 @@ DATA-016 re-ingest. No 2026 data was touched.
 ## Next required action
 
 No required V1 implementation task is currently queued. The next practical step is
-to run the local daily operator with `THE_ODDS_API_KEY` set, then refresh the
+to rerun the local daily operator with `THE_ODDS_API_KEY` set, then refresh the
 Streamlit dashboard.
 
 ## Safe parallel

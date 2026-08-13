@@ -54,6 +54,7 @@ DEFAULT_OUTPUT = Path("state") / "predictions" / "daily.jsonl"
 DEFAULT_MODEL_VERSION = "v1-adr-006-tuned-xgboost-expanding-uncalibrated"
 DEFAULT_BOOKMAKER = "draftkings"
 ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/"
+ODDS_MATCH_TOLERANCE_SECONDS = 12 * 60 * 60
 
 
 def _dict_rows(connection: duckdb.DuckDBPyConnection, sql: str, params: Sequence[Any] = ()) -> list[dict[str, Any]]:
@@ -193,8 +194,11 @@ def load_prediction_inputs(database: str, run_date: date, certification_path: Pa
 
 def build_today_feature_components(inputs: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]]:
     team_features = build_team_features(inputs["team_stats"])
+    starter_rows = list(inputs["starters"]) + _starter_placeholder_rows(
+        inputs["schedule"], inputs["starters"]
+    )
     starter_features = build_starter_features(
-        inputs["appearances"], inputs["games_for_features"], inputs["starters"]
+        inputs["appearances"], inputs["games_for_features"], starter_rows
     )
     bullpen_rows = list(inputs["appearances"]) + _bullpen_placeholder_rows(inputs["schedule"])
     bullpen_features = build_bullpen_features(bullpen_rows)
@@ -203,6 +207,36 @@ def build_today_feature_components(inputs: Mapping[str, Any]) -> dict[str, list[
         "starter": starter_features,
         "bullpen": bullpen_features,
     }
+
+
+def _starter_placeholder_rows(
+    schedule: Sequence[Mapping[str, Any]],
+    starters: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Add explicit unknown-starter rows for live inference gaps.
+
+    Historical builds should remain strict, but pregame live slates often have
+    one or both probable starters unavailable. These placeholders do not invent
+    identity or stats; they only allow ``build_starter_features`` to emit its
+    existing unknown-starter feature row for that team-game.
+    """
+    existing = {(row["game_pk"], row["team_id"]) for row in starters}
+    placeholders: list[dict[str, Any]] = []
+    for game in schedule:
+        for side, team_key in (("home", "home_team_id"), ("away", "away_team_id")):
+            key = (game["game_pk"], game[team_key])
+            if key in existing:
+                continue
+            placeholders.append(
+                {
+                    "game_pk": game["game_pk"],
+                    "team_id": game[team_key],
+                    "side": side,
+                    "actual_pitcher_id": None,
+                    "probable_pitcher_id": None,
+                }
+            )
+    return placeholders
 
 
 def _bullpen_placeholder_rows(schedule: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -270,7 +304,7 @@ def odds_snapshots_for_schedule(
     source: str = "the_odds_api",
 ) -> tuple[dict[Any, dict[str, Any]], dict[str, int]]:
     parsed = parse_the_odds_api_moneylines(payload, source=source)
-    games_by_key = _schedule_match_index(schedule)
+    matchup_index = _schedule_matchup_index(schedule)
     grouped: dict[tuple[str, str, datetime, str, str], dict[str, Any]] = {}
     for row in parsed:
         if row["bookmaker"] != bookmaker:
@@ -306,14 +340,9 @@ def odds_snapshots_for_schedule(
         if "home_american" not in group or "away_american" not in group:
             stats["incomplete_bookmaker_markets"] += 1
             continue
-        match_key = (
-            _utc_instant(group["commence_time"]),
-            _normalize_team_name(group["home_team"]),
-            _normalize_team_name(group["away_team"]),
-        )
-        game = games_by_key.get(match_key)
+        game, reason = _match_schedule_game(group, matchup_index)
         if game is None:
-            stats["unmatched_events"] += 1
+            stats[f"unmatched_events.{reason}"] += 1
             continue
         game_pk = game["game_pk"]
         current = snapshots.get(game_pk)
@@ -332,18 +361,41 @@ def odds_snapshots_for_schedule(
     return snapshots, dict(stats)
 
 
-def _schedule_match_index(schedule: Sequence[Mapping[str, Any]]) -> dict[tuple[datetime, str, str], Mapping[str, Any]]:
-    index: dict[tuple[datetime, str, str], Mapping[str, Any]] = {}
-    duplicates: list[tuple[datetime, str, str]] = []
+def _schedule_matchup_index(schedule: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], list[Mapping[str, Any]]]:
+    index: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for game in schedule:
         home_name, away_name = _mlb_team_names(game)
-        key = (_utc_instant(game["game_date"]), _normalize_team_name(home_name), _normalize_team_name(away_name))
-        if key in index:
-            duplicates.append(key)
-        index[key] = game
-    if duplicates:
-        raise ValueError(f"ambiguous schedule mapping keys: {duplicates}")
+        key = (_normalize_team_name(home_name), _normalize_team_name(away_name))
+        index.setdefault(key, []).append(game)
     return index
+
+
+def _match_schedule_game(
+    odds_group: Mapping[str, Any],
+    matchup_index: Mapping[tuple[str, str], Sequence[Mapping[str, Any]]],
+) -> tuple[Mapping[str, Any] | None, str]:
+    key = (
+        _normalize_team_name(str(odds_group["home_team"])),
+        _normalize_team_name(str(odds_group["away_team"])),
+    )
+    candidates = list(matchup_index.get(key, ()))
+    if not candidates:
+        return None, "no_team_match"
+
+    event_time = _utc_instant(odds_group["commence_time"])
+    ranked = sorted(
+        (
+            (abs((_utc_instant(game["game_date"]) - event_time).total_seconds()), game)
+            for game in candidates
+        ),
+        key=lambda item: (item[0], item[1]["game_pk"]),
+    )
+    nearest_seconds, nearest_game = ranked[0]
+    if nearest_seconds > ODDS_MATCH_TOLERANCE_SECONDS:
+        return None, "time_out_of_tolerance"
+    if len(ranked) > 1 and ranked[1][0] == nearest_seconds:
+        return None, "ambiguous_nearest_time"
+    return nearest_game, "matched"
 
 
 def _mlb_team_names(game: Mapping[str, Any]) -> tuple[str, str]:
@@ -415,6 +467,9 @@ def main(argv: list[str] | None = None) -> int:
         print("[done] no active regular-season games found for date", flush=True)
         return 0
 
+    starter_placeholders = _starter_placeholder_rows(inputs["schedule"], inputs["starters"])
+    if starter_placeholders:
+        print(f"[starters] unknown_placeholders={len(starter_placeholders)}", flush=True)
     components = build_today_feature_components(inputs)
     today_matrix = build_feature_matrix(
         inputs["schedule"],
