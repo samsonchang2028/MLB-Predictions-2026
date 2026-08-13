@@ -61,7 +61,7 @@ state source of truth.
 | Task | Status | Depends on | Notes |
 |---|---|---|---|
 | APP-004 | done | APP-003 | Streamlit deployment packaging |
-| ML-011 | in progress | ML-010 | model diagnostics report for underfit/overfit evidence |
+| ML-011 | done | ML-010 | model diagnostics report for underfit/overfit evidence |
 | DATA-021 | backlog | DATA-020 | targeted retry/normalization of the 39 DATA-018 games |
 | OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
 | OBS-002 | backlog | OBS-001, PIPE-003 | result enrichment for daily predictions after games finish |
@@ -73,9 +73,9 @@ state source of truth.
 Current safe parallel set:
 
 ```text
-ML-011 model diagnostics
 DATA-019 data investigation (completed)
 DOCS-001 docs/status cleanup (completed)
+ML-011 model diagnostics (completed)
 ```
 
 Avoid parallelizing tasks that both change prediction journal schema or the same

@@ -198,6 +198,15 @@ to certify cleanly.
   the 39 DATA-018 games require a later targeted retry if we want them
   republished into Bronze/Silver.
 
+
+- ML-011 - model diagnostics report completed: added an artifact-backed
+  diagnostics script and generated `reports/experiments/v1-model-diagnostics.json`
+  without retraining, retuning, or re-evaluating 2026. Key gaps vs repaired
+  development/tuning: holdout log_loss +0.007543, Brier +0.003727, ROC-AUC
+  -0.034776. Interpretation: no catastrophic overfit, but modest holdout
+  degradation / AUC drop and weak absolute edge indicate mild overfit, season
+  drift, weak signal, or a combination.
+
 ## In progress
 
 - None.
@@ -443,7 +452,7 @@ Streamlit dashboard.
 ## Next implementation task
 
 None required for V1. Optional follow-ups currently in flight or queued:
-ML-011 model diagnostics, DATA-021 targeted retry of the 39 DATA-018 games, OPS-001
+DATA-021 targeted retry of the 39 DATA-018 games, OPS-001
 scheduled daily operator/GitHub Actions, OBS-002 result enrichment, and
 MARKET-002 persisted market-relative reporting.
 
