@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 import pytest
@@ -270,6 +271,25 @@ def test_append_jsonl_records_is_idempotent_and_conflict_checked(tmp_path):
     conflicting = {**record, "price": -120}
     with pytest.raises(ValueError, match="conflicting re-write"):
         append_jsonl_records(path, [conflicting], key_fields=("run_date", "game_pk", "bookmaker"))
+
+
+def test_append_jsonl_records_overwrite_mode_updates_existing_key_in_place(tmp_path):
+    path = tmp_path / "detail.jsonl"
+    record = {"run_date": "2026-08-12", "game_pk": 1, "bookmaker": "draftkings", "price": -110}
+    other = {"run_date": "2026-08-12", "game_pk": 2, "bookmaker": "draftkings", "price": -105}
+
+    append_jsonl_records(path, [record, other], key_fields=("run_date", "game_pk", "bookmaker"), on_conflict="overwrite")
+
+    moved = {**record, "price": -130}
+    written = append_jsonl_records(path, [moved], key_fields=("run_date", "game_pk", "bookmaker"), on_conflict="overwrite")
+
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    by_game = {row["game_pk"]: row for row in lines}
+
+    assert written == 1
+    assert len(lines) == 2
+    assert by_game[1]["price"] == -130
+    assert by_game[2]["price"] == -105
 
 
 def test_bullpen_placeholders_emit_current_pregame_rows_without_current_bullpen_stats():

@@ -2,7 +2,9 @@
 
 ## Status
 
-candidate
+candidate (self-reviewed via an 8-angle multi-agent pass, 3 confirmed bugs
+fixed — see Handoff; this is not a substitute for the repo's independent
+reviewer/tester gate, which hasn't run)
 
 ## Dependencies
 
@@ -60,22 +62,23 @@ APP-005) without giving it DuckDB access.
 
 - `today_matrix["rows"][i]["features"]` from `build_feature_matrix` (already
   computed in `main()`, previously only logged as a row count)
-- The Odds API response, now fetched without a `bookmakers` filter so every
-  US book for the region comes back (`fetch_odds_payload(..., bookmakers=None)`)
+- The Odds API, fetched twice per live run: once exactly as before
+  (`bookmakers=args.bookmaker`, drives the canonical record unchanged) and
+  once for comparison (`bookmakers=None`, every US book for the region) —
+  see "Post-review fixes" below for why this is two calls, not one.
 
 ## Outputs
 
 - `state/predictions/game_features.jsonl` — one line per
-  `(run_date, game_pk, build_id)`: `{run_date, game_pk, build_id,
-  prediction_timestamp, features}`
+  `(run_date, game_pk, build_id)`: `{run_date, game_pk, build_id, features}`.
+  No `prediction_timestamp` — features are a deterministic function of the
+  locked `build_id`, not of wall-clock run time (see "Post-review fixes").
+  Append-only; `on_conflict="raise"`.
 - `state/predictions/odds_books.jsonl` — one line per
-  `(run_date, game_pk, bookmaker, snapshot_timestamp)`: `{run_date, game_pk,
-  bookmaker, home_american, away_american, snapshot_timestamp, source}`.
-  `snapshot_timestamp` is part of the key (not just `bookmaker`) so a
-  same-day re-run with line movement appends a new observation instead of
-  raising a spurious immutability conflict against a price that has since
-  moved — `game_features.jsonl` correctly omits it since its features don't
-  change intraday for a locked `build_id`.
+  `(run_date, game_pk, bookmaker)`, upserted: `{run_date, game_pk, bookmaker,
+  home_american, away_american, snapshot_timestamp, source}`. Tracks the
+  *current* price per book, not a tick-by-tick history — `on_conflict="overwrite"`
+  updates the row in place instead of growing the file forever.
 
 ## Requirements
 
@@ -148,5 +151,51 @@ APP-005) without giving it DuckDB access.
 - Known limitations: no live end-to-end run against the real Odds API in this
   session (offline unit coverage only); operator should confirm real payload
   shape includes the expected book count for a real slate on first live run.
+
+### Post-review fixes
+
+An 8-angle self-review (line-by-line, removed-behavior, cross-file tracer,
+reuse, simplification, efficiency, altitude, conventions — 8 parallel finder
+agents, findings deduped and verified) surfaced 3 real bugs in the first cut,
+fixed before merge:
+
+1. **Same-day rerun crash.** `game_features.jsonl` included `prediction_timestamp`
+   in the record body but not in `key_fields`; two same-day runs (a normal
+   retry) produced differing bodies for the same key, and `on_conflict="raise"`
+   correctly-but-unhelpfully raised on every second run. Fixed by dropping
+   `prediction_timestamp` from the artifact entirely — it isn't needed
+   (features are a pure function of `build_id`) and its presence was the bug.
+2. **Comparison-fetch blast radius.** Widening the live fetch to `bookmakers=None`
+   put every minor US book's data through `parse_the_odds_api_moneylines`'s
+   strict fail-fast parser (raises on the first malformed event/outcome
+   anywhere in the payload) — one bad book could crash the whole daily run,
+   including well-formed canonical DraftKings data that was previously
+   isolated by fetching only one book. Fixed by splitting into two fetches:
+   the canonical one is byte-for-byte the original pre-PIPE-004 call
+   (`bookmakers=args.bookmaker`), completely unaffected by anything below;
+   the comparison one is wrapped in `try/except` (`RuntimeError` on fetch,
+   `OddsDataError` on parse) and degrades to "no comparison data this run"
+   rather than failing the pipeline. Costs one extra API call per live run.
+3. **Unbounded artifact growth.** Keying `odds_books.jsonl` by
+   `(..., snapshot_timestamp)` to dodge the conflict check meant a bookmaker's
+   `last_update` ticking on nearly every poll would append a near-duplicate
+   row forever with no compaction. Changed `append_jsonl_records` to accept
+   `on_conflict="raise" | "overwrite"`; `odds_books.jsonl` now upserts one
+   current row per `(run_date, game_pk, bookmaker)` (full-file rewrite only
+   when a value actually changed), while `game_features.jsonl` keeps the
+   original pure-append path (no full-file rewrite cost) since a `raise` on a
+   genuine conflict is exactly the guarantee it needs.
+
+Also fixed on `src/app/game_detail.py` (surfaced by the same review, applies
+to APP-005 too since it's the same branch): `_find_prediction` now excludes
+malformed records via `app.board._record_problem` (the same check
+`load_daily_board_with_diagnostics`/APP-001A already applies) instead of
+indexing required fields directly and raising `KeyError` on a bad record
+reached via direct `?game_pk=...&run_date=...` navigation.
+
+Re-verified after fixes: `python -m pytest -q` (full suite) — 632 passed;
+headless `streamlit.testing.v1.AppTest` re-run against synthetic artifacts —
+zero exceptions, same correct rendering as before the fixes.
+
 - No ADR change required. No `state/CURRENT.md` update yet — pending review
   gate per repo convention.

@@ -15,10 +15,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.board import _format_pacific, _matchup, _team_label
+from app.board import _format_pacific, _matchup, _record_problem, _team_label
+from features.build import _COMPONENTS as FEATURE_COMPONENTS
 from market import no_vig_two_way
 
-FEATURE_COMPONENTS = ("team", "starter", "bullpen")
 FEATURE_SIDE_PREFIXES = ("home_", "away_", "diff_")
 
 
@@ -70,11 +70,18 @@ def load_game_detail(
 
 
 def _find_prediction(store: Any, game_pk: Any, run_date: Any) -> dict[str, Any] | None:
+    """Latest valid prediction record for ``(game_pk, run_date)``.
+
+    Malformed/stale records are excluded the same way the daily board's
+    ``load_daily_board_with_diagnostics`` (APP-001A) excludes them from
+    display, rather than reaching this page's field access below and raising.
+    """
     matches = [
         record
         for record in store.records()
         if str(record.get("game_pk")) == str(game_pk)
         and str(record.get("run_date")) == str(run_date)
+        and _record_problem(record) is None
     ]
     if not matches:
         return None
@@ -85,8 +92,10 @@ def _load_features(path: Path, game_pk: Any, run_date: Any) -> dict[str, dict[st
     matches = _jsonl_matches(path, game_pk, run_date)
     if not matches:
         return None
-    latest = sorted(matches, key=lambda r: str(r.get("prediction_timestamp")))[-1]
-    return _group_features(latest.get("features") or {})
+    # game_features.jsonl has no prediction_timestamp (features are a
+    # deterministic function of build_id, not of when the script ran); the
+    # file is append-only, so the last match in file order is the latest.
+    return _group_features(matches[-1].get("features") or {})
 
 
 def _group_features(features: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -115,16 +124,14 @@ def _group_features(features: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def _load_odds_books(
     path: Path, game_pk: Any, run_date: Any, *, model_probability: float
 ) -> list[dict[str, Any]]:
+    # odds_books.jsonl is upserted (one current row per (run_date, game_pk,
+    # bookmaker) -- see append_jsonl_records' on_conflict="overwrite" writer),
+    # so each bookmaker already appears at most once here.
     matches = _jsonl_matches(path, game_pk, run_date)
-    latest_per_book: dict[str, dict[str, Any]] = {}
-    for row in matches:
-        bookmaker = row.get("bookmaker")
-        current = latest_per_book.get(bookmaker)
-        if current is None or str(row.get("snapshot_timestamp")) > str(current.get("snapshot_timestamp")):
-            latest_per_book[bookmaker] = row
 
     books: list[dict[str, Any]] = []
-    for bookmaker, row in latest_per_book.items():
+    for row in matches:
+        bookmaker = row.get("bookmaker")
         try:
             market = no_vig_two_way(row.get("home_american"), row.get("away_american"))
         except ValueError:

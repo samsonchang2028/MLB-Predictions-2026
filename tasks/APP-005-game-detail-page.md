@@ -2,7 +2,9 @@
 
 ## Status
 
-candidate
+candidate (self-reviewed via an 8-angle multi-agent pass, 1 confirmed bug
+fixed — see Handoff; this is not a substitute for the repo's independent
+reviewer/tester gate, which hasn't run)
 
 ## Dependencies
 
@@ -123,6 +125,17 @@ Streamlit Cloud app, artifact-backed like the rest of `app/`).
 - Added `src/app/game_detail.py` (`load_game_detail`), reusing
   `app.board`'s `_team_label`/`_matchup`/`_format_pacific` and
   `market.no_vig_two_way` rather than duplicating either.
+- Post-review fix (8-angle self-review, see PIPE-004's handoff for full
+  detail): `_find_prediction` now also reuses `app.board._record_problem` to
+  exclude malformed records, same as `load_daily_board_with_diagnostics`
+  (APP-001A) does for the board. Without it, a malformed record reached via
+  direct `?game_pk=...&run_date=...` navigation raised `KeyError` and crashed
+  the whole page instead of the documented "no prediction found" fallback;
+  `features.build._COMPONENTS` is now imported directly instead of a
+  hand-copied `("team", "starter", "bullpen")` literal, so a future component
+  added there can't silently vanish from this page's grouping with no error.
+  `_load_odds_books` also simplified (dropped its latest-per-book dedup loop)
+  since `odds_books.jsonl` is now upserted by PIPE-004's writer, not appended.
 - Added `src/app/game_detail_page.py` + `pages/3_Game_Detail.py` following
   the existing thin-runpy-wrapper convention.
 - Wired click-through in `src/app/daily_board_page.py`: the board's
@@ -136,7 +149,9 @@ Streamlit Cloud app, artifact-backed like the rest of `app/`).
   the duplicate basename across the two directories. Confirmed by running
   the full suite once with the collision (failed) and once renamed (630
   passed).
-- Commands run: `python -m pytest -q` (full suite) — 630 passed.
+- Commands run: `python -m pytest -q` (full suite) — 630 passed pre-review-fixes,
+  632 passed after (2 new regression tests: malformed-record exclusion,
+  `append_jsonl_records` overwrite mode).
 - Built in an isolated worktree (`agent/PIPE-004-game-detail-artifacts`)
   since APP-001A's own in-flight work briefly collided with a first attempt
   directly on `main` (see PIPE-004's handoff); no functional loss, just a

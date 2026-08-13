@@ -46,6 +46,20 @@ def _write_jsonl(path, rows):
             handle.write(json.dumps(row) + "\n")
 
 
+def test_returns_none_for_malformed_prediction_record_instead_of_raising(tmp_path):
+    malformed = _record(1)
+    del malformed["edge"]  # matches app.board._record_problem's own required-field check
+
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([malformed]),
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=tmp_path / "odds_books.jsonl",
+    )
+    assert result is None
+
+
 def test_returns_none_when_no_matching_prediction(tmp_path):
     result = load_game_detail(
         999,
@@ -81,7 +95,6 @@ def test_features_grouped_by_component(tmp_path):
                 "run_date": "2026-08-12",
                 "game_pk": 1,
                 "build_id": "b1",
-                "prediction_timestamp": "2026-08-12T15:00:00+00:00",
                 "features": {
                     "home_starter_season_era_before": 3.5,
                     "away_starter_season_era_before": 4.1,
@@ -110,20 +123,14 @@ def test_features_grouped_by_component(tmp_path):
     assert result["features"]["team"] == {"diff_team_win_pct_before": 0.05}
 
 
-def test_odds_books_computes_implied_probability_and_keeps_latest_per_book(tmp_path):
+def test_odds_books_computes_implied_probability_per_book(tmp_path):
+    # odds_books.jsonl is upserted by the writer (append_jsonl_records with
+    # on_conflict="overwrite"), so realistic on-disk content has at most one
+    # row per (run_date, game_pk, bookmaker) already -- no dedup needed here.
     odds_path = tmp_path / "odds_books.jsonl"
     _write_jsonl(
         odds_path,
         [
-            {
-                "run_date": "2026-08-12",
-                "game_pk": 1,
-                "bookmaker": "draftkings",
-                "home_american": -120,
-                "away_american": 100,
-                "snapshot_timestamp": "2026-08-12T10:00:00+00:00",
-                "source": "the_odds_api",
-            },
             {
                 "run_date": "2026-08-12",
                 "game_pk": 1,
@@ -155,7 +162,6 @@ def test_odds_books_computes_implied_probability_and_keeps_latest_per_book(tmp_p
 
     books = {book["bookmaker"]: book for book in result["odds_books"]}
     assert set(books) == {"draftkings", "fanduel"}
-    # latest draftkings snapshot (-150/130) wins over the earlier one (-120/100).
     assert books["draftkings"]["home_american"] == -150
     assert books["draftkings"]["implied_home_probability"] > 0
     assert books["draftkings"]["model_vs_book_delta"] == (

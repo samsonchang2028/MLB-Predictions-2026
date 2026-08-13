@@ -37,10 +37,11 @@ from features.build import build_feature_matrix  # noqa: E402
 from features.bullpen import build_bullpen_features  # noqa: E402
 from features.starter import build_starter_features  # noqa: E402
 from features.team import build_team_features  # noqa: E402
-from ingestion.odds import parse_the_odds_api_moneylines  # noqa: E402
+from ingestion.odds import OddsDataError, parse_the_odds_api_moneylines  # noqa: E402
 from market import MarketLabel  # noqa: E402
 from models import xgboost_model  # noqa: E402
 from pipelines.daily import JsonLinesPredictionStore, run_daily_predictions  # noqa: E402
+from pipelines.daily import _serialize_record as _serialize_detail_record  # noqa: E402
 from rerun_repaired_experiment import _build_matrix as _build_training_matrix  # noqa: E402
 from rerun_repaired_experiment import _load_inputs as _load_training_inputs  # noqa: E402
 
@@ -495,41 +496,55 @@ def summarize_skips(skipped: Iterable[Mapping[str, Any]]) -> dict[str, int]:
     return dict(Counter(str(row.get("reason")) for row in skipped))
 
 
-def _serialize_detail_record(record: Mapping[str, Any]) -> dict[str, Any]:
-    """JSON-safe copy of a record (dates/datetimes -> ISO-8601 strings)."""
-    serial: dict[str, Any] = {}
-    for key, value in record.items():
-        if isinstance(value, (datetime, date)):
-            serial[key] = value.isoformat()
-        else:
-            serial[key] = value
-    return serial
-
-
 def append_jsonl_records(
     path: Path,
     records: Iterable[Mapping[str, Any]],
     *,
     key_fields: Sequence[str],
+    on_conflict: str = "raise",
 ) -> int:
-    """Append-only JSONL write for detail artifacts, deduped/conflict-checked by
-    ``key_fields``. Mirrors ``JsonLinesPredictionStore``'s idempotency contract
-    (src/pipelines/daily.py) without its prediction-specific required-field
-    schema: identical re-writes for an existing key are no-ops, conflicting
-    re-writes raise. Returns the number of newly written lines.
+    """Append-only JSONL write for detail artifacts, deduped by ``key_fields``.
+
+    Mirrors ``JsonLinesPredictionStore``'s idempotency contract (src/pipelines/
+    daily.py) without its prediction-specific required-field schema: identical
+    re-writes for an existing key are always a no-op.
+
+    ``on_conflict="raise"`` (default) treats a differing re-write for an
+    existing key as an error -- appropriate for ``game_features.jsonl``, where
+    the same ``(run_date, game_pk, build_id)`` should deterministically produce
+    the same feature values.
+
+    ``on_conflict="overwrite"`` replaces the existing row for that key instead
+    (rewriting the whole file) -- appropriate for ``odds_books.jsonl``, which
+    tracks the CURRENT price per ``(run_date, game_pk, bookmaker)``, not a full
+    tick-by-tick history; without this, ordinary intraday line movement across
+    re-runs would either raise or grow the file with a near-duplicate row per
+    poll.
+
+    Returns the number of rows written or updated.
     """
+    if on_conflict not in ("raise", "overwrite"):
+        raise ValueError(f"on_conflict must be 'raise' or 'overwrite', got {on_conflict!r}")
+
     existing: dict[tuple[Any, ...], dict[str, Any]] = {}
+    order: list[tuple[Any, ...]] = []
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
                 continue
             serial = json.loads(line)
-            existing[tuple(serial[field] for field in key_fields)] = serial
+            key = tuple(serial[field] for field in key_fields)
+            if key not in existing:
+                order.append(key)
+            existing[key] = serial
 
-    written = 0
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
+    if on_conflict == "raise":
+        # Pure append-only path: never rewrites existing lines, matches the
+        # original streaming-append cost -- appropriate for an artifact whose
+        # rows should never legitimately change once written.
+        new_lines: list[str] = []
+        written = 0
         for record in records:
             serial = _serialize_detail_record(record)
             key = tuple(serial[field] for field in key_fields)
@@ -538,10 +553,39 @@ def append_jsonl_records(
                 if prior == serial:
                     continue
                 raise ValueError(f"conflicting re-write for key {key} in {path}")
-            handle.write(json.dumps(serial, sort_keys=True) + "\n")
+            new_lines.append(json.dumps(serial, sort_keys=True))
             existing[key] = serial
             written += 1
-    return written
+        if new_lines:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8") as handle:
+                for line in new_lines:
+                    handle.write(line + "\n")
+        return written
+
+    # on_conflict == "overwrite": an existing row for a key may legitimately
+    # need to change (e.g. a bookmaker's price moved since the last run), so
+    # the whole file is rewritten with the merged current state.
+    changed = 0
+    for record in records:
+        serial = _serialize_detail_record(record)
+        key = tuple(serial[field] for field in key_fields)
+        prior = existing.get(key)
+        if prior == serial:
+            continue
+        if key not in existing:
+            order.append(key)
+        existing[key] = serial
+        changed += 1
+
+    if changed == 0:
+        return 0
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for key in order:
+            handle.write(json.dumps(existing[key], sort_keys=True) + "\n")
+    return changed
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -617,22 +661,36 @@ def main(argv: list[str] | None = None) -> int:
         ]
         print(f"[gold-excluded] {json.dumps(excluded, sort_keys=True)}", flush=True)
 
+    # The canonical fetch is scoped to exactly the configured bookmaker, same
+    # as before this task -- unaffected by anything below. The comparison
+    # fetch/parse is best-effort: a broader multi-book payload has a larger
+    # surface for one minor book's bad data to fail the strict parser, and a
+    # display-only comparison feature must never take down the canonical
+    # prediction run over that.
+    comparison_payload = None
     if args.odds_json:
         payload = json.loads(Path(args.odds_json).read_text(encoding="utf-8"))
         print(f"[odds] loaded payload={args.odds_json}", flush=True)
+        comparison_payload = payload
     else:
-        print(
-            f"[odds] fetching regions={args.regions} (all books; "
-            f"canonical bookmaker={args.bookmaker})",
-            flush=True,
-        )
-        payload = fetch_odds_payload(api_key, regions=args.regions, bookmakers=None, timeout=args.timeout)
+        print(f"[odds] fetching bookmaker={args.bookmaker} regions={args.regions}", flush=True)
+        payload = fetch_odds_payload(api_key, regions=args.regions, bookmakers=args.bookmaker, timeout=args.timeout)
+        print(f"[odds-books] fetching regions={args.regions} (all books, comparison only)", flush=True)
+        try:
+            comparison_payload = fetch_odds_payload(api_key, regions=args.regions, bookmakers=None, timeout=args.timeout)
+        except RuntimeError as exc:
+            print(f"[odds-books] comparison fetch failed, skipping: {exc}", flush=True)
 
     odds_snapshots, odds_stats = odds_snapshots_for_schedule(payload, inputs["schedule"], bookmaker=args.bookmaker)
     print(f"[odds] {json.dumps(odds_stats, sort_keys=True)}", flush=True)
 
-    all_books, all_books_stats = all_book_snapshots_for_schedule(payload, inputs["schedule"])
-    print(f"[odds-books] {json.dumps(all_books_stats, sort_keys=True)}", flush=True)
+    all_books: dict[tuple[Any, str], dict[str, Any]] = {}
+    if comparison_payload is not None:
+        try:
+            all_books, all_books_stats = all_book_snapshots_for_schedule(comparison_payload, inputs["schedule"])
+            print(f"[odds-books] {json.dumps(all_books_stats, sort_keys=True)}", flush=True)
+        except OddsDataError as exc:
+            print(f"[odds-books] comparison payload malformed, skipping: {exc}", flush=True)
 
     store = JsonLinesPredictionStore(args.output)
     result = run_daily_predictions(
@@ -658,12 +716,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"[skips] {json.dumps(summarize_skips(result.skipped), sort_keys=True)}", flush=True)
 
+    # No prediction_timestamp here (unlike daily.jsonl): these features are a
+    # deterministic function of (run_date, game_pk, build_id), not of when the
+    # script happened to run, so a same-day re-run produces byte-identical
+    # records and append_jsonl_records' default "raise" mode stays a no-op
+    # instead of conflicting on an incidental wall-clock difference.
     features_records = [
         {
             "run_date": run_date,
             "game_pk": row["game_pk"],
             "build_id": today_matrix["build_id"],
-            "prediction_timestamp": prediction_timestamp,
             "features": row["features"],
         }
         for row in today_matrix["rows"]
@@ -678,9 +740,9 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
 
-    # key includes snapshot_timestamp (not just bookmaker) so a same-day re-run
-    # with fresh line movement appends a new observation instead of conflicting
-    # with the immutability check on a price that has since moved.
+    # "overwrite": tracks the CURRENT price per (run_date, game_pk, bookmaker),
+    # not a tick-by-tick history -- ordinary intraday line movement across
+    # re-runs updates the row instead of raising or growing the file forever.
     odds_book_records = [
         {
             "run_date": run_date,
@@ -696,7 +758,8 @@ def main(argv: list[str] | None = None) -> int:
     odds_books_written = append_jsonl_records(
         Path(args.odds_books_output),
         odds_book_records,
-        key_fields=("run_date", "game_pk", "bookmaker", "snapshot_timestamp"),
+        key_fields=("run_date", "game_pk", "bookmaker"),
+        on_conflict="overwrite",
     )
     print(
         f"[odds-books] written={odds_books_written} output={args.odds_books_output}",
