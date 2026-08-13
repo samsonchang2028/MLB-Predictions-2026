@@ -13,3 +13,4 @@ data/
 # Published historical odds archive asset (large; SHA-256 pinned in ADR-004)
 mlb_odds_dataset.json
 .kiro/
+.env
