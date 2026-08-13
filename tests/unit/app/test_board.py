@@ -235,3 +235,33 @@ def test_load_starter_pending_games_reads_skipped_jsonl(tmp_path: Path):
     assert rows[0]["matchup"] == "MIL @ LAD"
     assert rows[0]["message"] == PENDING_STARTER_MESSAGE
     assert rows[0]["game_start_pacific"].startswith("2026-08-13")
+
+
+def test_board_joins_result_enrichment_by_prediction_key():
+    prediction = _record(1, edge=0.03)
+    journal = {
+        "game_pk": 1,
+        "prediction_timestamp": prediction["prediction_timestamp"],
+        "model_version": "v1",
+        "enrichment_timestamp": "2026-08-14T06:00:00+00:00",
+        "actual_home_win": True,
+        "predicted_home_win": True,
+        "correct": True,
+        "home_score": 5,
+        "away_score": 3,
+    }
+
+    [row] = load_daily_board(_FakeStore([prediction]), journal_store=_FakeStore([journal]))
+
+    assert row["result_status"] == "Final"
+    assert row["result_label"] == "Final: Home 5 - Away 3"
+    assert row["actual_home_win"] is True
+    assert row["correct"] is True
+
+
+def test_board_leaves_unenriched_predictions_pending():
+    [row] = load_daily_board(_FakeStore([_record(1)]), journal_store=_FakeStore([]))
+
+    assert row["result_status"] == "Pending"
+    assert row["result_label"] is None
+    assert row["correct"] is None

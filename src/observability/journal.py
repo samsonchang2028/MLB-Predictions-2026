@@ -121,6 +121,8 @@ def attach_results(
             skipped.append({"game_pk": game_pk, "reason": SKIP_NO_RESULT})
             continue
 
+        home_result = results_index.get((game_pk, home_id))
+        away_result = results_index.get((game_pk, away_id))
         predicted_home_win = prediction["model_probability"] >= 0.5
         record = {
             "game_pk": game_pk,
@@ -132,6 +134,8 @@ def attach_results(
             "actual_home_win": actual_home_win,
             "predicted_home_win": predicted_home_win,
             "correct": predicted_home_win == actual_home_win,
+            "home_score": _score(home_result),
+            "away_score": _score(away_result),
         }
         _assert_enrichment_complete(record)
 
@@ -226,6 +230,15 @@ def _is_number(value: Any) -> bool:
     # Matches features.build._is_number: bool is an int subclass in Python,
     # so it must be excluded explicitly.
     return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _score(row: Mapping[str, Any] | None) -> int | float | None:
+    if row is None:
+        return None
+    value = row.get("score")
+    if _is_number(value):
+        return value
+    return None
 
 
 def _assert_enrichment_complete(record: Mapping[str, Any]) -> None:

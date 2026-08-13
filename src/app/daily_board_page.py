@@ -36,9 +36,11 @@ from app.board import (
     load_daily_board_with_diagnostics,
     load_starter_pending_games,
 )
+from observability.journal import JsonLinesJournalStore
 from pipelines.daily import JsonLinesPredictionStore
 
 DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
+DEFAULT_JOURNAL_PATH = Path("state/predictions/journal.jsonl")
 
 
 def _store_path() -> Path:
@@ -47,6 +49,10 @@ def _store_path() -> Path:
 
 def _skipped_path() -> Path:
     return Path(os.environ.get("SKIPPED_STORE_PATH", DEFAULT_SKIPPED_PATH))
+
+
+def _journal_path() -> Path:
+    return Path(os.environ.get("PREDICTION_JOURNAL_PATH", DEFAULT_JOURNAL_PATH))
 
 
 st.set_page_config(page_title="MLB Daily Predictions", layout="wide")
@@ -68,7 +74,11 @@ else:
             index=dates.index(default_date) if default_date in dates else len(dates) - 1,
             help="Filters by the operator run_date / MLB official slate date.",
         )
-        board_report = load_daily_board_with_diagnostics(store, run_date=selected_date)
+        journal_path = _journal_path()
+        journal_store = JsonLinesJournalStore(journal_path) if journal_path.exists() else None
+        board_report = load_daily_board_with_diagnostics(
+            store, run_date=selected_date, journal_store=journal_store
+        )
         pending_starters = load_starter_pending_games(_skipped_path(), selected_date)
         pending_game_pks = {row["game_pk"] for row in pending_starters}
         rows = [
@@ -119,6 +129,8 @@ else:
                         "Matchup": row["matchup"],
                         "Model Side": row["model_side_detail"],
                         "Action Label": row["action_label"],
+                        "Result": row["result_label"] or row["result_status"],
+                        "Pick Result": "Correct" if row["correct"] is True else "Wrong" if row["correct"] is False else "Pending",
                         "Model P(home)": round(row["model_probability"], 4),
                         "Market P(home)": round(row["market_probability"], 4),
                         "Edge": round(row["edge"], 4),

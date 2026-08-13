@@ -66,6 +66,7 @@ def load_daily_board(
     *,
     run_date: Any = None,
     edge_threshold: float = DEFAULT_EDGE_THRESHOLD,
+    journal_store: Any | None = None,
 ) -> list[dict[str, Any]]:
     """Shape PIPE-001 prediction records into display rows, sorted by game_pk.
 
@@ -74,7 +75,10 @@ def load_daily_board(
     reasons for display.
     """
     return load_daily_board_with_diagnostics(
-        store, run_date=run_date, edge_threshold=edge_threshold
+        store,
+        run_date=run_date,
+        edge_threshold=edge_threshold,
+        journal_store=journal_store,
     )["rows"]
 
 
@@ -83,10 +87,12 @@ def load_daily_board_with_diagnostics(
     *,
     run_date: Any = None,
     edge_threshold: float = DEFAULT_EDGE_THRESHOLD,
+    journal_store: Any | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """Return display rows plus skipped malformed-record diagnostics."""
     rows: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
+    journal_by_key = _journal_by_prediction_key(journal_store)
     for position, record in enumerate(store.records()):
         if run_date is not None and isinstance(record, Mapping) and record.get("run_date") != run_date:
             continue
@@ -111,6 +117,9 @@ def load_daily_board_with_diagnostics(
         prediction_pacific = _format_pacific(record.get("prediction_timestamp"))
         odds_snapshot_pacific = _format_pacific(record["odds_snapshot_timestamp"])
         prediction_ts = _parse_datetime(record.get("prediction_timestamp"))
+        journal = journal_by_key.get(
+            _prediction_key(record.get("game_pk"), record.get("prediction_timestamp"))
+        )
         rows.append(
             {
                 "game_pk": record["game_pk"],
@@ -131,11 +140,55 @@ def load_daily_board_with_diagnostics(
                 "model_version": record["model_version"],
                 "play": abs(edge) >= edge_threshold,
                 "action_label": f"PLAY {model_side}" if abs(edge) >= edge_threshold else "PASS",
+                "result_status": _result_status(journal),
+                "result_label": _result_label(journal),
+                "actual_home_win": journal.get("actual_home_win") if journal else None,
+                "correct": journal.get("correct") if journal else None,
             }
         )
     rows = _latest_row_per_game(rows)
     rows.sort(key=lambda r: r["game_pk"])
     return {"rows": rows, "skipped": skipped}
+
+
+def _journal_by_prediction_key(journal_store: Any | None) -> dict[tuple[Any, str | None], Mapping[str, Any]]:
+    if journal_store is None:
+        return {}
+    by_key: dict[tuple[Any, str | None], Mapping[str, Any]] = {}
+    for record in journal_store.records():
+        if not isinstance(record, Mapping):
+            continue
+        key = _prediction_key(record.get("game_pk"), record.get("prediction_timestamp"))
+        current = by_key.get(key)
+        if current is None or str(record.get("enrichment_timestamp")) >= str(current.get("enrichment_timestamp")):
+            by_key[key] = record
+    return by_key
+
+
+def _prediction_key(game_pk: Any, prediction_timestamp: Any) -> tuple[Any, str | None]:
+    parsed = _parse_datetime(prediction_timestamp)
+    if parsed is not None:
+        return (game_pk, parsed.isoformat())
+    if prediction_timestamp is None:
+        return (game_pk, None)
+    return (game_pk, str(prediction_timestamp))
+
+
+def _result_status(journal: Mapping[str, Any] | None) -> str:
+    return "Final" if journal else "Pending"
+
+
+def _result_label(journal: Mapping[str, Any] | None) -> str | None:
+    if not journal:
+        return None
+    home_score = journal.get("home_score")
+    away_score = journal.get("away_score")
+    if home_score is not None and away_score is not None:
+        return f"Final: Home {home_score} - Away {away_score}"
+    actual = journal.get("actual_home_win")
+    if isinstance(actual, bool):
+        return "Final: home won" if actual else "Final: away won"
+    return "Final"
 
 
 def _latest_row_per_game(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -64,7 +64,7 @@ state source of truth.
 | ML-011 | done | ML-010 | model diagnostics report for underfit/overfit evidence |
 | DATA-021 | backlog | DATA-020 | targeted retry/normalization of the 39 DATA-018 games |
 | OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
-| OBS-002 | backlog | OBS-001, PIPE-003 | result enrichment for daily predictions after games finish |
+| OBS-002 | candidate | OBS-001, PIPE-003, PIPE-005 | result enrichment operator for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |

@@ -153,7 +153,11 @@ st.subheader("Prediction history")
 st.caption(MARKET_RELATIVE_NOTE)
 journal_path = _journal_path()
 if not journal_path.exists():
-    st.info(f"No journal found at {journal_path}. Run OBS-001 enrichment first.")
+    st.info(
+        f"No journal found at {journal_path}. Run "
+        "`python scripts/enrich_prediction_results.py --date YYYY-MM-DD` after "
+        "games finish to create OBS-002 result enrichment."
+    )
 else:
     history_rows = load_prediction_history(JsonLinesJournalStore(journal_path))
     if not history_rows:

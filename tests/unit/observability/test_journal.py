@@ -43,8 +43,11 @@ def _prediction(game_pk: int, *, home_id: int, away_id: int, p_home: float) -> d
     }
 
 
-def _result(game_pk: int, team_id: int, *, is_winner: bool) -> dict:
-    return {"game_pk": game_pk, "team_id": team_id, "is_winner": is_winner}
+def _result(game_pk: int, team_id: int, *, is_winner: bool, score: int | None = None) -> dict:
+    row = {"game_pk": game_pk, "team_id": team_id, "is_winner": is_winner}
+    if score is not None:
+        row["score"] = score
+    return row
 
 
 def test_attaches_result_and_marks_correct_pick() -> None:
@@ -66,6 +69,24 @@ def test_attaches_result_and_marks_correct_pick() -> None:
     assert record["predicted_home_win"] is True
     assert record["correct"] is True
     assert record["model_version"] == "logistic-2024-04-01"
+
+
+def test_attaches_final_scores_when_available() -> None:
+    predictions = [_prediction(1, home_id=10, away_id=11, p_home=0.7)]
+    results = [
+        _result(1, 10, is_winner=True, score=5),
+        _result(1, 11, is_winner=False, score=3),
+    ]
+
+    outcome = attach_results(
+        predictions=predictions,
+        results=results,
+        enrichment_timestamp=ENRICHMENT_TS,
+        store=InMemoryJournalStore(),
+    )
+
+    assert outcome.written[0]["home_score"] == 5
+    assert outcome.written[0]["away_score"] == 3
 
 
 def test_incorrect_pick_marked_false() -> None:
