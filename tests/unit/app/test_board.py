@@ -8,7 +8,20 @@ No Streamlit import here -- this module is the testable half of APP-001.
 
 from __future__ import annotations
 
-from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board, load_daily_board_with_diagnostics
+import json
+from datetime import date
+from pathlib import Path
+
+from app.board import (
+    DEFAULT_EDGE_THRESHOLD,
+    PENDING_STARTER_MESSAGE,
+    SKIP_NO_STARTER_ANNOUNCED,
+    available_run_dates,
+    latest_run_date,
+    load_daily_board,
+    load_daily_board_with_diagnostics,
+    load_starter_pending_games,
+)
 
 
 class _FakeStore:
@@ -137,15 +150,15 @@ def test_rows_sorted_by_game_pk_regardless_of_store_order():
     assert [r["game_pk"] for r in rows] == [1, 2, 3]
 
 
-def test_multiple_predictions_for_same_game_pk_are_all_shown():
-    # Legitimate PIPE-001 scenario: an odds-refresh re-snapshot writes a second,
-    # distinct record for the same game_pk. The board must not silently collapse
-    # or overwrite -- both should be visible.
+def test_board_shows_latest_prediction_per_game_pk():
+    # Scheduled re-runs append a newer prediction_timestamp for the same slate
+    # game; the board shows only the most recent snapshot per game_pk.
     first = _record(7, edge=0.03)
-    second = dict(first, edge=0.05, odds_snapshot_timestamp="2024-04-01T15:00:00+00:00")
+    first["prediction_timestamp"] = "2024-04-01T14:00:00+00:00"
+    second = dict(first, edge=0.05, prediction_timestamp="2024-04-01T16:00:00+00:00")
     rows = load_daily_board(_FakeStore([first, second]))
-    assert len(rows) == 2
-    assert sorted(r["edge"] for r in rows) == [0.03, 0.05]
+    assert len(rows) == 1
+    assert rows[0]["edge"] == 0.05
 
 
 def test_edge_is_displayed_verbatim_even_when_internally_inconsistent():
@@ -195,3 +208,30 @@ def test_non_numeric_probability_record_is_skipped_with_reason():
 
     assert report["rows"] == []
     assert report["skipped"][0]["reason"] == "model_probability must be numeric"
+
+
+def test_load_starter_pending_games_reads_skipped_jsonl(tmp_path: Path):
+    skipped_path = tmp_path / "skipped.jsonl"
+    skipped_path.write_text(
+        json.dumps(
+            {
+                "run_date": "2026-08-13",
+                "game_pk": 823915,
+                "reason": SKIP_NO_STARTER_ANNOUNCED,
+                "home_team_id": 119,
+                "away_team_id": 158,
+                "game_start_timestamp": "2026-08-14T02:10:00+00:00",
+                "message": PENDING_STARTER_MESSAGE,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rows = load_starter_pending_games(skipped_path, "2026-08-13")
+
+    assert len(rows) == 1
+    assert rows[0]["game_pk"] == 823915
+    assert rows[0]["matchup"] == "MIL @ LAD"
+    assert rows[0]["message"] == PENDING_STARTER_MESSAGE
+    assert rows[0]["game_start_pacific"].startswith("2026-08-13")

@@ -1,14 +1,26 @@
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from pathlib import Path
 
+import duckdb
 import pytest
 
+from scripts import daily_predictions as dp
 from scripts.daily_predictions import (
+    PENDING_STARTER_MESSAGE,
+    SKIP_NO_STARTER_ANNOUNCED,
     _bullpen_placeholder_rows,
+    _format_duration,
+    _starter_is_announced,
     _starter_placeholder_rows,
     all_book_snapshots_for_schedule,
     append_jsonl_records,
+    main,
     odds_snapshots_for_schedule,
+    partition_schedule_by_announced_starters,
+    refresh_pregame_game_details,
+    replace_skipped_for_run_date,
+    slate_game_pks_for_detail_refresh,
 )
 from features.bullpen import build_bullpen_features
 from features.starter import build_starter_features
@@ -292,6 +304,35 @@ def test_append_jsonl_records_overwrite_mode_updates_existing_key_in_place(tmp_p
     assert by_game[2]["price"] == -105
 
 
+def test_append_jsonl_records_overwrite_updates_changed_game_features(tmp_path):
+    path = tmp_path / "features.jsonl"
+    first = {
+        "run_date": "2026-08-13",
+        "game_pk": 823508,
+        "build_id": "a910017bac839af5",
+        "features": {"home_starter_starter_known": False},
+    }
+    updated = {**first, "features": {"home_starter_starter_known": True}}
+
+    append_jsonl_records(
+        path, [first], key_fields=("run_date", "game_pk", "build_id"), on_conflict="overwrite"
+    )
+    written = append_jsonl_records(
+        path, [updated], key_fields=("run_date", "game_pk", "build_id"), on_conflict="overwrite"
+    )
+
+    assert written == 1
+    row = json.loads(path.read_text(encoding="utf-8").strip())
+    assert row["features"]["home_starter_starter_known"] is True
+
+
+def test_format_duration_renders_minutes_and_seconds():
+    assert _format_duration(5.4) == "5s"
+    assert _format_duration(65) == "1m 5s"
+    assert _format_duration(330) == "5m 30s"
+    assert _format_duration(3665) == "1h 1m 5s"
+
+
 def test_bullpen_placeholders_emit_current_pregame_rows_without_current_bullpen_stats():
     schedule = [_schedule_row(823672)]
     history = [
@@ -373,3 +414,403 @@ def test_starter_placeholders_emit_unknown_starter_features_for_live_gaps():
     assert by_team[(823672, 142)]["starter_is_probable"] is True
     assert by_team[(823672, 110)]["starter_known"] is False
     assert by_team[(823672, 110)]["starter_pitcher_id"] is None
+
+
+def test_starter_is_announced_requires_probable_or_actual_id():
+    assert _starter_is_announced(None) is False
+    assert _starter_is_announced({"actual_pitcher_id": None, "probable_pitcher_id": None}) is False
+    assert _starter_is_announced({"actual_pitcher_id": None, "probable_pitcher_id": 42}) is True
+    assert _starter_is_announced({"actual_pitcher_id": 7, "probable_pitcher_id": None}) is True
+
+
+def test_partition_schedule_withholds_games_missing_either_starter():
+    schedule = [_schedule_row(823915)]
+    schedule[0].update({"home_team_id": 119, "away_team_id": 158})
+    starters = [
+        {
+            "game_pk": 823915,
+            "team_id": 158,
+            "side": "away",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 675660,
+        }
+    ]
+
+    ready, skipped = partition_schedule_by_announced_starters(
+        schedule, starters, run_date=__import__("datetime").date(2026, 8, 13)
+    )
+
+    assert ready == []
+    assert len(skipped) == 1
+    assert skipped[0]["game_pk"] == 823915
+    assert skipped[0]["reason"] == SKIP_NO_STARTER_ANNOUNCED
+    assert skipped[0]["missing_team_ids"] == [119]
+    assert skipped[0]["message"] == PENDING_STARTER_MESSAGE
+
+
+def test_partition_schedule_keeps_game_when_both_starters_announced():
+    schedule = [_schedule_row(823915)]
+    schedule[0].update({"home_team_id": 119, "away_team_id": 158})
+    starters = [
+        {
+            "game_pk": 823915,
+            "team_id": 158,
+            "side": "away",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 675660,
+        },
+        {
+            "game_pk": 823915,
+            "team_id": 119,
+            "side": "home",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 808967,
+        },
+    ]
+
+    ready, skipped = partition_schedule_by_announced_starters(
+        schedule, starters, run_date=__import__("datetime").date(2026, 8, 13)
+    )
+
+    assert len(ready) == 1
+    assert skipped == []
+
+
+def test_replace_skipped_for_run_date_rewrites_only_target_slate(tmp_path):
+    path = tmp_path / "skipped.jsonl"
+    path.write_text(
+        json.dumps({"run_date": "2026-08-12", "game_pk": 1, "reason": "other"}) + "\n",
+        encoding="utf-8",
+    )
+
+    written = replace_skipped_for_run_date(
+        path,
+        __import__("datetime").date(2026, 8, 13),
+        [
+            {
+                "run_date": "2026-08-13",
+                "game_pk": 823915,
+                "reason": SKIP_NO_STARTER_ANNOUNCED,
+                "message": PENDING_STARTER_MESSAGE,
+            }
+        ],
+    )
+
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert written == 1
+    assert {row["game_pk"] for row in rows} == {1, 823915}
+
+
+def _write_slate_games(database: Path, rows: list[tuple[int, str, date]]) -> None:
+    with duckdb.connect(str(database)) as connection:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS silver")
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS silver.games (
+                game_pk BIGINT,
+                game_type VARCHAR,
+                official_date DATE,
+                abstract_game_state VARCHAR
+            )
+            """
+        )
+        connection.executemany(
+            "INSERT INTO silver.games VALUES (?, 'R', ?, ?)",
+            [(game_pk, official_date, state) for game_pk, state, official_date in rows],
+        )
+
+
+def test_slate_game_pks_for_detail_refresh_targets_preview_and_live_only(tmp_path):
+    database = tmp_path / "mlb.duckdb"
+    run_date = date(2026, 8, 12)
+    _write_slate_games(
+        database,
+        [
+            (101, "Preview", run_date),
+            (102, "Live", run_date),
+            (103, "Final", run_date),
+            (104, "Preview", date(2026, 8, 13)),
+        ],
+    )
+
+    assert slate_game_pks_for_detail_refresh(database, run_date) == [101, 102]
+
+
+def test_refresh_pregame_game_details_invalidates_backfills_and_normalizes(
+    monkeypatch, tmp_path
+):
+    database = tmp_path / "mlb.duckdb"
+    run_date = date(2026, 8, 12)
+    _write_slate_games(database, [(823915, "Preview", run_date), (823916, "Live", run_date)])
+
+    calls: dict[str, object] = {}
+
+    def fake_invalidate(storage_root, game_pks):
+        calls["storage_root"] = storage_root
+        calls["invalidate_game_pks"] = list(game_pks)
+        return len(game_pks)
+
+    def fake_backfill(storage_root, fetcher, **kwargs):
+        calls["backfill_kwargs"] = kwargs
+        calls["fetcher"] = fetcher
+        return {"fetched": 2, "targeted": 2}
+
+    def fake_normalize(connection):
+        calls["normalized"] = True
+        return {"pitcher_starters": 4}
+
+    monkeypatch.setattr(dp, "invalidate_game_detail_payloads", fake_invalidate)
+    monkeypatch.setattr(dp, "backfill_game_details", fake_backfill)
+    monkeypatch.setattr(dp, "normalize_silver", fake_normalize)
+    monkeypatch.setattr(dp, "connect_database", duckdb.connect)
+
+    fetcher = object()
+    stats = refresh_pregame_game_details(database, run_date, fetcher)
+
+    assert calls["storage_root"] == tmp_path
+    assert calls["invalidate_game_pks"] == [823915, 823916]
+    assert calls["backfill_kwargs"]["game_pks"] == [823915, 823916]
+    assert calls["backfill_kwargs"]["retry_unresolved"] is True
+    assert calls["fetcher"] is fetcher
+    assert calls["normalized"] is True
+    assert stats == {
+        "targeted": 2,
+        "invalidated": 2,
+        "fetched": 2,
+        "normalized": True,
+        "game_pks": [823915, 823916],
+        "backfill": {"fetched": 2, "targeted": 2},
+    }
+
+
+def test_refresh_pregame_game_details_noops_when_slate_empty(monkeypatch, tmp_path):
+    database = tmp_path / "mlb.duckdb"
+    _write_slate_games(database, [(103, "Final", date(2026, 8, 12))])
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("network/backfill path should not run for empty slate")
+
+    monkeypatch.setattr(dp, "invalidate_game_detail_payloads", fail_if_called)
+    monkeypatch.setattr(dp, "backfill_game_details", fail_if_called)
+    monkeypatch.setattr(dp, "normalize_silver", fail_if_called)
+
+    stats = refresh_pregame_game_details(database, date(2026, 8, 12), object())
+
+    assert stats == {
+        "targeted": 0,
+        "invalidated": 0,
+        "fetched": 0,
+        "normalized": False,
+    }
+
+
+def test_main_skip_detail_refresh_bypasses_backfill(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(
+        dp,
+        "train_locked_model",
+        lambda *args, **kwargs: (object(), ["f1"], "build", 10),
+    )
+    refresh_calls: list[tuple] = []
+
+    def fake_refresh(*args, **kwargs):
+        refresh_calls.append((args, kwargs))
+        return {
+            "targeted": 0,
+            "invalidated": 0,
+            "fetched": 0,
+            "normalized": False,
+        }
+
+    monkeypatch.setattr(dp, "refresh_pregame_game_details", fake_refresh)
+    monkeypatch.setattr(
+        dp,
+        "load_prediction_inputs",
+        lambda *args, **kwargs: {
+            "certification": {},
+            "schedule": [],
+            "games_for_features": [],
+            "games_for_today": [],
+            "team_stats": [],
+            "appearances": [],
+            "starters": [],
+        },
+    )
+
+    assert main(["--skip-detail-refresh", "--database", str(tmp_path / "mlb.duckdb")]) == 0
+    assert refresh_calls == []
+    assert "[detail-refresh] skipped" in capsys.readouterr().out
+
+
+def test_main_runs_detail_refresh_before_loading_inputs(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(
+        dp,
+        "train_locked_model",
+        lambda *args, **kwargs: (object(), ["f1"], "build", 10),
+    )
+    call_order: list[str] = []
+
+    def fake_refresh(*args, **kwargs):
+        call_order.append("refresh")
+        return {
+            "targeted": 1,
+            "invalidated": 1,
+            "fetched": 1,
+            "normalized": True,
+        }
+
+    def fake_load(*args, **kwargs):
+        call_order.append("load")
+        return {
+            "certification": {},
+            "schedule": [],
+            "games_for_features": [],
+            "games_for_today": [],
+            "team_stats": [],
+            "appearances": [],
+            "starters": [],
+        }
+
+    monkeypatch.setattr(dp, "refresh_pregame_game_details", fake_refresh)
+    monkeypatch.setattr(dp, "load_prediction_inputs", fake_load)
+    monkeypatch.setattr(dp, "make_game_detail_fetcher", lambda: object())
+
+    assert main(["--database", str(tmp_path / "mlb.duckdb")]) == 0
+    assert call_order == ["refresh", "load"]
+    assert "[detail-refresh] targeted=1 invalidated=1 fetched=1 normalized=True" in capsys.readouterr().out
+
+
+def test_main_sets_prediction_timestamp_after_odds_fetch(monkeypatch, tmp_path):
+    """Regression: a long pre-odds phase must not freeze prediction_timestamp too early."""
+    monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
+    events: list[str] = []
+    odds_ts = datetime(2026, 8, 13, 20, 0, tzinfo=timezone.utc)
+    pred_ts = datetime(2026, 8, 13, 20, 1, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(
+        dp,
+        "train_locked_model",
+        lambda *args, **kwargs: (object(), ["f1"], "build", 10),
+    )
+    monkeypatch.setattr(
+        dp,
+        "refresh_pregame_game_details",
+        lambda *args, **kwargs: {
+            "targeted": 0,
+            "invalidated": 0,
+            "fetched": 0,
+            "normalized": False,
+        },
+    )
+    schedule_row = {
+        "game_pk": 823915,
+        "season": "2026",
+        "game_type": "R",
+        "game_date": datetime(2026, 8, 14, 2, 10),
+        "game_start_timestamp": datetime(2026, 8, 14, 2, 10, tzinfo=timezone.utc),
+        "official_date": date(2026, 8, 13),
+        "home_team_id": 119,
+        "away_team_id": 158,
+        "game_number": 1,
+        "abstract_game_state": "Preview",
+        "detailed_state": "Scheduled",
+        "source_game_json": "{}",
+    }
+    starter_rows = [
+        {
+            "game_pk": 823915,
+            "team_id": 119,
+            "side": "home",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 808963,
+        },
+        {
+            "game_pk": 823915,
+            "team_id": 158,
+            "side": "away",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 675660,
+        },
+    ]
+    monkeypatch.setattr(
+        dp,
+        "load_prediction_inputs",
+        lambda *args, **kwargs: {
+            "certification": {"build_id": "build"},
+            "schedule": [schedule_row],
+            "games_for_features": [],
+            "games_for_today": [],
+            "team_stats": [],
+            "appearances": [],
+            "starters": starter_rows,
+        },
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_today_feature_components",
+        lambda inputs: {"team": [], "starter": [], "bullpen": []},
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_feature_matrix",
+        lambda *args, **kwargs: {
+            "build_id": "build",
+            "rows": [
+                {
+                    "game_pk": 823915,
+                    "features": {"f1": 1.0},
+                }
+            ],
+            "excluded": [],
+            "feature_columns": ["f1"],
+            "feature_completeness": {"status": "PASS"},
+        },
+    )
+
+    def fake_fetch_odds(*args, **kwargs):
+        events.append("odds_fetch")
+        return []
+
+    monkeypatch.setattr(dp, "fetch_odds_payload", fake_fetch_odds)
+    monkeypatch.setattr(
+        dp,
+        "odds_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: (
+            {
+                823915: {
+                    "home_american": -140,
+                    "away_american": 131,
+                    "snapshot_timestamp": odds_ts,
+                    "source": "the_odds_api:draftkings",
+                }
+            },
+            {"mapped_games": 1},
+        ),
+    )
+    monkeypatch.setattr(
+        dp,
+        "all_book_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: ({}, {"mapped_game_books": 0}),
+    )
+    monkeypatch.setattr(dp, "parse_timestamp", lambda value: (events.append("prediction_timestamp"), pred_ts)[1])
+
+    captured: dict[str, datetime] = {}
+
+    def fake_run_daily_predictions(**kwargs):
+        captured["prediction_timestamp"] = kwargs["prediction_timestamp"]
+        class Result:
+            records = ()
+            written = ()
+            skipped = ()
+
+        return Result()
+
+    monkeypatch.setattr(dp, "run_daily_predictions", fake_run_daily_predictions)
+    monkeypatch.setattr(dp, "append_jsonl_records", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(dp, "JsonLinesPredictionStore", lambda path: object())
+
+    assert dp.main(["--skip-detail-refresh", "--database", str(tmp_path / "mlb.duckdb"), "--date", "2026-08-13"]) == 0
+    assert events.index("odds_fetch") < events.index("prediction_timestamp")
+    assert captured["prediction_timestamp"] == pred_ts
+    assert odds_ts < pred_ts
