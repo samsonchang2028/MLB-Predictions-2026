@@ -168,6 +168,26 @@ to certify cleanly.
   such as `PLAY LAD` or `PASS`. The synthetic threshold caveat remains; no
   staking policy or model logic changed.
 
+
+- DATA-019 - zero pitcher-line investigation completed: added a read-only
+  diagnostic script and report for the 39 DATA-018 failures. Local evidence
+  shows failed_games=39, all_zero_pitching_line_guard_failures=39,
+  zero_silver_pitcher_appearance_games=39, spread across 2021-2025. Report:
+  `reports/data-quality/zero-pitcher-line-investigation.json`. This confirms
+  these are DATA-016 guard rejections and remain visible, not silently reused
+  hollow data.
+
+- DOCS-001 - repo status cleanup completed: README and `tasks/index.md` now
+  reflect the current V1-complete state, local daily operator, Streamlit boards,
+  and optional post-V1 graph candidates.
+
+
+- APP-004 - Streamlit deployment packaging completed: added a Streamlit Cloud
+  entrypoint (`streamlit_app.py`), multipage wrappers under `pages/`,
+  `.streamlit/config.toml`, and root `requirements.txt`. Deployment remains
+  artifact-backed: local DuckDB/raw data and `.env` are not deployed unless a
+  later automation task publishes artifacts.
+
 ## In progress
 
 - None.
@@ -412,9 +432,10 @@ Streamlit dashboard.
 
 ## Next implementation task
 
-None required. Optional follow-ups: add scheduled automation/GitHub Actions for
-the local operator, add a persisted market-relative evaluation artifact, or
-investigate the 39 all-zero pitcher-line games from DATA-018.
+None required for V1. Optional follow-ups currently in flight or queued:
+ML-011 model diagnostics, OPS-001
+scheduled daily operator/GitHub Actions, OBS-002 result enrichment, and
+MARKET-002 persisted market-relative reporting.
 
 ## Deferred follow-ups
 

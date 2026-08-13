@@ -1,86 +1,88 @@
 # Task Index
 
-The task graph is defined conceptually in `docs/roadmap.md`.
+The task graph is defined conceptually in `docs/roadmap.md`. This file is the
+human-readable status index; `state/CURRENT.md` remains the detailed project
+state source of truth.
 
-This index lists task state and dependency relationships in a human-readable
-format.
+## Completed V1 graph
 
-| Task | Status | Depends on | Parallel notes |
+| Task | Status | Depends on | Notes |
 |---|---|---|---|
-| META-001 | done | - | completed |
-| DATA-001 | done | META-001 | completed |
-| DATA-002 | done | DATA-001 | completed |
-| DATA-003 | done | DATA-001 | completed live timestamped odds ingestion |
-| DATA-004 | done | DATA-002, DATA-003 | completed Silver schedule/live-odds contracts |
-| DATA-005 | done | DATA-004 | merged e50747c; MLB game-detail/pitcher backfill |
-| DATA-006 | done | DATA-005 | merged 1d9b83b; validation package + side-effect-free certification runner |
-| DATA-007 | done | DATA-006 | certification artifact layer; real 2021-2025 build certified PASS |
-| DATA-008 | done | DATA-001 | merged 479af32; checksum-verified historical odds archive ingestion |
-| DATA-009 | done | DATA-004, DATA-008 | odds->game_pk mapping audit + odds validation + coverage report |
-| DATA-010 | done | DATA-005 | merged a87ef2b; restart resilience |
-| DATA-011 | done | DATA-005/006/007/008/009 | MLB-StatsAPI fetchers + historical certification runner |
-| DATA-012 | done | DATA-006 | postponed/suspended/cancelled games reported as abstract Final no longer fail valid_scores |
+| META-001 | done | - | repository/agent foundation |
+| DATA-001 | done | META-001 | DuckDB/Parquet storage |
+| DATA-002 | done | DATA-001 | MLB schedule ingestion |
+| DATA-003 | done | DATA-001 | live timestamped odds ingestion |
+| DATA-004 | done | DATA-002, DATA-003 | normalized Silver datasets/contracts |
+| DATA-005 | done | DATA-004 | MLB game-detail/pitcher backfill |
+| DATA-006 | done | DATA-005 | validation package |
+| DATA-007 | done | DATA-006 | certification artifact layer |
+| DATA-008 | done | DATA-001 | historical odds archive ingestion |
+| DATA-009 | done | DATA-004, DATA-008 | odds->game_pk mapping audit |
+| DATA-010 | done | DATA-005 | game-detail restart resilience |
+| DATA-011 | done | DATA-005/006/007/008/009 | real-build certification runner |
+| DATA-012 | done | DATA-006 | postponed/suspended/cancelled Final score handling |
 | DATA-013 | done | DATA-002 | repeated season-response game_pk reconciliation |
-| DATA-014 | done | DATA-002, DATA-013 | suspended/resumed same-Final duplicate game_pk reconciliation |
+| DATA-014 | done | DATA-002, DATA-013 | suspended/resumed duplicate game_pk reconciliation |
 | DATA-015 | done | DATA-006 | regular-season home_win derivation scope |
-| DATA-016 | done | DATA-011 | projection fix + lifecycle-aware hollow-payload guard |
-| DATA-017 | done | DATA-007 | certification semantic-completeness gate |
-| DATA-018 | done | DATA-016, DATA-010 | hollow invalidation + real 2021-2025 re-ingest completed; repaired certification PASS |
-| FEAT-001 | done | DATA-004 | completed team features |
-| FEAT-002 | done | DATA-007 | point-in-time starter features |
-| FEAT-003 | done | DATA-007 | point-in-time bullpen features |
+| DATA-016 | done | DATA-011 | game-detail pitching-stat projection repair |
+| DATA-017 | done | DATA-007 | semantic completeness certification |
+| DATA-018 | done | DATA-016, DATA-010 | hollow invalidation + full repaired re-ingest |
+| FEAT-001 | done | DATA-004 | team features |
+| FEAT-002 | done | DATA-007 | starter features |
+| FEAT-003 | done | DATA-007 | bullpen features |
 | FEAT-004 | done | DATA-007, FEAT-001/002/003 | game feature matrix |
 | FEAT-005 | done | FEAT-004 | component-coverage exclusion policy |
-| FEAT-006 | done | FEAT-004 | Gold pre-model completeness gate |
+| FEAT-006 | done | FEAT-004 | Gold feature completeness gate |
 | ML-001 | done | FEAT-004 | logistic regression |
 | ML-002 | done | FEAT-004 | random forest |
 | ML-003 | done | FEAT-004 | XGBoost |
 | ML-004 | done | ML-001/002/003 | walk-forward framework |
 | ML-004A | done | ML-004 | game_pk-keyed per-fold predictions |
 | ML-005 | done | ML-004A | expanding-window experiment |
-| ML-006 | done | ML-004A | rolling 2/3-season experiments |
-| ML-007 | done | ML-005/006 | model x window comparison; 2026 unused |
-| ML-008 | done | ML-007 | calibration with inner calibration split |
-| ML-009 | done | ML-008, FEAT-006 | ADR-006 locks tuned shallow XGBoost + expanding + uncalibrated; 2026 unused |
-| ML-010 | ready | ML-009 | untouched 2026 final holdout evaluation using ADR-006 |
-| MARKET-001 | done | DATA-009, ML-008 | no-vig, edge, EV; timestamp-guarded; opening benchmark labeled |
-| PIPE-001 | done | MARKET-001 | daily pipeline |
-| OBS-001 | done | PIPE-001 | append-only prediction journal merged |
-| APP-001 | done | PIPE-001 | Streamlit daily board merged |
-| APP-002 | ready | APP-001, OBS-001 | performance dashboard; can run after methodology lock if it needs final model evidence |
+| ML-006 | done | ML-004A | rolling-window experiments |
+| ML-007 | done | ML-005/006 | model/window comparison |
+| ML-008 | done | ML-007 | calibration comparison |
+| ML-009 | done | ML-008, FEAT-006 | ADR-006 methodology lock |
+| ML-010 | done | ML-009 | final 2026 holdout evaluated once |
+| MARKET-001 | done | DATA-009, ML-008 | no-vig/edge/EV engine |
+| PIPE-001 | done | MARKET-001 | daily prediction pipeline core |
+| OBS-001 | done | PIPE-001 | append-only prediction journal |
+| APP-001 | done | PIPE-001 | Streamlit daily board |
+| APP-002 | done | APP-001, OBS-001 | performance dashboard with final holdout evidence |
+| PIPE-002 | done | PIPE-001, ML-009 | local daily operator |
+| PIPE-003 | done | PIPE-002 | live odds matching + unknown-starter hardening |
+| APP-003 | done | APP-001, PIPE-002 | daily board Pacific time/model-side display |
+| DATA-019 | done | DATA-018 | zero pitcher-line local investigation report |
+| DOCS-001 | done | V1 completion | README/task-index status cleanup |
 
-## Current orchestration gate
+## Current optional graph candidates
 
-ML-010 is the critical next task. It is the first task allowed to inspect 2026,
-and it must use ADR-006 without post-holdout methodology changes.
+| Task | Status | Depends on | Notes |
+|---|---|---|---|
+| APP-004 | done | APP-003 | Streamlit deployment packaging |
+| ML-011 | in progress | ML-010 | model diagnostics report for underfit/overfit evidence |
+| OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
+| OBS-002 | backlog | OBS-001, PIPE-003 | result enrichment for daily predictions after games finish |
+| MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
+| APP-001A | backlog | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 
-APP-002 is dependency-ready from an application graph perspective, but it should
-not present final holdout conclusions until ML-010 artifacts exist.
+## Safe parallel guidance
+
+Current safe parallel set:
+
+```text
+ML-011 model diagnostics
+DATA-019 data investigation (completed)
+DOCS-001 docs/status cleanup (completed)
+```
+
+Avoid parallelizing tasks that both change prediction journal schema or the same
+Streamlit board files.
 
 ## Status transitions
 
 ```text
-backlog
-  |
-  v
-ready
-  |
-  v
-implementing
-  |
-  v
-candidate
-  +--> reviewer
-  +--> tester
-        |
-        v
-changes_requested
-        |
-        v
-approved
-        |
-        v
-done
+backlog -> ready -> implementing -> candidate -> reviewer/tester -> approved -> done
 ```
 
 Use `blocked` whenever an unmet dependency or unresolved decision prevents

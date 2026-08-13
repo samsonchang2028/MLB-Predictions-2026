@@ -1,0 +1,11 @@
+"""Streamlit multipage wrapper for the daily prediction board."""
+
+from __future__ import annotations
+
+import runpy
+from pathlib import Path
+
+runpy.run_path(
+    str(Path(__file__).resolve().parents[1] / "src" / "app" / "daily_board_page.py"),
+    run_name="__main__",
+)
