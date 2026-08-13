@@ -70,6 +70,7 @@ state source of truth.
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
 | APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
+| PIPE-005 | done | PIPE-003, DATA-018 | refresh today's MLB game-detail payloads before daily predictions (probable starters) |
 
 ## Safe parallel guidance
 

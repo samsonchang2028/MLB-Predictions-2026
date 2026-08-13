@@ -16,6 +16,7 @@ import argparse
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -37,8 +38,12 @@ from features.build import build_feature_matrix  # noqa: E402
 from features.bullpen import build_bullpen_features  # noqa: E402
 from features.starter import build_starter_features  # noqa: E402
 from features.team import build_team_features  # noqa: E402
+from ingestion.mlb import backfill_game_details, invalidate_game_detail_payloads  # noqa: E402
+from ingestion.mlb.statsapi_fetchers import make_game_detail_fetcher  # noqa: E402
 from ingestion.odds import OddsDataError, parse_the_odds_api_moneylines  # noqa: E402
 from market import MarketLabel  # noqa: E402
+from storage import connect_database  # noqa: E402
+from transforms import normalize_silver  # noqa: E402
 from models import xgboost_model  # noqa: E402
 from pipelines.daily import JsonLinesPredictionStore, run_daily_predictions  # noqa: E402
 from pipelines.daily import _serialize_record as _serialize_detail_record  # noqa: E402
@@ -54,10 +59,49 @@ DEFAULT_DATABASE = Path("data") / "mlb.duckdb"
 DEFAULT_OUTPUT = Path("state") / "predictions" / "daily.jsonl"
 DEFAULT_FEATURES_OUTPUT = Path("state") / "predictions" / "game_features.jsonl"
 DEFAULT_ODDS_BOOKS_OUTPUT = Path("state") / "predictions" / "odds_books.jsonl"
+DEFAULT_SKIPPED_OUTPUT = Path("state") / "predictions" / "skipped.jsonl"
 DEFAULT_MODEL_VERSION = "v1-adr-006-tuned-xgboost-expanding-uncalibrated"
+SKIP_NO_STARTER_ANNOUNCED = "no_starter_announced"
+PENDING_STARTER_MESSAGE = (
+    "No starting pitcher has been chosen for this game yet. Check back later."
+)
 DEFAULT_BOOKMAKER = "draftkings"
 ODDS_API_URL = "https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/"
 ODDS_MATCH_TOLERANCE_SECONDS = 12 * 60 * 60
+
+
+def _format_duration(seconds: float) -> str:
+    """Human-readable elapsed time for operator logs."""
+    total = max(0, int(round(seconds)))
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
+class _StepTimer:
+    """Log per-step and total wall time for long operator runs."""
+
+    def __init__(self) -> None:
+        self._run_started = time.monotonic()
+        self._step_started = self._run_started
+
+    def log(self, step: str) -> None:
+        now = time.monotonic()
+        print(
+            f"[timing] {step} took {_format_duration(now - self._step_started)}",
+            flush=True,
+        )
+        self._step_started = now
+
+    def log_total(self) -> None:
+        print(
+            f"[timing] total took {_format_duration(time.monotonic() - self._run_started)}",
+            flush=True,
+        )
 
 
 def _dict_rows(connection: duckdb.DuckDBPyConnection, sql: str, params: Sequence[Any] = ()) -> list[dict[str, Any]]:
@@ -95,6 +139,63 @@ def train_locked_model(database: str, certification_path: Path, random_state: in
     estimator = xgboost_model.build_model(random_state=random_state, **LOCKED_PARAMS)
     estimator.fit(X[mask], y[mask].astype(int))
     return estimator, feature_columns, matrix["build_id"], int(mask.sum())
+
+
+def _storage_root_from_database(database: str | Path) -> Path:
+    return Path(database).parent
+
+
+def slate_game_pks_for_detail_refresh(database: str | Path, run_date: date) -> list[int]:
+    """Return today's Preview/Live regular-season ``game_pk`` values for detail refresh."""
+    with duckdb.connect(str(database), read_only=True) as connection:
+        rows = connection.execute(
+            """
+            SELECT game_pk
+            FROM silver.games
+            WHERE official_date = ?
+              AND game_type = 'R'
+              AND abstract_game_state IN ('Preview', 'Live')
+            ORDER BY game_pk
+            """,
+            [run_date],
+        ).fetchall()
+    return [int(row[0]) for row in rows]
+
+
+def refresh_pregame_game_details(
+    database: str | Path,
+    run_date: date,
+    game_detail_fetcher: Any,
+) -> dict[str, Any]:
+    """Invalidate, re-fetch, and normalize MLB game detail for today's active slate."""
+    storage_root = _storage_root_from_database(database)
+    game_pks = slate_game_pks_for_detail_refresh(database, run_date)
+    if not game_pks:
+        return {
+            "targeted": 0,
+            "invalidated": 0,
+            "fetched": 0,
+            "normalized": False,
+        }
+
+    invalidated = invalidate_game_detail_payloads(storage_root, game_pks)
+    backfill = backfill_game_details(
+        storage_root,
+        game_detail_fetcher,
+        game_pks=game_pks,
+        retry_unresolved=True,
+    )
+    with connect_database(database) as connection:
+        normalize_silver(connection)
+
+    return {
+        "targeted": len(game_pks),
+        "invalidated": invalidated,
+        "fetched": int(backfill.get("fetched", 0)),
+        "normalized": True,
+        "game_pks": game_pks,
+        "backfill": backfill,
+    }
 
 
 def load_prediction_inputs(database: str, run_date: date, certification_path: Path) -> dict[str, Any]:
@@ -193,6 +294,80 @@ def load_prediction_inputs(database: str, run_date: date, certification_path: Pa
         "appearances": appearances,
         "starters": starters,
     }
+
+
+def _starter_is_announced(row: Mapping[str, Any] | None) -> bool:
+    if row is None:
+        return False
+    return (
+        row.get("actual_pitcher_id") is not None
+        or row.get("probable_pitcher_id") is not None
+    )
+
+
+def partition_schedule_by_announced_starters(
+    schedule: Sequence[Mapping[str, Any]],
+    starters: Sequence[Mapping[str, Any]],
+    *,
+    run_date: date,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split today's slate into predict-ready games and starter-pending games."""
+    by_key = {(row["game_pk"], row["team_id"]): row for row in starters}
+    ready: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    for game in schedule:
+        missing_team_ids = [
+            game[team_key]
+            for team_key in ("home_team_id", "away_team_id")
+            if not _starter_is_announced(by_key.get((game["game_pk"], game[team_key])))
+        ]
+        if missing_team_ids:
+            skipped.append(
+                {
+                    "run_date": str(run_date),
+                    "game_pk": game["game_pk"],
+                    "reason": SKIP_NO_STARTER_ANNOUNCED,
+                    "home_team_id": game["home_team_id"],
+                    "away_team_id": game["away_team_id"],
+                    "missing_team_ids": missing_team_ids,
+                    "game_start_timestamp": game.get("game_start_timestamp"),
+                    "message": PENDING_STARTER_MESSAGE,
+                }
+            )
+        else:
+            ready.append(dict(game))
+    ready.sort(key=lambda row: row["game_pk"])
+    skipped.sort(key=lambda row: row["game_pk"])
+    return ready, skipped
+
+
+def replace_skipped_for_run_date(
+    path: Path,
+    run_date: date,
+    skipped: Sequence[Mapping[str, Any]],
+) -> int:
+    """Rewrite starter-pending rows for one slate date; preserve other dates."""
+    run_date_str = str(run_date)
+    retained: list[dict[str, Any]] = []
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            if str(row.get("run_date")) == run_date_str:
+                continue
+            retained.append(row)
+
+    serials = [_serialize_detail_record(row) for row in skipped]
+    retained.extend(serials)
+    retained.sort(key=lambda row: (str(row.get("run_date")), row.get("game_pk")))
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        for row in retained:
+            handle.write(json.dumps(row, sort_keys=True) + "\n")
+    return len(serials)
 
 
 def build_today_feature_components(inputs: Mapping[str, Any]) -> dict[str, list[dict[str, Any]]]:
@@ -596,16 +771,29 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
     parser.add_argument("--features-output", default=str(DEFAULT_FEATURES_OUTPUT))
     parser.add_argument("--odds-books-output", default=str(DEFAULT_ODDS_BOOKS_OUTPUT))
+    parser.add_argument("--skipped-output", default=str(DEFAULT_SKIPPED_OUTPUT))
     parser.add_argument("--bookmaker", default=DEFAULT_BOOKMAKER)
     parser.add_argument("--regions", default="us")
     parser.add_argument("--odds-json", default=None, help="Optional saved The Odds API payload for offline replay/tests.")
     parser.add_argument("--prediction-timestamp", default=None, help="ISO timestamp with timezone; default now UTC.")
     parser.add_argument("--random-state", type=int, default=0)
     parser.add_argument("--timeout", type=float, default=20.0)
+    parser.add_argument(
+        "--skip-detail-refresh",
+        action="store_true",
+        help="Skip MLB game-detail invalidate/backfill before loading starters (offline replay).",
+    )
     args = parser.parse_args(argv)
 
+    timer = _StepTimer()
+    try:
+        return _run_operator(args, timer)
+    finally:
+        timer.log_total()
+
+
+def _run_operator(args: argparse.Namespace, timer: _StepTimer) -> int:
     run_date = parse_date(args.date)
-    prediction_timestamp = parse_timestamp(args.prediction_timestamp)
     certification_path = Path(args.certification)
     api_key = os.environ.get("THE_ODDS_API_KEY")
     if not args.odds_json and not api_key:
@@ -620,6 +808,24 @@ def main(argv: list[str] | None = None) -> int:
         f"training_build_id={training_build_id}",
         flush=True,
     )
+    timer.log("model_train")
+
+    if args.skip_detail_refresh:
+        print("[detail-refresh] skipped", flush=True)
+    else:
+        detail_stats = refresh_pregame_game_details(
+            args.database,
+            run_date,
+            make_game_detail_fetcher(),
+        )
+        print(
+            f"[detail-refresh] targeted={detail_stats['targeted']} "
+            f"invalidated={detail_stats['invalidated']} "
+            f"fetched={detail_stats['fetched']} "
+            f"normalized={detail_stats['normalized']}",
+            flush=True,
+        )
+    timer.log("detail_refresh")
 
     print(f"[load] run_date={run_date} database={args.database}", flush=True)
     inputs = load_prediction_inputs(args.database, run_date, certification_path)
@@ -632,17 +838,37 @@ def main(argv: list[str] | None = None) -> int:
         print("[done] no active regular-season games found for date", flush=True)
         return 0
 
-    starter_placeholders = _starter_placeholder_rows(inputs["schedule"], inputs["starters"])
-    if starter_placeholders:
-        print(f"[starters] unknown_placeholders={len(starter_placeholders)}", flush=True)
-    components = build_today_feature_components(inputs)
-    today_matrix = build_feature_matrix(
+    ready_schedule, starter_skipped = partition_schedule_by_announced_starters(
         inputs["schedule"],
+        inputs["starters"],
+        run_date=run_date,
+    )
+    skipped_written = replace_skipped_for_run_date(
+        Path(args.skipped_output),
+        run_date,
+        starter_skipped,
+    )
+    if starter_skipped:
+        print(
+            f"[starters] awaiting_announcement={len(starter_skipped)} "
+            f"written={skipped_written} output={args.skipped_output}",
+            flush=True,
+        )
+    timer.log("load_slate")
+
+    if not ready_schedule:
+        print("[done] no games with both starting pitchers announced yet", flush=True)
+        return 0
+
+    prediction_inputs = {**inputs, "schedule": ready_schedule}
+    components = build_today_feature_components(prediction_inputs)
+    today_matrix = build_feature_matrix(
+        ready_schedule,
         team_features=components["team"],
         starter_features=components["starter"],
         bullpen_features=components["bullpen"],
         results=[],
-        certification=inputs["certification"],
+        certification=prediction_inputs["certification"],
         completeness_mode="inference",
     )
     print(
@@ -660,6 +886,7 @@ def main(argv: list[str] | None = None) -> int:
             for row in today_matrix["excluded"]
         ]
         print(f"[gold-excluded] {json.dumps(excluded, sort_keys=True)}", flush=True)
+    timer.log("gold_build")
 
     # The canonical fetch is scoped to exactly the configured bookmaker, same
     # as before this task -- unaffected by anything below. The comparison
@@ -681,25 +908,35 @@ def main(argv: list[str] | None = None) -> int:
         except RuntimeError as exc:
             print(f"[odds-books] comparison fetch failed, skipping: {exc}", flush=True)
 
-    odds_snapshots, odds_stats = odds_snapshots_for_schedule(payload, inputs["schedule"], bookmaker=args.bookmaker)
+    odds_snapshots, odds_stats = odds_snapshots_for_schedule(
+        payload, ready_schedule, bookmaker=args.bookmaker
+    )
     print(f"[odds] {json.dumps(odds_stats, sort_keys=True)}", flush=True)
 
     all_books: dict[tuple[Any, str], dict[str, Any]] = {}
     if comparison_payload is not None:
         try:
-            all_books, all_books_stats = all_book_snapshots_for_schedule(comparison_payload, inputs["schedule"])
+            all_books, all_books_stats = all_book_snapshots_for_schedule(
+                comparison_payload, ready_schedule
+            )
             print(f"[odds-books] {json.dumps(all_books_stats, sort_keys=True)}", flush=True)
         except OddsDataError as exc:
             print(f"[odds-books] comparison payload malformed, skipping: {exc}", flush=True)
+    timer.log("odds_fetch")
+
+    # ADR-002: odds_snapshot < prediction_timestamp < first_pitch. The cutoff must
+    # be taken after odds are fetched, not at operator start -- a long model train
+    # or detail refresh otherwise makes fresh odds look "from the future".
+    prediction_timestamp = parse_timestamp(args.prediction_timestamp)
 
     store = JsonLinesPredictionStore(args.output)
     result = run_daily_predictions(
         run_date=run_date,
-        schedule=inputs["schedule"],
+        schedule=ready_schedule,
         team_features=components["team"],
         starter_features=components["starter"],
         bullpen_features=components["bullpen"],
-        certification=inputs["certification"],
+        certification=prediction_inputs["certification"],
         estimator=estimator,
         model_version=DEFAULT_MODEL_VERSION,
         training_feature_columns=feature_columns,
@@ -715,12 +952,17 @@ def main(argv: list[str] | None = None) -> int:
         flush=True,
     )
     print(f"[skips] {json.dumps(summarize_skips(result.skipped), sort_keys=True)}", flush=True)
+    if result.skipped:
+        print(
+            f"[skips-detail] {json.dumps([dict(row) for row in result.skipped], sort_keys=True)}",
+            flush=True,
+        )
+    timer.log("predictions")
 
-    # No prediction_timestamp here (unlike daily.jsonl): these features are a
-    # deterministic function of (run_date, game_pk, build_id), not of when the
-    # script happened to run, so a same-day re-run produces byte-identical
-    # records and append_jsonl_records' default "raise" mode stays a no-op
-    # instead of conflicting on an incidental wall-clock difference.
+    # Tracks the CURRENT feature snapshot per (run_date, game_pk, build_id).
+    # A same-day re-run with unchanged Silver inputs is idempotent; after a
+    # detail refresh or newly announced starter the features legitimately change
+    # and should overwrite the prior row (same contract as odds_books.jsonl).
     features_records = [
         {
             "run_date": run_date,
@@ -734,6 +976,7 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.features_output),
         features_records,
         key_fields=("run_date", "game_pk", "build_id"),
+        on_conflict="overwrite",
     )
     print(
         f"[features] written={features_written} output={args.features_output}",
@@ -765,6 +1008,7 @@ def main(argv: list[str] | None = None) -> int:
         f"[odds-books] written={odds_books_written} output={args.odds_books_output}",
         flush=True,
     )
+    timer.log("artifact_writes")
     return 0
 
 

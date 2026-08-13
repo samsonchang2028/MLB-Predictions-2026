@@ -25,8 +25,11 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
+
+import json
 
 # ponytail: MLB's 30 team_ids are a fixed, unchanging set with no existing
 # id->name lookup anywhere in the repo (checked ingestion/storage/features).
@@ -51,6 +54,11 @@ DAILY_BOARD_REQUIRED_FIELDS = (
     "odds_snapshot_timestamp",
     "model_version",
 )
+SKIP_NO_STARTER_ANNOUNCED = "no_starter_announced"
+PENDING_STARTER_MESSAGE = (
+    "No starting pitcher has been chosen for this game yet. Check back later."
+)
+DEFAULT_SKIPPED_PATH = Path("state/predictions/skipped.jsonl")
 
 
 def load_daily_board(
@@ -102,6 +110,7 @@ def load_daily_board_with_diagnostics(
         game_start_pacific = _format_pacific(record.get("game_start_timestamp"))
         prediction_pacific = _format_pacific(record.get("prediction_timestamp"))
         odds_snapshot_pacific = _format_pacific(record["odds_snapshot_timestamp"])
+        prediction_ts = _parse_datetime(record.get("prediction_timestamp"))
         rows.append(
             {
                 "game_pk": record["game_pk"],
@@ -115,6 +124,7 @@ def load_daily_board_with_diagnostics(
                 "market_probability": record["market_probability"],
                 "edge": edge,
                 "game_start_pacific": game_start_pacific,
+                "prediction_timestamp": prediction_ts,
                 "prediction_timestamp_pacific": prediction_pacific,
                 "odds_snapshot_timestamp": record["odds_snapshot_timestamp"],
                 "odds_snapshot_pacific": odds_snapshot_pacific,
@@ -123,8 +133,28 @@ def load_daily_board_with_diagnostics(
                 "action_label": f"PLAY {model_side}" if abs(edge) >= edge_threshold else "PASS",
             }
         )
+    rows = _latest_row_per_game(rows)
     rows.sort(key=lambda r: r["game_pk"])
     return {"rows": rows, "skipped": skipped}
+
+
+def _latest_row_per_game(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only the newest prediction per ``game_pk`` for board display."""
+    latest: dict[Any, dict[str, Any]] = {}
+    for row in rows:
+        game_pk = row["game_pk"]
+        current = latest.get(game_pk)
+        if current is None:
+            latest[game_pk] = row
+            continue
+        row_ts = row.get("prediction_timestamp")
+        current_ts = current.get("prediction_timestamp")
+        if isinstance(row_ts, datetime) and isinstance(current_ts, datetime):
+            if row_ts >= current_ts:
+                latest[game_pk] = row
+        elif row_ts is not None:
+            latest[game_pk] = row
+    return list(latest.values())
 
 
 def _team_label(team_id: Any) -> str:
@@ -147,6 +177,35 @@ def latest_run_date(store: Any) -> str | None:
     """Return the latest run_date string available in a prediction store."""
     dates = available_run_dates(store)
     return dates[-1] if dates else None
+
+
+def load_starter_pending_games(
+    skipped_path: Path,
+    run_date: Any,
+) -> list[dict[str, Any]]:
+    """Games withheld from prediction because a starter is not announced yet."""
+    if not skipped_path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in skipped_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        record = json.loads(line)
+        if str(record.get("run_date")) != str(run_date):
+            continue
+        if record.get("reason") != SKIP_NO_STARTER_ANNOUNCED:
+            continue
+        rows.append(
+            {
+                "game_pk": record["game_pk"],
+                "matchup": _matchup(record.get("away_team_id"), record.get("home_team_id")),
+                "game_start_pacific": _format_pacific(record.get("game_start_timestamp")),
+                "message": record.get("message", PENDING_STARTER_MESSAGE),
+            }
+        )
+    rows.sort(key=lambda row: row["game_pk"])
+    return rows
 
 
 def _format_pacific(value: Any) -> str | None:

@@ -28,7 +28,14 @@ from pathlib import Path
 
 import streamlit as st
 
-from app.board import DEFAULT_EDGE_THRESHOLD, available_run_dates, latest_run_date, load_daily_board_with_diagnostics
+from app.board import (
+    DEFAULT_EDGE_THRESHOLD,
+    DEFAULT_SKIPPED_PATH,
+    available_run_dates,
+    latest_run_date,
+    load_daily_board_with_diagnostics,
+    load_starter_pending_games,
+)
 from pipelines.daily import JsonLinesPredictionStore
 
 DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
@@ -36,6 +43,10 @@ DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
 
 def _store_path() -> Path:
     return Path(os.environ.get("PREDICTIONS_STORE_PATH", DEFAULT_STORE_PATH))
+
+
+def _skipped_path() -> Path:
+    return Path(os.environ.get("SKIPPED_STORE_PATH", DEFAULT_SKIPPED_PATH))
 
 
 st.set_page_config(page_title="MLB Daily Predictions", layout="wide")
@@ -58,7 +69,11 @@ else:
             help="Filters by the operator run_date / MLB official slate date.",
         )
         board_report = load_daily_board_with_diagnostics(store, run_date=selected_date)
-        rows = board_report["rows"]
+        pending_starters = load_starter_pending_games(_skipped_path(), selected_date)
+        pending_game_pks = {row["game_pk"] for row in pending_starters}
+        rows = [
+            row for row in board_report["rows"] if row["game_pk"] not in pending_game_pks
+        ]
         skipped = board_report["skipped"]
         st.caption(
             "Times are displayed in Pacific time (America/Los_Angeles). "
@@ -75,6 +90,23 @@ else:
             )
             with st.expander("Skipped malformed records"):
                 st.dataframe(skipped, use_container_width=True, hide_index=True)
+        if pending_starters:
+            st.info(
+                f"{len(pending_starters)} game(s) are waiting for starting-pitcher "
+                "announcements. The model will not predict those slates yet."
+            )
+            st.dataframe(
+                [
+                    {
+                        "First Pitch (Pacific)": row["game_start_pacific"],
+                        "Matchup": row["matchup"],
+                        "Status": row["message"],
+                    }
+                    for row in pending_starters
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
         if not rows:
             st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
