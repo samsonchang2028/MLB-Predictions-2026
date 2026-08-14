@@ -86,6 +86,17 @@ def test_homepage_summary_counts_latest_slate_and_excludes_pass_from_record(tmp_
     assert summary["play_wins"] == 1
     assert summary["play_losses"] == 0
     assert summary["play_pending"] == 0
+    assert summary["play_performance_7d"]["wins"] == 1
+    assert summary["play_performance_7d"]["losses"] == 0
+    assert summary["play_performance_7d"]["win_rate"] == 1.0
+    assert summary["slate_snapshot"] == {
+        "plays": 1,
+        "passes": 1,
+        "awaiting": 1,
+        "play_wins": 1,
+        "play_losses": 0,
+        "play_pending": 0,
+    }
     assert summary["skipped_count"] == 1
     assert summary["awaiting_data_count"] == 1
     assert summary["skipped_reasons"] == {"no_odds_snapshot": 1}
@@ -110,6 +121,9 @@ def test_homepage_summary_reports_missing_artifacts(tmp_path: Path) -> None:
     assert summary["predictions_count"] == 0
     assert summary["plays_count"] == 0
     assert summary["play_wins"] == 0
+    assert summary["play_performance_7d"]["finished"] == 0
+    assert summary["play_performance_7d"]["win_rate"] is None
+    assert summary["slate_snapshot"]["plays"] == 0
     assert summary["awaiting_data_count"] == 0
     assert summary["missing_artifacts"] == [
         str(paths.predictions),
@@ -174,3 +188,82 @@ def test_homepage_summary_counts_only_latest_prediction_per_game(tmp_path: Path)
     assert summary["no_play_count"] == 1
     assert summary["finished_predictions_count"] == 0
     assert summary["predictions_last_updated"] == "2026-08-13T17:00:00+00:00"
+
+
+def test_homepage_play_performance_7d_aggregates_last_seven_slates(tmp_path: Path) -> None:
+    predictions = tmp_path / "daily.jsonl"
+    journal = tmp_path / "journal.jsonl"
+    skipped = tmp_path / "skipped.jsonl"
+    holdout = tmp_path / "holdout.json"
+    diagnostics = tmp_path / "diagnostics.json"
+    rows: list[dict] = []
+    for offset, run_date in enumerate(
+        (
+            "2026-08-07",
+            "2026-08-08",
+            "2026-08-09",
+            "2026-08-10",
+            "2026-08-11",
+            "2026-08-12",
+            "2026-08-13",
+            "2026-08-14",
+        ),
+        start=1,
+    ):
+        rows.append(
+            {
+                "game_pk": offset,
+                "run_date": run_date,
+                "edge": 0.05,
+                "prediction_timestamp": f"{run_date}T16:00:00+00:00",
+                "odds_snapshot_timestamp": f"{run_date}T15:59:00+00:00",
+            }
+        )
+    _write_jsonl(predictions, rows)
+    _write_jsonl(
+        journal,
+        [
+            {
+                "game_pk": 7,
+                "prediction_timestamp": "2026-08-13T16:00:00+00:00",
+                "correct": True,
+                "enrichment_timestamp": "2026-08-14T06:00:00+00:00",
+            },
+            {
+                "game_pk": 8,
+                "prediction_timestamp": "2026-08-14T16:00:00+00:00",
+                "correct": False,
+                "enrichment_timestamp": "2026-08-15T06:00:00+00:00",
+            },
+        ],
+    )
+    skipped.write_text("", encoding="utf-8")
+    holdout.write_text(
+        json.dumps({"metrics": {"log_loss": 0.68, "brier": 0.24, "secondary": {"accuracy": 0.54}}}),
+        encoding="utf-8",
+    )
+    diagnostics.write_text("{}", encoding="utf-8")
+
+    summary = build_homepage_summary(
+        ArtifactPaths(
+            predictions=predictions,
+            journal=journal,
+            skipped=skipped,
+            holdout_report=holdout,
+            diagnostics_report=diagnostics,
+        )
+    )
+
+    assert [row["run_date"] for row in summary["play_performance_7d"]["daily"]] == [
+        "2026-08-08",
+        "2026-08-09",
+        "2026-08-10",
+        "2026-08-11",
+        "2026-08-12",
+        "2026-08-13",
+        "2026-08-14",
+    ]
+    assert summary["play_performance_7d"]["wins"] == 1
+    assert summary["play_performance_7d"]["losses"] == 1
+    assert summary["play_performance_7d"]["win_rate"] == 0.5
+    assert summary["holdout_metrics"]["accuracy"] == 0.54
