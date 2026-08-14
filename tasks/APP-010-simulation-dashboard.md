@@ -2,7 +2,7 @@
 
 ## Status
 
-`blocked` (until PIPE-007 merges or simulation.jsonl contract is stable on branch)
+`ready` (can implement against PIPE-007 contract; may use fixtures if PIPE-007 not merged yet)
 
 ## Dependencies
 

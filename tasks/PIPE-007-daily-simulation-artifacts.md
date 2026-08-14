@@ -2,7 +2,7 @@
 
 ## Status
 
-`blocked` (until SIM-003 merges)
+`ready`
 
 ## Dependencies
 

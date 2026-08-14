@@ -3,9 +3,7 @@
 | Field | Value |
 |---|---|
 | Task | PIPE-007 |
-| Status | BLOCKED |
-| Blocker | SIM-003 merge |
-
-## Activity
-
-Queued wave 3: wire simulation into daily operator → `simulation.jsonl`.
+| Role | implementer |
+| Status | IMPLEMENTING |
+| Branch | `agent/PIPE-007-daily-simulation-artifacts` |
+| Worktree | `../predictions-1-wt-PIPE-007` |

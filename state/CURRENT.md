@@ -244,12 +244,10 @@ to certify cleanly.
 
 ## In progress
 
-- **V2 simulation wave 2 (dispatched):**
-  - `SIM-003` — full Gold score model (`agent/SIM-003-full-gold-score-model`)
-  - `SIM-002` — totals / runs-per-game markets (`agent/SIM-002-simulation-totals-markets`)
-- **V2 simulation wave 3 (blocked on SIM-003):**
-  - `PIPE-007` — daily operator `simulation.jsonl` artifacts
-  - `APP-010` — Streamlit simulation comparison tab
+- **V2 simulation wave 3 (dispatched):**
+  - `PIPE-007` — daily operator `simulation.jsonl` (`agent/PIPE-007-daily-simulation-artifacts`)
+  - `APP-010` — Streamlit Simulation tab (`agent/APP-010-simulation-dashboard`)
+- **Merged wave 2:** SIM-003 (full Gold), SIM-002 (totals markets) on `main`
 - **Merged wave 1:** SIM-000, DATA-024 on `main`
 
 ## In review
