@@ -2,7 +2,7 @@
 
 ## Status
 
-`blocked` (until SIM-000 merges or exposes stable simulation contract)
+`ready`
 
 ## Dependencies
 

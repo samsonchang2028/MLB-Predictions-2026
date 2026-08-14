@@ -244,12 +244,13 @@ to certify cleanly.
 
 ## In progress
 
-- **V2 simulation wave 1 (dispatched):**
-  - `SIM-000` — game-level team score Monte Carlo (`agent/SIM-000-game-level-simulation`)
-  - `DATA-024` — totals odds ingestion (`agent/DATA-024-totals-odds-ingestion`)
-- **V2 simulation wave 2 (blocked on SIM-000):**
-  - `SIM-001` — sim vs XGBoost moneyline validation
-  - `SIM-002` — totals / runs-per-game from simulation
+- **V2 simulation wave 2 (dispatched):**
+  - `SIM-003` — full Gold score model (`agent/SIM-003-full-gold-score-model`)
+  - `SIM-002` — totals / runs-per-game markets (`agent/SIM-002-simulation-totals-markets`)
+- **V2 simulation wave 3 (blocked on SIM-003):**
+  - `PIPE-007` — daily operator `simulation.jsonl` artifacts
+  - `APP-010` — Streamlit simulation comparison tab
+- **Merged wave 1:** SIM-000, DATA-024 on `main`
 
 ## In review
 

@@ -80,14 +80,17 @@ state source of truth.
 
 | Task | Status | Depends on | Notes |
 |---|---|---|---|
-| SIM-000 | ready | FEAT-004, ML-010 | game-level team score Monte Carlo from existing Gold features |
-| DATA-024 | ready | DATA-003, DATA-004 | totals (over/under) odds ingestion |
-| SIM-001 | blocked | SIM-000, ML-009 | walk-forward validate sim P(home_win) vs locked XGBoost |
-| SIM-002 | blocked | SIM-000, MARKET-001, DATA-024 | totals / runs-per-game probs + edge from simulation |
+| SIM-000 | done | FEAT-004, ML-010 | game-level team score Monte Carlo from existing Gold features |
+| DATA-024 | done | DATA-003, DATA-004 | totals (over/under) odds ingestion |
+| SIM-001 | backlog | SIM-003, ML-009 | walk-forward validate sim P(home_win) vs locked XGBoost |
+| SIM-002 | ready | SIM-000, MARKET-001 | totals / runs-per-game probs + edge from simulation |
+| SIM-003 | ready | SIM-000 | full Gold feature score model |
+| PIPE-007 | blocked | SIM-003, PIPE-005 | daily operator simulation.jsonl artifacts |
+| APP-010 | blocked | PIPE-007 | Streamlit simulation comparison tab + charts |
 | DOCS-002 | backlog | SIM-001 | ADR-007 V2 policy: XGBoost owns ML, sim owns totals |
 
-Wave 1 parallel: **SIM-000** + **DATA-024** (no shared file surface).
-Wave 2 parallel (after SIM-000 merge): **SIM-001** + **SIM-002**.
+Wave 2 parallel: **SIM-003** + **SIM-002**.
+Wave 3 parallel (after SIM-003 merge): **PIPE-007** + **APP-010**.
 
 ## Safe parallel guidance
 
