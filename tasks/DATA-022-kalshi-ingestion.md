@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+implemented, awaiting review
 
 ## Dependencies
 
@@ -132,3 +132,117 @@ Record: summary, files changed, commands run, test results, known
 limitations (especially: was the response shape verified against a live
 Kalshi API call, or only against the research doc's medium-confidence
 description?), any new ADR/state changes.
+
+### Implementer handoff (2026-08-14)
+
+**Summary.** Added `src/ingestion/kalshi/snapshots.py`
+(`parse_kalshi_market_snapshots` + `ingest_kalshi_market_snapshots`) and
+`src/ingestion/kalshi/__init__.py`, mirroring
+`src/ingestion/odds/snapshots.py`'s parse-function + idempotent-DuckDB-ingest
+pattern for a new, independent `bronze.kalshi_market_snapshots` table.
+`src/ingestion/odds/` was not touched.
+
+**Response shape: verified live, not assumed.** `api.kalshi.com` (the host
+named in the research doc) does not resolve from this environment. The
+actual working REST host is **`api.elections.kalshi.com`**
+(`https://api.elections.kalshi.com/trade-api/v2/markets?series_ticker=KXMLBGAME&status=open`)
+— confirmed by fetching it directly and getting real, current (2026-08-16/17)
+MLB `KXMLBGAME` markets (Seattle @ Houston, Colorado @ San Francisco,
+Milwaukee @ LA Dodgers). This is a genuine finding beyond the research doc
+and matters for whoever wires a real fetcher (DATA-023/PIPE-006): use
+`api.elections.kalshi.com`, not `api.kalshi.com`.
+
+Confirmed live field names on each `Market` object (exact, from the raw
+response, not summarized): `ticker`, `event_ticker`, `yes_sub_title`,
+`no_sub_title`, `status`, `result`, `yes_bid_dollars`, `yes_ask_dollars`,
+`no_bid_dollars`, `no_ask_dollars`, `last_price_dollars`, `updated_time`,
+`open_time`, `close_time`, `occurrence_datetime`, plus many fields not needed
+for this table (`price_ranges`, `custom_strike`, `rules_primary`, etc.). Two
+things the research doc did not pin down that the live payload confirmed:
+(1) all four price fields are present per market (not just yes_bid/yes_ask) —
+so the table stores all four; (2) prices are decimal-dollar **strings**
+(e.g. `"0.4400"`), not floats or cents — parsed with `Decimal`, not `float`,
+to avoid binary rounding on a money-shaped value.
+
+**Design calls (documented per AGENTS.md's "smallest reasonable judgment
+call" guidance):**
+
+- `side` = `yes_sub_title` (Kalshi's own docs call this "the yes side of
+  this market" — i.e. the team this market's "yes" resolves for). This is a
+  direct field, not a ticker-suffix parse, per Kalshi's own guidance not to
+  parse ticker strings.
+- `source_payload_sha256` is a SHA-256 of the canonical (sorted-key) JSON
+  serialization of the already-decoded `payload` dict passed into
+  `parse_kalshi_market_snapshots`, not a hash of literal wire bytes. This
+  matches the odds-ingestion mirror's function signature
+  (`parse_the_odds_api_moneylines(payload, ...)` takes decoded JSON, not raw
+  bytes) — a bytes-hashing raw-file-on-disk design like
+  `bronze.mlb_game_detail_payloads` would need a different (bytes-accepting)
+  signature the task did not ask for. One hash is computed per call and
+  shared across every row that call produces, same relationship as
+  `mlb_game_detail_payloads.payload_sha256` to its downstream rows.
+- `yes_bid`/`yes_ask`/`no_bid`/`no_ask` stored as `DECIMAL(5,4)` with a
+  `CHECK (0 <= x <= 1)` — a `"0.0000"` bid is treated as a normal "no current
+  bid" observation (MLB liquidity on Kalshi is thin per the research doc),
+  not malformed data; only out-of-range or non-numeric values are rejected.
+- Conflict/idempotency key: `(source, market_ticker, snapshot_timestamp)`,
+  using Kalshi's own `updated_time` as `snapshot_timestamp` (the provider-
+  supplied "as of" time), same role `last_update` plays for a sportsbook in
+  the odds mirror. A repeat fetch with identical prices is a no-op; a
+  different price for the same key (in the same payload, or against an
+  already-stored row) raises `KalshiDataError`.
+
+**Files changed:**
+- `src/ingestion/kalshi/snapshots.py` (new)
+- `src/ingestion/kalshi/__init__.py` (new)
+- `tests/unit/ingestion/kalshi/test_kalshi_snapshots.py` (new)
+- `tests/unit/ingestion/kalshi/fixtures/kalshi_market_snapshots.json` (new —
+  built from the real live 2-market Seattle-vs-Houston payload captured
+  during this task, trimmed to the fields the parser reads)
+- `tests/integration/ingestion/kalshi/test_kalshi_ingestion.py` (new)
+
+**Naming deviation from the task's suggested test paths:** the task listed
+`tests/unit/ingestion/kalshi/test_snapshots.py` and implied
+`tests/integration/ingestion/kalshi/test_ingestion.py`-style naming. Using
+those exact basenames collides with `tests/unit/ingestion/odds/test_snapshots.py`
+and `tests/integration/ingestion/odds/test_ingestion.py` under pytest's
+default rootdir-relative import mode (no `__init__.py` anywhere under
+`tests/`), which aborts the *entire* suite's collection with `import file
+mismatch`. Renamed to `test_kalshi_snapshots.py` /
+`test_kalshi_ingestion.py` (same pattern already used elsewhere in this repo,
+e.g. `test_schedule_ingestion.py` under `tests/integration/ingestion/mlb/`)
+rather than adding `__init__.py` files outside this task's allowed
+directories.
+
+**Commands run:**
+- `python -m pytest tests/unit/ingestion/kalshi tests/integration/ingestion/kalshi -q`
+  → 28 passed.
+- `python -m pytest -q` (full repo suite, from the worktree, using
+  `../predictions-1/.venv/Scripts/python.exe`) → **699 passed**.
+
+**Known limitations:**
+- No fetcher/HTTP client was added — this task is parse+store only, per the
+  task's own scope. DATA-023 (game_pk matching) and PIPE-006 (fetch cadence,
+  wiring into the daily pipeline) are separate, undone.
+- Only `GET /markets` (top-of-book summary) is modeled, not
+  `GET /markets/{ticker}/orderbook` (full depth). The research doc and this
+  task's Outputs section both point at the summary endpoint as "likely the
+  right endpoint for a snapshot ingester"; full depth was out of scope.
+- Cross-market consistency (yes-team-A vs. `1 - yes`-team-B, per the research
+  doc §3) is not checked here — it is a market-analysis concern for
+  MARKET-003, not an ingestion-time validation; Kalshi's own two per-team
+  markets are independently stored and independently validated.
+- Rate limits, ToS/usage-restriction terms, and state-availability geofencing
+  for read-only market data (flagged as unverified in the research doc §5)
+  were not independently re-checked in this pass; this task only performs a
+  handful of read requests, well under any plausible limit.
+- `state/predictions/` shows as untracked in this worktree's `git status`;
+  it predates this task's changes and was left untouched (not part of the
+  Kalshi diff, outside the allowed-files list).
+
+**ADR/state update:** no ADR is needed (the research doc already flagged
+Kalshi as a structurally distinct source, not a variant of the sportsbook
+odds engine, and this task changes no accepted decision). `state/CURRENT.md`
+should get a one-line "DATA-022 implemented, awaiting review" entry when this
+task is merged — left to the orchestrator/reviewer per this repo's normal
+flow, not written by the implementer.
