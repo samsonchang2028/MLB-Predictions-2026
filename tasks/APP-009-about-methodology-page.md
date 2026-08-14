@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+candidate (implemented; awaiting independent review/tester)
 
 ## Dependencies
 
@@ -111,3 +111,15 @@ Record:
 - commands run,
 - test results,
 - known limitations.
+
+## Implementation handoff
+
+- Added `src/app/about.py` with plain-English copy helpers for V1 methodology,
+  pick/PASS interpretation, limitations, evidence labels, and primary metrics.
+- Added Streamlit page `pages/4_About.py`.
+- Added unit tests pinning the core user-facing claims and limitations:
+  moneyline only, no weather, no Monte Carlo, no Kalshi/arbitrage, and no
+  staking policy.
+- The page is display/documentation only; it does not read DuckDB, retrain,
+  recompute metrics, or alter methodology.
+- Manual Streamlit smoke was not performed in this task handoff.
