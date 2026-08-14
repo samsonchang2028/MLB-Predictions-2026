@@ -81,6 +81,19 @@ state source of truth.
 | PIPE-006 | backlog | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp |
 | APP-010 | backlog | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table |
 
+## V2 simulation graph (team-level Monte Carlo — no player props)
+
+| Task | Status | Depends on | Notes |
+|---|---|---|---|
+| SIM-000 | ready | FEAT-004, ML-010 | game-level team score Monte Carlo from existing Gold features |
+| DATA-024 | ready | DATA-003, DATA-004 | totals (over/under) odds ingestion |
+| SIM-001 | blocked | SIM-000, ML-009 | walk-forward validate sim P(home_win) vs locked XGBoost |
+| SIM-002 | blocked | SIM-000, MARKET-001, DATA-024 | totals / runs-per-game probs + edge from simulation |
+| DOCS-002 | backlog | SIM-001 | ADR-007 V2 policy: XGBoost owns ML, sim owns totals |
+
+Wave 1 parallel: **SIM-000** + **DATA-024** (no shared file surface).
+Wave 2 parallel (after SIM-000 merge): **SIM-001** + **SIM-002**.
+
 ## Safe parallel guidance
 
 Current safe parallel set:
