@@ -12,7 +12,9 @@ from ingestion.odds.historical import (
 from ingestion.odds.snapshots import (
     OddsDataError,
     ingest_the_odds_api_moneylines,
+    ingest_the_odds_api_totals,
     parse_the_odds_api_moneylines,
+    parse_the_odds_api_totals,
 )
 
 __all__ = [
@@ -24,6 +26,8 @@ __all__ = [
     "OddsDataError",
     "ingest_historical_odds_archive",
     "ingest_the_odds_api_moneylines",
+    "ingest_the_odds_api_totals",
     "parse_historical_odds_archive",
     "parse_the_odds_api_moneylines",
+    "parse_the_odds_api_totals",
 ]
