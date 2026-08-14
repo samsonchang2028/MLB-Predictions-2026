@@ -244,7 +244,12 @@ to certify cleanly.
 
 ## In progress
 
-- None.
+- **V2 simulation wave 1 (dispatched):**
+  - `SIM-000` — game-level team score Monte Carlo (`agent/SIM-000-game-level-simulation`)
+  - `DATA-024` — totals odds ingestion (`agent/DATA-024-totals-odds-ingestion`)
+- **V2 simulation wave 2 (blocked on SIM-000):**
+  - `SIM-001` — sim vs XGBoost moneyline validation
+  - `SIM-002` — totals / runs-per-game from simulation
 
 ## In review
 
