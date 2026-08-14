@@ -244,11 +244,18 @@ to certify cleanly.
 
 ## In progress
 
-- **V2 simulation wave 3 (dispatched):**
-  - `PIPE-007` — daily operator `simulation.jsonl` (`agent/PIPE-007-daily-simulation-artifacts`)
-  - `APP-010` — Streamlit Simulation tab (`agent/APP-010-simulation-dashboard`)
-- **Merged wave 2:** SIM-003 (full Gold), SIM-002 (totals markets) on `main`
-- **Merged wave 1:** SIM-000, DATA-024 on `main`
+- None (V2 simulation stack merged to `main` — run operator + Streamlit to populate artifacts).
+
+## Recently shipped (V2 simulation)
+
+- **SIM-000** — game-level Monte Carlo engine
+- **DATA-024** — totals odds bronze ingestion
+- **SIM-003** — full Gold (~240 col) Poisson score model
+- **SIM-002** — totals `p_over` / `p_under` from trials
+- **PIPE-007** — daily operator writes `simulation.jsonl`
+- **APP-010** — Streamlit **Simulation** page (XGB vs Sim vs Market charts)
+
+Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
 
 ## In review
 
