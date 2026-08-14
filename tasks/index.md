@@ -66,6 +66,10 @@ state source of truth.
 | OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
 | OBS-002 | candidate | OBS-001, PIPE-003, PIPE-005 | result enrichment operator for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
+| APP-006 | backlog | APP-004, APP-005, OBS-002 | user-friendly homepage overview with model/status/result summary cards |
+| APP-007 | backlog | APP-006, OBS-002 | friendlier daily picks board for non-technical users |
+| APP-008 | backlog | APP-007 | best plays of the day chart/ranking |
+| APP-009 | backlog | APP-006 | plain-English about/methodology page |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
