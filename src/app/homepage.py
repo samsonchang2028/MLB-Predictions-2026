@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.board import DEFAULT_EDGE_THRESHOLD
+
 
 DEFAULT_PREDICTIONS_PATH = Path("state/predictions/daily.jsonl")
 DEFAULT_JOURNAL_PATH = Path("state/predictions/journal.jsonl")
@@ -45,6 +47,7 @@ def build_homepage_summary(paths: ArtifactPaths = ArtifactPaths()) -> dict[str, 
     latest_predictions = [
         row for row in predictions if str(row.get("run_date")) == str(latest_run_date)
     ] if latest_run_date is not None else []
+    latest_predictions = _latest_prediction_per_game(latest_predictions)
     latest_journal = _journal_for_predictions(journal, latest_predictions)
     latest_skipped = [
         row for row in skipped if str(row.get("run_date")) == str(latest_run_date)
@@ -80,6 +83,7 @@ def build_homepage_summary(paths: ArtifactPaths = ArtifactPaths()) -> dict[str, 
         "play_losses": losses,
         "play_pending": len(play_rows) - wins - losses,
         "skipped_count": len(latest_skipped),
+        "awaiting_data_count": len(latest_skipped),
         "skipped_reasons": dict(Counter(str(row.get("reason")) for row in latest_skipped)),
         "predictions_last_updated": _max_timestamp(
             row.get("prediction_timestamp") for row in latest_predictions
@@ -144,6 +148,26 @@ def _journal_for_predictions(
     return matches
 
 
+def _latest_prediction_per_game(
+    predictions: Iterable[Mapping[str, Any]],
+) -> list[Mapping[str, Any]]:
+    latest: dict[Any, Mapping[str, Any]] = {}
+    for row in predictions:
+        game_pk = row.get("game_pk")
+        current = latest.get(game_pk)
+        if current is None:
+            latest[game_pk] = row
+            continue
+        row_timestamp = _parse_timestamp(row.get("prediction_timestamp"))
+        current_timestamp = _parse_timestamp(current.get("prediction_timestamp"))
+        if row_timestamp is not None and current_timestamp is not None:
+            if row_timestamp >= current_timestamp:
+                latest[game_pk] = row
+        elif row_timestamp is not None:
+            latest[game_pk] = row
+    return list(latest.values())
+
+
 def _prediction_key(row: Mapping[str, Any]) -> tuple[Any, str | None]:
     timestamp = row.get("prediction_timestamp")
     return (row.get("game_pk"), str(timestamp) if timestamp is not None else None)
@@ -151,7 +175,11 @@ def _prediction_key(row: Mapping[str, Any]) -> tuple[Any, str | None]:
 
 def _is_play(row: Mapping[str, Any]) -> bool:
     edge = row.get("edge")
-    return isinstance(edge, (int, float)) and not isinstance(edge, bool) and abs(edge) >= 0.02
+    return (
+        isinstance(edge, (int, float))
+        and not isinstance(edge, bool)
+        and abs(edge) >= DEFAULT_EDGE_THRESHOLD
+    )
 
 
 def _max_timestamp(values: Iterable[Any]) -> str | None:

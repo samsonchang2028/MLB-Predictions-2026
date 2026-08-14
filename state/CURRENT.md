@@ -238,7 +238,9 @@ to certify cleanly.
   picked-team daily board fields, best-plays display ranking, and plain-English
   About/Methodology page. These are artifact-backed display changes only; they
   do not alter model methodology, prediction generation, market math, or result
-  journal semantics.
+  journal semantics. APP-006 reviewer P1/P2 findings were repaired: the homepage
+  now counts only the latest displayed prediction per game and exposes awaiting
+  starters/odds in the top summary cards.
 
 ## In progress
 

@@ -134,3 +134,17 @@ Record:
 - Test result: 21 passed.
 - Known limitation: no manual Streamlit screenshot smoke was performed in this
   task handoff.
+
+## Reviewer-fix handoff
+
+- Fixed reviewer P1: homepage summary now collapses same-slate re-runs to the
+  latest prediction per `game_pk` before counting plays, no-plays, finished
+  predictions, and freshness timestamps, matching the Daily Predictions board.
+- Fixed reviewer P2: homepage reuses `app.board.DEFAULT_EDGE_THRESHOLD` instead
+  of duplicating `0.02`, and the top cards now expose "Awaiting starters/odds".
+- Added regression coverage proving stale same-game predictions are not counted
+  after a newer prediction exists.
+- Commands run:
+  - `python.exe -m pytest tests\unit\app\test_homepage.py tests\unit\app\test_board.py`
+  - `python.exe -m py_compile src\app\homepage.py streamlit_app.py`
+- Test result: 22 passed.
