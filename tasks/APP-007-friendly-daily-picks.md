@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+candidate (implemented; awaiting independent review/tester)
 
 ## Dependencies
 
@@ -124,3 +124,18 @@ Record:
 - test results,
 - known limitations,
 - whether manual Streamlit smoke was performed.
+
+## Implementation handoff
+
+- Added picked-team display fields to `app.board`: `pick`, `pick_side`,
+  `model_chance`, `market_chance`, `difference`, and `recommendation`.
+- Preserved raw home-team probability fields (`model_probability`,
+  `market_probability`, `edge`) for advanced inspection and backwards
+  compatibility.
+- Updated the Daily Predictions table to lead with `Pick`, `Recommendation`,
+  picked-team `Model Chance`, picked-team `Market Chance`, and `Difference`.
+- Kept the existing synthetic display-threshold caveat explicit and clarified
+  that PASS rows are no-play rows, not wins or losses.
+- Added regression coverage for away-side probability flipping and PASS/no-play
+  display.
+- Manual Streamlit smoke was not performed in this task handoff.

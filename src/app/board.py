@@ -111,8 +111,14 @@ def load_daily_board_with_diagnostics(
         edge = float(record["edge"])
         home_team_id = record.get("home_team_id")
         away_team_id = record.get("away_team_id")
-        model_side_id = home_team_id if edge >= 0 else away_team_id
+        picked_home = edge >= 0
+        model_side_id = home_team_id if picked_home else away_team_id
         model_side = _team_label(model_side_id)
+        model_probability = float(record["model_probability"])
+        market_probability = float(record["market_probability"])
+        model_chance = model_probability if picked_home else 1.0 - model_probability
+        market_chance = market_probability if picked_home else 1.0 - market_probability
+        play = abs(edge) >= edge_threshold
         game_start_pacific = _format_pacific(record.get("game_start_timestamp"))
         prediction_pacific = _format_pacific(record.get("prediction_timestamp"))
         odds_snapshot_pacific = _format_pacific(record["odds_snapshot_timestamp"])
@@ -127,8 +133,14 @@ def load_daily_board_with_diagnostics(
                 "matchup": _matchup(away_team_id, home_team_id),
                 "home_team": _team_label(home_team_id),
                 "away_team": _team_label(away_team_id),
+                "pick": model_side,
+                "pick_side": "home" if picked_home else "away",
+                "model_chance": model_chance,
+                "market_chance": market_chance,
+                "difference": model_chance - market_chance,
+                "recommendation": f"PLAY {model_side}" if play else "PASS",
                 "model_side": model_side,
-                "model_side_detail": f"{model_side} ({'home' if edge >= 0 else 'away'})",
+                "model_side_detail": f"{model_side} ({'home' if picked_home else 'away'})",
                 "model_probability": record["model_probability"],
                 "market_probability": record["market_probability"],
                 "edge": edge,
@@ -138,8 +150,8 @@ def load_daily_board_with_diagnostics(
                 "odds_snapshot_timestamp": record["odds_snapshot_timestamp"],
                 "odds_snapshot_pacific": odds_snapshot_pacific,
                 "model_version": record["model_version"],
-                "play": abs(edge) >= edge_threshold,
-                "action_label": f"PLAY {model_side}" if abs(edge) >= edge_threshold else "PASS",
+                "play": play,
+                "action_label": f"PLAY {model_side}" if play else "PASS",
                 "result_status": _result_status(journal),
                 "result_label": _result_label(journal),
                 "actual_home_win": journal.get("actual_home_win") if journal else None,

@@ -98,8 +98,8 @@ else:
         skipped = board_report["skipped"]
         st.caption(
             "Times are displayed in Pacific time (America/Los_Angeles). "
-            "Model side is the team whose price the model prefers relative to the "
-            "no-vig market probability. PLAY/PASS still uses a synthetic, "
+            "Pick means the side the model prefers relative to the market price. "
+            "PLAY/PASS still uses a synthetic, "
             "display-only edge threshold "
             f"(|edge| >= {DEFAULT_EDGE_THRESHOLD:.0%}); no real staking policy "
             "exists in this codebase yet."
@@ -132,21 +132,25 @@ else:
             st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
             st.caption("Select a row to open its detail page (pitcher/bullpen stats, multi-book odds).")
+            st.caption("This is not a staking policy. PASS rows are no-play rows, not wins or losses.")
             selection = st.dataframe(
                 [
                     {
                         "Slate Date": row["run_date"],
                         "First Pitch (Pacific)": row["game_start_pacific"],
                         "Matchup": row["matchup"],
-                        "Model Side": row["model_side_detail"],
-                        "Action Label": row["action_label"],
+                        "Pick": row["pick"],
+                        "Recommendation": row["recommendation"],
                         "Result": row["result_label"] or row["result_status"],
                         "Pick Result": _pick_result_label(row),
-                        "Model P(home)": round(row["model_probability"], 4),
-                        "Market P(home)": round(row["market_probability"], 4),
-                        "Edge": round(row["edge"], 4),
+                        "Model Chance": round(row["model_chance"], 4),
+                        "Market Chance": round(row["market_chance"], 4),
+                        "Difference": round(row["difference"], 4),
                         "Odds Snapshot (Pacific)": row["odds_snapshot_pacific"],
                         "Prediction Time (Pacific)": row["prediction_timestamp_pacific"],
+                        "Raw P(home)": round(row["model_probability"], 4),
+                        "Raw Market P(home)": round(row["market_probability"], 4),
+                        "Raw Edge": round(row["edge"], 4),
                         "Model Version": row["model_version"],
                     }
                     for row in rows
