@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+candidate (implemented; awaiting independent review/tester)
 
 ## Dependencies
 
@@ -100,3 +100,15 @@ Record:
 - test results,
 - known limitations,
 - whether chart was manually inspected.
+
+## Implementation handoff
+
+- Added `src/app/best_plays.py` to rank artifact-backed APP-007 board rows by
+  absolute displayed model-market difference with deterministic tie-breaking.
+- Added a "Best plays of the day" section to the Daily Predictions page with
+  display-only copy and an all-PASS empty-state message.
+- The section preserves PASS labels; it does not create a staking policy,
+  recompute ROI, or change prediction generation.
+- Added focused unit tests for ranking, row limits, no-data, and all-PASS
+  states.
+- Manual Streamlit chart inspection was not performed in this task handoff.

@@ -36,6 +36,7 @@ from app.board import (
     load_daily_board_with_diagnostics,
     load_starter_pending_games,
 )
+from app.best_plays import build_best_plays_report
 from observability.journal import JsonLinesJournalStore
 from pipelines.daily import JsonLinesPredictionStore
 
@@ -131,6 +132,28 @@ else:
         if not rows:
             st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
+            best_plays = build_best_plays_report(rows)
+            st.subheader("Best plays of the day")
+            st.caption(
+                "Ranked by the displayed model-market difference. This is "
+                "display-only, not a staking system or ROI calculation."
+            )
+            if best_plays["status"] == "all_pass":
+                st.info(
+                    "No rows cleared the current PLAY threshold, so the slate is "
+                    "shown as PASS/no-play under the current display rule."
+                )
+            if best_plays["rows"]:
+                best_play_rows = [
+                    {
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"game_pk", "play"}
+                    }
+                    for row in best_plays["rows"]
+                ]
+                st.dataframe(best_play_rows, use_container_width=True, hide_index=True)
+
             st.caption("Select a row to open its detail page (pitcher/bullpen stats, multi-book odds).")
             st.caption("This is not a staking policy. PASS rows are no-play rows, not wins or losses.")
             selection = st.dataframe(
