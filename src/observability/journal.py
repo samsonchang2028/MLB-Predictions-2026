@@ -123,7 +123,7 @@ def attach_results(
 
         home_result = results_index.get((game_pk, home_id))
         away_result = results_index.get((game_pk, away_id))
-        predicted_home_win = prediction["model_probability"] >= 0.5
+        predicted_home_win = _predicted_home_win_for_pick(prediction)
         record = {
             "game_pk": game_pk,
             "prediction_timestamp": prediction["prediction_timestamp"],
@@ -239,6 +239,22 @@ def _score(row: Mapping[str, Any] | None) -> int | float | None:
     if _is_number(value):
         return value
     return None
+
+
+def _predicted_home_win_for_pick(prediction: Mapping[str, Any]) -> bool:
+    """Return whether the displayed edge-side pick is the home team.
+
+    Daily board picks are not raw ``model_probability >= 0.5`` winner calls.
+    They are market-relative sides: positive edge means home is the displayed
+    side, negative edge means away is the displayed side. Correctness must score
+    that same displayed side; otherwise a home team can have win probability
+    above 50% but still be a bad price versus the market, and the UI would mark
+    the away value pick incorrectly.
+    """
+    edge = prediction.get("edge")
+    if _is_number(edge):
+        return edge >= 0
+    return prediction["model_probability"] >= 0.5
 
 
 def _assert_enrichment_complete(record: Mapping[str, Any]) -> None:

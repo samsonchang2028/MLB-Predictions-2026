@@ -31,8 +31,8 @@ PREDICTION_TS = _dt("2024-04-01T15:00:00")
 ENRICHMENT_TS = _dt("2024-04-02T09:00:00")
 
 
-def _prediction(game_pk: int, *, home_id: int, away_id: int, p_home: float) -> dict:
-    return {
+def _prediction(game_pk: int, *, home_id: int, away_id: int, p_home: float, edge: float | None = None) -> dict:
+    record = {
         "game_pk": game_pk,
         "prediction_timestamp": PREDICTION_TS,
         "model_version": "logistic-2024-04-01",
@@ -41,6 +41,9 @@ def _prediction(game_pk: int, *, home_id: int, away_id: int, p_home: float) -> d
         "home_team_id": home_id,
         "away_team_id": away_id,
     }
+    if edge is not None:
+        record["edge"] = edge
+    return record
 
 
 def _result(game_pk: int, team_id: int, *, is_winner: bool, score: int | None = None) -> dict:
@@ -87,6 +90,31 @@ def test_attaches_final_scores_when_available() -> None:
 
     assert outcome.written[0]["home_score"] == 5
     assert outcome.written[0]["away_score"] == 3
+
+
+def test_correctness_scores_edge_side_not_probability_threshold() -> None:
+    """Regression for 2026-08-13: the displayed pick follows edge sign.
+
+    A team can have P(home) > 0.5 while the market price makes the away side
+    the value pick. Result journaling must score the same side shown in the UI.
+    """
+    predictions = [_prediction(823508, home_id=147, away_id=136, p_home=0.543, edge=-0.06)]
+    results = [
+        _result(823508, 147, is_winner=False, score=0),
+        _result(823508, 136, is_winner=True, score=1),
+    ]
+
+    outcome = attach_results(
+        predictions=predictions,
+        results=results,
+        enrichment_timestamp=ENRICHMENT_TS,
+        store=InMemoryJournalStore(),
+    )
+
+    record = outcome.written[0]
+    assert record["predicted_home_win"] is False
+    assert record["actual_home_win"] is False
+    assert record["correct"] is True
 
 
 def test_incorrect_pick_marked_false() -> None:

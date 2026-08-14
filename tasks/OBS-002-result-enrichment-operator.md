@@ -143,4 +143,6 @@ Record:
 - Added journal score fields (`home_score`, `away_score`) so artifact-backed dashboards can display final scores without mutating `daily.jsonl`.
 - Daily board can optionally join `state/predictions/journal.jsonl` and display pending/final/correctness status.
 - Focused tests added for completed-result loading, separate journal writes, schedule-refresh wiring, score fields, and board join behavior.
-- Focused unit/integration tests and live MLB smoke passed. Status remains candidate until independent review/tester gate passes.
+- Focused unit/integration tests and live MLB smoke passed.
+- Correctness now scores the displayed edge-side pick, not a raw `model_probability >= 0.5` winner call. This fixes the 2026-08-13 mismatch where an away value pick could be marked wrong even when the away team won.
+- Status remains candidate until independent review/tester gate passes.
