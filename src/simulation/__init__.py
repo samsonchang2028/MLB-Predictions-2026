@@ -6,6 +6,13 @@ from simulation.game_level import (
     simulate_game,
     simulate_games,
 )
+from simulation.markets import (
+    TotalsMarketEvaluation,
+    TotalsSimulationResult,
+    evaluate_totals_pregame,
+    simulate_totals,
+    totals_probabilities_from_trials,
+)
 from simulation.score_model import (
     AWAY_RUNS_FEATURES,
     HOME_RUNS_FEATURES,
@@ -19,7 +26,12 @@ __all__ = [
     "GameSimulationResult",
     "ScoreModel",
     "SimulationConfig",
+    "TotalsMarketEvaluation",
+    "TotalsSimulationResult",
+    "evaluate_totals_pregame",
     "fit_score_model",
     "simulate_game",
     "simulate_games",
+    "simulate_totals",
+    "totals_probabilities_from_trials",
 ]
