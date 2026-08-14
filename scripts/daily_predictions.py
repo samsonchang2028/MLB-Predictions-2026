@@ -40,7 +40,11 @@ from features.starter import build_starter_features  # noqa: E402
 from features.team import build_team_features  # noqa: E402
 from ingestion.mlb import backfill_game_details, invalidate_game_detail_payloads  # noqa: E402
 from ingestion.mlb.statsapi_fetchers import make_game_detail_fetcher  # noqa: E402
-from ingestion.odds import OddsDataError, parse_the_odds_api_moneylines  # noqa: E402
+from ingestion.odds import (  # noqa: E402
+    OddsDataError,
+    parse_the_odds_api_moneylines,
+    parse_the_odds_api_totals,
+)
 from market import MarketLabel  # noqa: E402
 from storage import connect_database  # noqa: E402
 from transforms import normalize_silver  # noqa: E402
@@ -49,6 +53,9 @@ from pipelines.daily import JsonLinesPredictionStore, run_daily_predictions  # n
 from pipelines.daily import _serialize_record as _serialize_detail_record  # noqa: E402
 from rerun_repaired_experiment import _build_matrix as _build_training_matrix  # noqa: E402
 from rerun_repaired_experiment import _load_inputs as _load_training_inputs  # noqa: E402
+from simulation.game_level import SimulationConfig, simulate_games  # noqa: E402
+from simulation.markets import totals_probabilities_from_trials  # noqa: E402
+from simulation.score_model import fit_score_model  # noqa: E402
 
 DEFAULT_CERTIFICATION = (
     Path("state")
@@ -60,7 +67,10 @@ DEFAULT_OUTPUT = Path("state") / "predictions" / "daily.jsonl"
 DEFAULT_FEATURES_OUTPUT = Path("state") / "predictions" / "game_features.jsonl"
 DEFAULT_ODDS_BOOKS_OUTPUT = Path("state") / "predictions" / "odds_books.jsonl"
 DEFAULT_SKIPPED_OUTPUT = Path("state") / "predictions" / "skipped.jsonl"
+DEFAULT_SIMULATION_OUTPUT = Path("state") / "predictions" / "simulation.jsonl"
 DEFAULT_MODEL_VERSION = "v1-adr-006-tuned-xgboost-expanding-uncalibrated"
+DEFAULT_SIMULATION_MODEL_VERSION = "sim-game-level-v1"
+DEFAULT_SIMULATION_TRIALS = 10_000
 SKIP_NO_STARTER_ANNOUNCED = "no_starter_announced"
 PENDING_STARTER_MESSAGE = (
     "No starting pitcher has been chosen for this game yet. Check back later."
@@ -123,6 +133,119 @@ def parse_timestamp(value: str | None) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("--prediction-timestamp must include a timezone offset")
     return parsed.astimezone(timezone.utc)
+
+
+def _runs_by_game_pk(team_stats: Sequence[Mapping[str, Any]]) -> dict[Any, tuple[int, int]]:
+    """Map each ``game_pk`` to finalized ``(home_runs, away_runs)`` scores."""
+    by_game: dict[Any, dict[str, int]] = {}
+    for row in team_stats:
+        score = row.get("score")
+        if score is None or isinstance(score, bool) or not isinstance(score, (int, float)):
+            continue
+        side = row.get("side")
+        if side not in ("home", "away"):
+            continue
+        by_game.setdefault(row["game_pk"], {})[side] = int(score)
+    return {
+        game_pk: (sides["home"], sides["away"])
+        for game_pk, sides in by_game.items()
+        if "home" in sides and "away" in sides
+    }
+
+
+def score_training_rows_from_matrix(
+    matrix: Mapping[str, Any],
+    team_stats: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Convert historical Gold rows into score-model training examples."""
+    runs_index = _runs_by_game_pk(team_stats)
+    training_rows: list[dict[str, Any]] = []
+    for row in matrix["rows"]:
+        runs = runs_index.get(row["game_pk"])
+        if runs is None:
+            continue
+        home_runs, away_runs = runs
+        training_rows.append(
+            {
+                "features": row["features"],
+                "home_runs": home_runs,
+                "away_runs": away_runs,
+            }
+        )
+    return training_rows
+
+
+def train_locked_score_model(
+    database: str,
+    certification_path: Path,
+    random_state: int,
+) -> tuple[Any, str, int]:
+    """Fit the full-Gold Poisson score model on repaired 2021-2025 rows only."""
+    inputs = _load_training_inputs(database, certification_path)
+    matrix, _counts = _build_training_matrix(inputs)
+    if matrix["feature_completeness"]["status"] != "PASS":
+        raise RuntimeError("historical Gold completeness is not PASS; refusing to fit score model")
+    training_rows = score_training_rows_from_matrix(matrix, inputs["team_stats"])
+    if not training_rows:
+        raise RuntimeError("score model training matrix has no labeled rows")
+    score_model = fit_score_model(
+        training_rows,
+        feature_columns=matrix["feature_columns"],
+        random_state=random_state,
+    )
+    return score_model, matrix["build_id"], len(training_rows)
+
+
+def build_simulation_records(
+    feature_rows: Sequence[Mapping[str, Any]],
+    *,
+    score_model: Any,
+    run_date: date,
+    build_id: str,
+    n_trials: int = DEFAULT_SIMULATION_TRIALS,
+    random_state: int = 0,
+    model_version: str = DEFAULT_SIMULATION_MODEL_VERSION,
+    totals_lines: Mapping[Any, float] | None = None,
+) -> list[dict[str, Any]]:
+    """Run Monte Carlo trials for today's Gold rows and shape operator artifacts."""
+    config = SimulationConfig(
+        n_trials=n_trials,
+        random_state=random_state,
+        store_trials=True,
+    )
+    results = simulate_games(feature_rows, score_model=score_model, config=config)
+    records: list[dict[str, Any]] = []
+    lines = totals_lines or {}
+    for result in results:
+        if result.home_runs_trials is None or result.away_runs_trials is None:
+            raise RuntimeError("simulation trials were not stored")
+        totals = np.asarray(result.home_runs_trials, dtype=float) + np.asarray(
+            result.away_runs_trials, dtype=float
+        )
+        record: dict[str, Any] = {
+            "run_date": str(run_date),
+            "game_pk": result.game_pk,
+            "p_home_win": result.p_home_win,
+            "home_runs_mean": result.home_runs_mean,
+            "away_runs_mean": result.away_runs_mean,
+            "total_runs_mean": result.total_runs_mean,
+            "total_runs_median": float(np.median(totals)),
+            "n_trials": n_trials,
+            "model_version": model_version,
+            "build_id": build_id,
+        }
+        line = lines.get(result.game_pk)
+        if line is not None:
+            p_over, p_under = totals_probabilities_from_trials(
+                result.home_runs_trials,
+                result.away_runs_trials,
+                line=line,
+            )
+            record["totals_line"] = line
+            record["p_over"] = p_over
+            record["p_under"] = p_under
+        records.append(record)
+    return records
 
 
 def train_locked_model(database: str, certification_path: Path, random_state: int) -> tuple[Any, list[str], str, int]:
@@ -607,6 +730,69 @@ def all_book_snapshots_for_schedule(
     return snapshots, dict(stats)
 
 
+def totals_lines_for_schedule(
+    payload: Any,
+    schedule: Sequence[Mapping[str, Any]],
+    *,
+    bookmaker: str,
+    source: str = "the_odds_api",
+) -> tuple[dict[Any, float], dict[str, int]]:
+    """Map the primary bookmaker's totals line to each ``game_pk`` on the slate."""
+    parsed = parse_the_odds_api_totals(payload, source=source)
+    matchup_index = _schedule_matchup_index(schedule)
+    line_groups: dict[tuple[str, str, datetime, str, str, float], dict[str, Any]] = {}
+    for row in parsed:
+        if row["bookmaker"] != bookmaker:
+            continue
+        key = (
+            row["source_event_id"],
+            row["bookmaker"],
+            row["commence_time"],
+            _normalize_team_name(row["home_team"]),
+            _normalize_team_name(row["away_team"]),
+            row["point"],
+        )
+        group = line_groups.setdefault(
+            key,
+            {
+                "source_event_id": row["source_event_id"],
+                "bookmaker": row["bookmaker"],
+                "commence_time": row["commence_time"],
+                "home_team": row["home_team"],
+                "away_team": row["away_team"],
+                "point": row["point"],
+                "snapshot_timestamp": row["snapshot_timestamp"],
+            },
+        )
+        if row["snapshot_timestamp"] > group["snapshot_timestamp"]:
+            group["snapshot_timestamp"] = row["snapshot_timestamp"]
+
+    event_lines: dict[tuple[str, str, datetime, str, str], list[dict[str, Any]]] = {}
+    for group in line_groups.values():
+        event_key = (
+            group["source_event_id"],
+            group["bookmaker"],
+            group["commence_time"],
+            _normalize_team_name(str(group["home_team"])),
+            _normalize_team_name(str(group["away_team"])),
+        )
+        event_lines.setdefault(event_key, []).append(group)
+
+    lines: dict[Any, float] = {}
+    stats = Counter()
+    for candidates in event_lines.values():
+        chosen = max(candidates, key=lambda group: group["snapshot_timestamp"])
+        game, reason = _match_schedule_game(chosen, matchup_index)
+        if game is None:
+            stats[f"unmatched_events.{reason}"] += 1
+            continue
+        lines[game["game_pk"]] = float(chosen["point"])
+        stats["matched_events"] += 1
+    stats["parsed_totals_rows"] = len(parsed)
+    stats["mapped_games"] = len(lines)
+    return lines, dict(stats)
+
+
 def _schedule_matchup_index(schedule: Sequence[Mapping[str, Any]]) -> dict[tuple[str, str], list[Mapping[str, Any]]]:
     index: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for game in schedule:
@@ -783,6 +969,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Skip MLB game-detail invalidate/backfill before loading starters (offline replay).",
     )
+    parser.add_argument("--simulation-output", default=str(DEFAULT_SIMULATION_OUTPUT))
+    parser.add_argument(
+        "--skip-simulation",
+        action="store_true",
+        help="Skip full-Gold score-model fit and simulation artifact writes.",
+    )
     args = parser.parse_args(argv)
 
     timer = _StepTimer()
@@ -888,6 +1080,21 @@ def _run_operator(args: argparse.Namespace, timer: _StepTimer) -> int:
         print(f"[gold-excluded] {json.dumps(excluded, sort_keys=True)}", flush=True)
     timer.log("gold_build")
 
+    score_model = None
+    if args.skip_simulation:
+        print("[simulation] skipped", flush=True)
+    else:
+        score_model, sim_training_build_id, n_sim_train = train_locked_score_model(
+            args.database,
+            certification_path,
+            args.random_state,
+        )
+        print(
+            f"[simulation] trained_rows={n_sim_train} "
+            f"training_build_id={sim_training_build_id}",
+            flush=True,
+        )
+
     # The canonical fetch is scoped to exactly the configured bookmaker, same
     # as before this task -- unaffected by anything below. The comparison
     # fetch/parse is best-effort: a broader multi-book payload has a larger
@@ -923,6 +1130,46 @@ def _run_operator(args: argparse.Namespace, timer: _StepTimer) -> int:
         except OddsDataError as exc:
             print(f"[odds-books] comparison payload malformed, skipping: {exc}", flush=True)
     timer.log("odds_fetch")
+
+    if score_model is not None:
+        totals_lines: dict[Any, float] = {}
+        if comparison_payload is not None:
+            try:
+                totals_lines, totals_stats = totals_lines_for_schedule(
+                    comparison_payload,
+                    ready_schedule,
+                    bookmaker=args.bookmaker,
+                )
+                print(
+                    f"[simulation] totals {json.dumps(totals_stats, sort_keys=True)}",
+                    flush=True,
+                )
+            except OddsDataError as exc:
+                print(
+                    f"[simulation] totals parse failed, skipping lines: {exc}",
+                    flush=True,
+                )
+        simulation_records = build_simulation_records(
+            today_matrix["rows"],
+            score_model=score_model,
+            run_date=run_date,
+            build_id=today_matrix["build_id"],
+            n_trials=DEFAULT_SIMULATION_TRIALS,
+            random_state=args.random_state,
+            totals_lines=totals_lines,
+        )
+        simulation_written = append_jsonl_records(
+            Path(args.simulation_output),
+            simulation_records,
+            key_fields=("run_date", "game_pk"),
+            on_conflict="overwrite",
+        )
+        print(
+            f"[simulation] games={len(simulation_records)} written={simulation_written} "
+            f"output={args.simulation_output}",
+            flush=True,
+        )
+        timer.log("simulation")
 
     # ADR-002: odds_snapshot < prediction_timestamp < first_pitch. The cutoff must
     # be taken after odds are fetched, not at operator start -- a long model train
