@@ -77,5 +77,6 @@ Use the sidebar for the detailed pages:
 - **Daily Predictions** — current slate picks and results.
 - **Model Performance** — historical development and final holdout evidence.
 - **Game Detail** — per-game feature and odds breakdown.
+- **Simulation** — XGBoost vs Monte Carlo vs market comparison and runs view.
 """
 )
