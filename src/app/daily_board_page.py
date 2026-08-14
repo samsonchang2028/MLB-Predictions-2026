@@ -43,6 +43,17 @@ DEFAULT_STORE_PATH = Path("state/predictions/daily.jsonl")
 DEFAULT_JOURNAL_PATH = Path("state/predictions/journal.jsonl")
 
 
+
+
+def _pick_result_label(row: dict) -> str:
+    if not row.get("play"):
+        return "No Play"
+    if row.get("correct") is True:
+        return "Correct"
+    if row.get("correct") is False:
+        return "Wrong"
+    return "Pending"
+
 def _store_path() -> Path:
     return Path(os.environ.get("PREDICTIONS_STORE_PATH", DEFAULT_STORE_PATH))
 
@@ -130,7 +141,7 @@ else:
                         "Model Side": row["model_side_detail"],
                         "Action Label": row["action_label"],
                         "Result": row["result_label"] or row["result_status"],
-                        "Pick Result": "Correct" if row["correct"] is True else "Wrong" if row["correct"] is False else "Pending",
+                        "Pick Result": _pick_result_label(row),
                         "Model P(home)": round(row["model_probability"], 4),
                         "Market P(home)": round(row["market_probability"], 4),
                         "Edge": round(row["edge"], 4),
