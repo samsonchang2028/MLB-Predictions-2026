@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+candidate
 
 ## Dependencies
 
@@ -117,3 +117,20 @@ Record:
 - test results,
 - known limitations,
 - whether screenshots/manual Streamlit smoke were performed.
+
+## Implementation handoff
+
+- Added `src/app/homepage.py` with artifact-backed summary helpers for the
+  Streamlit landing page.
+- Updated `streamlit_app.py` from a placeholder entrypoint into a user-facing
+  homepage with summary cards, data freshness, model identity, holdout metrics,
+  missing-artifact guidance, and artifact-source details.
+- Added `tests/unit/app/test_homepage.py` covering latest-slate aggregation,
+  PASS/no-play exclusion from play win/loss counts, freshness timestamps,
+  holdout metric loading, and missing artifact behavior.
+- Commands run:
+  - `python.exe -m pytest tests\unit\app\test_homepage.py tests\unit\app\test_board.py`
+  - `python.exe -m py_compile src\app\homepage.py streamlit_app.py`
+- Test result: 21 passed.
+- Known limitation: no manual Streamlit screenshot smoke was performed in this
+  task handoff.
