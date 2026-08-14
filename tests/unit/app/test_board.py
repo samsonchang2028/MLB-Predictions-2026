@@ -75,14 +75,26 @@ def test_model_side_points_to_home_for_positive_edge_and_away_for_negative_edge(
     by_pk = {row["game_pk"]: row for row in rows}
     assert by_pk[1]["model_side_detail"] == "LAD (home)"
     assert by_pk[1]["action_label"] == "PLAY LAD"
+    assert by_pk[1]["pick"] == "LAD"
+    assert by_pk[1]["pick_side"] == "home"
+    assert by_pk[1]["model_chance"] == positive["model_probability"]
+    assert by_pk[1]["market_chance"] == positive["market_probability"]
+    assert round(by_pk[1]["difference"], 6) == round(positive["edge"], 6)
     assert by_pk[2]["model_side_detail"] == "KC (away)"
     assert by_pk[2]["action_label"] == "PLAY KC"
+    assert by_pk[2]["pick"] == "KC"
+    assert by_pk[2]["pick_side"] == "away"
+    assert by_pk[2]["model_chance"] == 1.0 - negative["model_probability"]
+    assert by_pk[2]["market_chance"] == 1.0 - negative["market_probability"]
+    assert round(by_pk[2]["difference"], 6) == round(abs(negative["edge"]), 6)
 
 
 def test_action_label_pass_when_edge_below_display_threshold():
     [row] = load_daily_board(_FakeStore([_record(1, home_id=119, away_id=118, edge=0.001)]))
     assert row["model_side_detail"] == "LAD (home)"
     assert row["action_label"] == "PASS"
+    assert row["recommendation"] == "PASS"
+    assert row["play"] is False
 
 
 def test_timestamps_display_in_pacific_time_not_raw_utc_date():

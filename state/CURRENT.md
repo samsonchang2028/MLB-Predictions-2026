@@ -233,6 +233,15 @@ to certify cleanly.
   reviewed only, at the requesting orchestrator's direction); flag for a real
   review pass if one becomes available. Full suite: 632 passed.
 
+- APP-006/007/008/009 - user-friendly Streamlit dashboard pass completed as
+  candidate implementations and merged to main: homepage overview, friendly
+  picked-team daily board fields, best-plays display ranking, and plain-English
+  About/Methodology page. These are artifact-backed display changes only; they
+  do not alter model methodology, prediction generation, market math, or result
+  journal semantics. APP-006 reviewer P1/P2 findings were repaired: the homepage
+  now counts only the latest displayed prediction per game and exposes awaiting
+  starters/odds in the top summary cards.
+
 ## In progress
 
 - None.
@@ -481,7 +490,9 @@ Streamlit dashboard.
 
 None required for V1. Optional follow-ups currently in flight or queued:
 DATA-021 targeted retry of the 39 DATA-018 games, OPS-001
-scheduled daily operator/GitHub Actions, OBS-002 result enrichment, MARKET-002 persisted market-relative reporting.
+scheduled daily operator/GitHub Actions, OBS-002 result enrichment, MARKET-002
+persisted market-relative reporting, and independent review/test gates for
+APP-006/007/008/009 if required before marking those UI tasks done.
 
 ## Deferred follow-ups
 
