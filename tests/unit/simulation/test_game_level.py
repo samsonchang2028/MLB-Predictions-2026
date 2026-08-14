@@ -29,9 +29,6 @@ def _base_features(**overrides: float) -> dict[str, float]:
         "home_team_runs_allowed_avg_L7": 4.0,
         "away_team_runs_allowed_avg_before": 4.3,
         "away_team_runs_allowed_avg_L7": 4.1,
-        # Post-game score columns must never influence simulation inputs.
-        "home_final_score": 7.0,
-        "away_final_score": 2.0,
     }
     features.update(overrides)
     return features
@@ -110,6 +107,7 @@ def test_tie_counts_as_half_home_win(score_model: ScoreModel):
     model = ScoreModel(
         home_model=score_model.home_model,
         away_model=score_model.away_model,
+        feature_names=score_model.feature_names,
     )
     home = np.array([3, 3, 3, 4, 2], dtype=int)
     away = np.array([3, 3, 3, 1, 5], dtype=int)
@@ -144,7 +142,8 @@ def test_missing_features_raises_clearly(score_model: ScoreModel):
 
 def test_post_game_scores_do_not_change_simulation(score_model: ScoreModel):
     base = _base_features()
-    mutated = _base_features(home_final_score=99.0, away_final_score=0.0)
+    # Extra post-game keys not in the fitted union must not affect simulation.
+    mutated = {**base, "home_final_score": 99.0, "away_final_score": 0.0}
     config = SimulationConfig(n_trials=1_000, random_state=11)
     assert simulate_game(base, score_model=score_model, config=config) == simulate_game(
         mutated, score_model=score_model, config=config

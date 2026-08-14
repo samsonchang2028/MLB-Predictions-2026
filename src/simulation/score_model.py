@@ -1,32 +1,23 @@
-"""Fit and sample expected team runs from pregame Gold features (SIM-000).
+"""Fit and sample expected team runs from pregame Gold features (SIM-000 / SIM-003).
 
 Assumptions
 -----------
 * Final scores are modeled as independent Poisson draws per team per trial.
-* Each side uses a separate ``PoissonRegressor`` on a small, documented subset of
-  pregame run-rate features (offense for the scoring team + opponent run
-  prevention). Missing feature values are mean-imputed using training-partition
-  statistics only.
+* Each side uses a separate ``PoissonRegressor`` on the **full sorted union** of
+  Gold feature keys observed in the training partition (same contract as
+  :func:`evaluation.runner.vectorize_matrix`). Missing values are mean-imputed
+  using training-partition statistics only.
 * Training rows must supply realized ``home_runs`` / ``away_runs`` labels that
   are **not** present in the ``features`` mapping (Gold target isolation).
 * Fitting is chronological-safe when callers pass only pregame feature rows
   from completed games; this module does not join scores into ``features``.
 
-Feature columns used
---------------------
-Home runs model (predict home team scoring):
-
-* ``home_team_runs_scored_avg_before``
-* ``home_team_runs_scored_avg_L7``
-* ``away_team_runs_allowed_avg_before``
-* ``away_team_runs_allowed_avg_L7``
-
-Away runs model (predict away team scoring):
-
-* ``away_team_runs_scored_avg_before``
-* ``away_team_runs_scored_avg_L7``
-* ``home_team_runs_allowed_avg_before``
-* ``home_team_runs_allowed_avg_L7``
+Feature columns
+---------------
+SIM-000's fixed 8-column run-rate subsets (``HOME_RUNS_FEATURES`` /
+``AWAY_RUNS_FEATURES``) are retained for documentation only; production fitting
+derives the column list dynamically from Gold rows via
+:func:`evaluation.runner._feature_columns`.
 """
 
 from __future__ import annotations
@@ -40,6 +31,9 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import PoissonRegressor
 from sklearn.pipeline import Pipeline
 
+from evaluation.runner import _as_float, _feature_columns
+
+# SIM-000 legacy subsets — superseded by dynamic Gold union (SIM-003).
 HOME_RUNS_FEATURES: tuple[str, ...] = (
     "home_team_runs_scored_avg_before",
     "home_team_runs_scored_avg_L7",
@@ -63,15 +57,13 @@ class ScoreModel:
 
     home_model: Pipeline
     away_model: Pipeline
-    home_feature_names: tuple[str, ...] = HOME_RUNS_FEATURES
-    away_feature_names: tuple[str, ...] = AWAY_RUNS_FEATURES
+    feature_names: tuple[str, ...]
 
     def expected_rates(self, features: Mapping[str, float]) -> tuple[float, float]:
         """Return ``(lambda_home, lambda_away)`` expected runs for one game."""
-        home_x = _vectorize(features, self.home_feature_names)
-        away_x = _vectorize(features, self.away_feature_names)
-        lambda_home = float(self.home_model.predict(home_x)[0])
-        lambda_away = float(self.away_model.predict(away_x)[0])
+        x = _vectorize(features, self.feature_names)
+        lambda_home = float(self.home_model.predict(x)[0])
+        lambda_away = float(self.away_model.predict(x)[0])
         return max(lambda_home, _MIN_RATE), max(lambda_away, _MIN_RATE)
 
     def sample_runs(
@@ -93,6 +85,7 @@ class ScoreModel:
 def fit_score_model(
     training_rows: Sequence[Mapping[str, Any]],
     *,
+    feature_columns: Sequence[str] | None = None,
     random_state: int = 0,
 ) -> ScoreModel:
     """Fit home/away Poisson regressors from historical Gold rows + scores.
@@ -102,24 +95,29 @@ def fit_score_model(
     * ``features`` — pregame Gold feature mapping (no score columns).
     * ``home_runs`` / ``away_runs`` — nonnegative integer final scores.
 
-    Rows missing any required feature name raise ``ValueError`` at fit time so
-    callers fail loudly instead of silently dropping signal.
+    When ``feature_columns`` is omitted, the sorted union of feature keys across
+    ``training_rows`` is derived the same way as
+    :func:`evaluation.runner.vectorize_matrix` (via ``_feature_columns``).
     """
     if not training_rows:
         raise ValueError("training_rows must be non-empty")
 
-    home_x = np.vstack(
-        [_vectorize(row["features"], HOME_RUNS_FEATURES)[0] for row in training_rows]
+    columns = (
+        list(feature_columns)
+        if feature_columns is not None
+        else _feature_columns(training_rows)
     )
-    away_x = np.vstack(
-        [_vectorize(row["features"], AWAY_RUNS_FEATURES)[0] for row in training_rows]
-    )
+    if not columns:
+        raise ValueError("training_rows have no feature keys")
+
+    x = _training_feature_matrix(training_rows, columns)
     home_y = np.asarray([_runs_label(row, "home_runs") for row in training_rows])
     away_y = np.asarray([_runs_label(row, "away_runs") for row in training_rows])
 
     return ScoreModel(
-        home_model=_build_poisson_pipeline(random_state).fit(home_x, home_y),
-        away_model=_build_poisson_pipeline(random_state).fit(away_x, away_y),
+        home_model=_build_poisson_pipeline(random_state).fit(x, home_y),
+        away_model=_build_poisson_pipeline(random_state).fit(x, away_y),
+        feature_names=tuple(columns),
     )
 
 
@@ -132,6 +130,22 @@ def _build_poisson_pipeline(random_state: int) -> Pipeline:  # noqa: ARG001
             ("regressor", PoissonRegressor(alpha=1.0, max_iter=300)),
         ]
     )
+
+
+def _training_feature_matrix(
+    training_rows: Sequence[Mapping[str, Any]],
+    feature_columns: Sequence[str],
+) -> np.ndarray:
+    """Build ``X`` for score-model fitting (missing / non-numeric -> ``NaN``)."""
+    col_index = {col: j for j, col in enumerate(feature_columns)}
+    x = np.full((len(training_rows), len(feature_columns)), np.nan, dtype=float)
+    for i, row in enumerate(training_rows):
+        features = row.get("features", {}) or {}
+        for col, j in col_index.items():
+            numeric = _as_float(features.get(col))
+            if numeric is not None:
+                x[i, j] = numeric
+    return x
 
 
 def _vectorize(features: Mapping[str, float], names: Sequence[str]) -> np.ndarray:
