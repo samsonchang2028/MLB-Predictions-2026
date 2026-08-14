@@ -22,6 +22,15 @@ summary = build_homepage_summary(ArtifactPaths())
 st.title("MLB Moneyline Predictor")
 st.caption("Daily MLB moneyline model dashboard · artifact-backed V1")
 
+st.markdown(
+    """
+This dashboard shows the model's current MLB moneyline predictions, whether
+finished picks won or lost, and the model's locked V1 performance context. It
+does **not** place bets, guarantee outcomes, or update the model from today's
+results.
+"""
+)
+
 if summary["missing_artifacts"]:
     st.info(
         "Some prediction artifacts are not available yet. Run the local daily "
@@ -40,15 +49,31 @@ with hero_col:
         st.metric(
             "Play win rate",
             f"{win_rate_pct}%",
-            help="Finished plays only; PASS picks are excluded.",
+            help=(
+                "Displayed play results from the prediction journal over the last "
+                "seven slates. Finished plays only; PASS picks are excluded. "
+                "This is not model training or holdout evaluation evidence."
+            ),
         )
         st.caption(
             f"{performance['wins']} wins · {performance['losses']} losses · "
-            f"{performance['pending']} pending"
+            f"{performance['pending']} pending · displayed play results, not "
+            "training/holdout evidence"
         )
     else:
-        st.metric("Play win rate", "—")
-        st.caption("No finished plays in the last seven slates yet.")
+        st.metric(
+            "Play win rate",
+            "—",
+            help=(
+                "Displayed play results from the prediction journal over the last "
+                "seven slates. This is not model training or holdout evaluation "
+                "evidence."
+            ),
+        )
+        st.caption(
+            "No finished plays in the last seven slates yet · displayed play "
+            "results, not training/holdout evidence"
+        )
 
 with trend_col:
     daily_rows = performance["daily"]

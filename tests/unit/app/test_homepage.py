@@ -188,6 +188,10 @@ def test_homepage_summary_counts_only_latest_prediction_per_game(tmp_path: Path)
     assert summary["no_play_count"] == 1
     assert summary["finished_predictions_count"] == 0
     assert summary["predictions_last_updated"] == "2026-08-13T17:00:00+00:00"
+    assert summary["play_performance_7d"]["wins"] == 0
+    assert summary["play_performance_7d"]["losses"] == 0
+    assert summary["play_performance_7d"]["finished"] == 0
+    assert summary["play_performance_7d"]["win_rate"] is None
 
 
 def test_homepage_play_performance_7d_aggregates_last_seven_slates(tmp_path: Path) -> None:
