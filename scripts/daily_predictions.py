@@ -971,9 +971,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--simulation-output", default=str(DEFAULT_SIMULATION_OUTPUT))
     parser.add_argument(
-        "--skip-simulation",
+        "--enable-simulation",
         action="store_true",
-        help="Skip full-Gold score-model fit and simulation artifact writes.",
+        help="Opt in to full-Gold score-model fit and simulation.jsonl writes (off by default).",
     )
     args = parser.parse_args(argv)
 
@@ -1081,8 +1081,8 @@ def _run_operator(args: argparse.Namespace, timer: _StepTimer) -> int:
     timer.log("gold_build")
 
     score_model = None
-    if args.skip_simulation:
-        print("[simulation] skipped", flush=True)
+    if not args.enable_simulation:
+        print("[simulation] skipped (Monte Carlo disabled by default)", flush=True)
     else:
         score_model, sim_training_build_id, n_sim_train = train_locked_score_model(
             args.database,

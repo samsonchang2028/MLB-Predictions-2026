@@ -823,7 +823,6 @@ def test_main_sets_prediction_timestamp_after_odds_fetch(monkeypatch, tmp_path):
     assert dp.main(
         [
             "--skip-detail-refresh",
-            "--skip-simulation",
             "--database",
             str(tmp_path / "mlb.duckdb"),
             "--date",
@@ -973,7 +972,7 @@ def test_totals_lines_for_schedule_maps_primary_bookmaker_line_to_game_pk():
     assert fanduel_lines[823672] == 9.0
 
 
-def test_main_skip_simulation_bypasses_score_model_fit(monkeypatch, tmp_path, capsys):
+def test_main_skips_simulation_by_default(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
     monkeypatch.setattr(
         dp,
@@ -984,7 +983,7 @@ def test_main_skip_simulation_bypasses_score_model_fit(monkeypatch, tmp_path, ca
 
     def fail_fit(*args, **kwargs):
         fit_calls.append((args, kwargs))
-        raise AssertionError("score model fit should not run when --skip-simulation")
+        raise AssertionError("score model fit should not run unless --enable-simulation")
 
     monkeypatch.setattr(dp, "train_locked_score_model", fail_fit)
     monkeypatch.setattr(
@@ -1070,7 +1069,6 @@ def test_main_skip_simulation_bypasses_score_model_fit(monkeypatch, tmp_path, ca
     assert main(
         [
             "--skip-detail-refresh",
-            "--skip-simulation",
             "--database",
             str(tmp_path / "mlb.duckdb"),
             "--date",
@@ -1206,6 +1204,7 @@ def test_main_writes_simulation_jsonl_with_mocked_score_model(monkeypatch, tmp_p
         dp.main(
             [
                 "--skip-detail-refresh",
+                "--enable-simulation",
                 "--database",
                 str(tmp_path / "mlb.duckdb"),
                 "--date",

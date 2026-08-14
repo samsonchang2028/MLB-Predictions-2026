@@ -233,6 +233,34 @@ def main() -> None:
     fig.savefig(OUT / "roc_auc_leaderboard.png", dpi=160)
     plt.close(fig)
 
+    # 5) Monte Carlo smoke — sim E[total] vs actual (2026-08-13 slate, 8 games)
+    matchups = [
+        "BOS@TOR",
+        "SEA@NYY",
+        "PHI@MIN",
+        "PIT@MIA",
+        "MIL@LAD",
+        "TEX@LAA",
+        "CLE@DET",
+        "CIN@CWS",
+    ]
+    sim_totals = [8.24, 9.21, 8.88, 8.72, 9.10, 8.73, 8.90, 8.82]
+    actual_totals = [7, 1, 8, 14, 9, 7, 3, 17]
+    x = np.arange(len(matchups))
+    width = 0.36
+    fig, ax = plt.subplots(figsize=(11, 5.2))
+    ax.bar(x - width / 2, sim_totals, width, label="Sim E[total]", color="#5b7c99")
+    ax.bar(x + width / 2, actual_totals, width, label="Actual total", color="#c45c3e")
+    ax.set_xticks(x)
+    ax.set_xticklabels(matchups, rotation=35, ha="right")
+    ax.set_ylabel("Runs")
+    ax.set_ylim(0, 18)
+    ax.set_title("Monte Carlo smoke (2026-08-13) — compressed sim totals vs reality")
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(OUT / "monte_carlo_smoke_totals.png", dpi=160)
+    plt.close(fig)
+
     for path in sorted(OUT.glob("*.png")):
         print(f"wrote {path.relative_to(ROOT)} ({path.stat().st_size} bytes)")
 

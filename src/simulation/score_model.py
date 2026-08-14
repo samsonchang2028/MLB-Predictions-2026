@@ -157,10 +157,11 @@ def _vectorize(features: Mapping[str, float], names: Sequence[str]) -> np.ndarra
         value = features[name]
         if value is None or (isinstance(value, float) and np.isnan(value)):
             values.append(np.nan)
-        elif isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        numeric = _as_float(value)
+        if numeric is None:
             raise ValueError(f"feature {name!r} must be numeric, got {value!r}")
-        else:
-            values.append(float(value))
+        values.append(numeric)
     return np.asarray([values], dtype=float)
 
 

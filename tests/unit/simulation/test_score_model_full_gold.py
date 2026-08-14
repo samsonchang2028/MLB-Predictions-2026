@@ -96,3 +96,21 @@ def test_explicit_feature_columns_override():
     subset = sorted(rows[0]["features"])[:10]
     model = fit_score_model(rows, feature_columns=subset, random_state=0)
     assert model.feature_names == tuple(subset)
+
+
+def test_inference_coerces_boolean_gold_flags_like_training():
+    rows = _gold_training_rows()
+    for row in rows:
+        row["features"]["away_starter_starter_is_probable"] = True
+        row["features"]["home_starter_starter_known"] = False
+    model = fit_score_model(rows, random_state=0)
+
+    features = {
+        **rows[0]["features"],
+        "away_starter_starter_is_probable": True,
+        "home_starter_starter_known": False,
+    }
+    lambda_home, lambda_away = model.expected_rates(features)
+
+    assert lambda_home >= 0.05
+    assert lambda_away >= 0.05
