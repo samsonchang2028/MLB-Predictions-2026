@@ -26,6 +26,7 @@ from market import (
     expected_value,
     no_vig_two_way,
     opening_market_benchmark_from_archive,
+    probability_to_american,
     snapshot_is_pregame_valid,
 )
 
@@ -94,6 +95,66 @@ def test_invalid_american_rejected(bad):
 def test_decimal_to_implied_probability_rejects_non_positive_payout(bad):
     with pytest.raises(ValueError):
         decimal_to_implied_probability(bad)
+
+
+# --------------------------------------------------------------------------- #
+# Probability -> American odds (MARKET-003, inverse of american_to_implied_probability)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "probability, expected_american",
+    [
+        (110.0 / 210.0, -110),  # hand-verified: implied of -110
+        (100.0 / 210.0, 110),  # hand-verified: implied of +110
+        (200.0 / 300.0, -200),  # hand-verified: implied of -200
+        (100.0 / 250.0, 150),  # hand-verified: implied of +150
+        (0.5, -100),  # boundary: favorite-side convention (see docstring)
+    ],
+)
+def test_probability_to_american_known_values(probability, expected_american):
+    assert probability_to_american(probability) == expected_american
+
+
+def test_probability_to_american_is_integer():
+    assert isinstance(probability_to_american(0.3), int)
+
+
+@pytest.mark.parametrize(
+    "american",
+    [-110, 110, -200, 150, -100],  # -100 covered separately (boundary asymmetry)
+)
+def test_probability_to_american_roundtrips_implied_probability(american):
+    probability = american_to_implied_probability(american)
+    assert probability_to_american(probability) == american
+
+
+def test_probability_to_american_roundtrip_at_plus_100_boundary():
+    # +100 and -100 both imply exactly 0.5; probability_to_american(0.5) picks
+    # the favorite-side convention (-100), so +100 round-trips to the nearest
+    # valid equal-magnitude price rather than itself.
+    probability = american_to_implied_probability(100)
+    assert probability_to_american(probability) == -100
+
+
+@pytest.mark.parametrize("probability", [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99])
+def test_probability_to_american_roundtrip_property_across_range(probability):
+    american = probability_to_american(probability)
+    recovered = american_to_implied_probability(american)
+    # Integer rounding of the American price means recovery is approximate,
+    # not exact, except where the theoretical price is already an integer.
+    assert recovered == pytest.approx(probability, abs=5e-3)
+
+
+@pytest.mark.parametrize("bad", [0, 0.0, 1, 1.0, -0.1, 1.1, None, "0.5", True, False])
+def test_probability_to_american_rejects_invalid_probability(bad):
+    with pytest.raises(ValueError):
+        probability_to_american(bad)
+
+
+def test_probability_to_american_result_never_below_american_floor():
+    # Minimum magnitude occurs at the 0.5 boundary and equals exactly 100,
+    # which is valid (_validate_american rejects only magnitude < 100).
+    for probability in (0.001, 0.2, 0.5, 0.8, 0.999):
+        assert abs(probability_to_american(probability)) >= 100
 
 
 # --------------------------------------------------------------------------- #
