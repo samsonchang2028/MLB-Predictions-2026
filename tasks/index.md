@@ -78,9 +78,9 @@ state source of truth.
 | APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
 | PIPE-005 | done | PIPE-003, DATA-018 | refresh today's MLB game-detail payloads before daily predictions (probable starters) |
 | DATA-022 | done | DATA-001 | Kalshi MLB market data ingestion (Bronze, public API, no auth) — merged, Reviewer APPROVE + Tester PASS, 1 non-blocking P2 xfail-pinned (>4-decimal price rounding) |
-| DATA-023 | ready | DATA-022, DATA-002 | Kalshi event -> game_pk matching (mirrors sportsbook matching, own logic) |
+| DATA-023 | done | DATA-022, DATA-002 | Kalshi event -> game_pk matching — merged; Reviewer P1 (silent wrong-match on same-city club collisions) fixed + re-reviewed APPROVE, Tester PASS |
 | MARKET-003 | done | MARKET-001 | probability<->American-odds helper so Kalshi reuses the existing odds_books.jsonl schema — merged, Reviewer APPROVE + Tester PASS, 1 non-blocking P2 xfail-pinned (OverflowError below ~5.5e-307) |
-| PIPE-006 | blocked | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp; unblocks once DATA-023 merges |
+| PIPE-006 | ready | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp; needs a Bronze schema addition or fetch-time matching since DATA-022 doesn't persist occurrence_datetime/title/no_sub_title (flagged by DATA-023's Implementer) |
 | APP-012 | blocked | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table (renamed from APP-010 to avoid collision with the merged V2 simulation-dashboard APP-010) |
 | ML-012 | ready | ML-009, FEAT-006 | feature-family ablation study (KEEP/INVESTIGATE/REMOVE per family, top-3 next-experiment recommendations); does not change production model selection |
 

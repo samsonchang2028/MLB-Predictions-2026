@@ -265,10 +265,34 @@ to certify cleanly.
   probabilities below ~5.5e-307 — unreachable, Kalshi prices are
   cent-precision (>= 0.01).
 
-Unblocked next: **DATA-023** (Kalshi event → `game_pk` matching). Still
-blocked: **PIPE-006** (needs DATA-023 too), **APP-012** (renamed from
-APP-010 to avoid colliding with the merged V2 simulation-dashboard APP-010;
-needs PIPE-006).
+- **DATA-023** — Kalshi event → `game_pk` matching
+  (`src/ingestion/kalshi/matching.py`), mirroring
+  `scripts/daily_predictions.py`'s sportsbook matcher pattern (explicit
+  MATCHED/UNMATCHED/AMBIGUOUS, doubleheader time tolerance) without reusing
+  it directly, since Kalshi's city-name + `occurrence_datetime` input shape
+  differs. Reviewer initially CHANGES REQUIRED: found a real P1 — word-subset
+  city matching (e.g. "Chicago" matches both Cubs and White Sox) could
+  silently return a confidently WRONG `game_pk` when candidates spanned two
+  distinct same-city team pairs and weren't exactly time-tied, plus a P2
+  (`mapped_games` double-counted real games since Kalshi issues two markets —
+  yes/no sides — per game). Fixed: candidates are now grouped by distinct
+  team pair before nearest-time tie-breaking, so team-identity ambiguity
+  always surfaces as `AMBIGUOUS` rather than being silently arbitrated by
+  timestamp proximity; `mapped_games` now dedupes by `game_pk`. Re-review:
+  APPROVE (independently re-derived the exploit, confirmed closed without
+  breaking doubleheader disambiguation). Tester: PASS. Full suite post-merge:
+  841 passed, 5 xfailed.
+- **Known gap for PIPE-006**: `bronze.kalshi_market_snapshots` (DATA-022)
+  does not persist `occurrence_datetime`, `title`, or `no_sub_title` — only
+  `side` (= `yes_sub_title`). DATA-023's matcher is written against the raw
+  Kalshi market-object shape, not the Bronze row shape, since Bronze alone
+  is insufficient to match. PIPE-006 needs either a Bronze schema addition
+  or to match at fetch time before persisting.
+
+Unblocked next: **PIPE-006** (all three deps — DATA-022, DATA-023,
+MARKET-003 — merged; see the schema gap above). Still blocked: **APP-012**
+(renamed from APP-010 to avoid colliding with the merged V2
+simulation-dashboard APP-010; needs PIPE-006).
 
 ## In progress (V2 simulation)
 
