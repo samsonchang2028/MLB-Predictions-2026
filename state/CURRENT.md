@@ -244,12 +244,18 @@ to certify cleanly.
 
 ## In progress
 
-- **V2 simulation wave 1 (dispatched):**
-  - `SIM-000` — game-level team score Monte Carlo (`agent/SIM-000-game-level-simulation`)
-  - `DATA-024` — totals odds ingestion (`agent/DATA-024-totals-odds-ingestion`)
-- **V2 simulation wave 2 (blocked on SIM-000):**
-  - `SIM-001` — sim vs XGBoost moneyline validation
-  - `SIM-002` — totals / runs-per-game from simulation
+- None (V2 simulation stack merged to `main` — run operator + Streamlit to populate artifacts).
+
+## Recently shipped (V2 simulation)
+
+- **SIM-000** — game-level Monte Carlo engine
+- **DATA-024** — totals odds bronze ingestion
+- **SIM-003** — full Gold (~240 col) Poisson score model
+- **SIM-002** — totals `p_over` / `p_under` from trials
+- **PIPE-007** — daily operator writes `simulation.jsonl`
+- **APP-010** — Streamlit **Simulation** page (XGB vs Sim vs Market charts)
+
+Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
 
 ## In review
 

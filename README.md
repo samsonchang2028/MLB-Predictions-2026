@@ -14,7 +14,7 @@ It is built for trustworthy evaluation first: certified historical data, point-i
 | **Model lab** | Trains logistic regression, random forest, and XGBoost under expanding / rolling windows |
 | **Locked V1 model** | Tuned shallow XGBoost, expanding window, uncalibrated probs (ADR-006) |
 | **Daily operator** | Refreshes today's starters, trains on 2021–2025 only, fetches live odds, writes predictions |
-| **Streamlit app** | Daily board, model performance, and per-game detail |
+| **Streamlit app** | Chart-first homepage, daily board, model performance, and per-game detail |
 
 **Target:** binary home-team win probability.  
 **Primary metrics:** log loss → Brier score → calibration (ECE).  
@@ -92,6 +92,8 @@ Training windows compared:
 4. Fetch live moneylines (The Odds API).
 5. Set `prediction_timestamp` **after** odds fetch (so fresh odds are not treated as “from the future”).
 6. Append immutable prediction rows to `state/predictions/daily.jsonl` with model prob, no-vig market prob, and edge.
+
+**Monte Carlo simulation is off by default.** The Poisson score-model path (`src/simulation/`) remains in the repo for research, but the daily operator does not fit it or write `simulation.jsonl` unless you pass `--enable-simulation`. See [Monte Carlo (paused)](#monte-carlo-simulation-paused).
 
 Skipped games get an explicit reason (`prediction_not_before_first_pitch`, missing starters, odds timing, etc.).
 
@@ -245,6 +247,8 @@ src/
   validation/    Certification & leakage checks
 scripts/
   daily_predictions.py          Live daily operator
+  enrich_prediction_results.py  Post-game journal enrichment (wins/losses on board)
+  smoke_sim_yesterday.py        Offline Monte Carlo smoke on a past slate (research)
   holdout_2026.py               One-shot holdout evaluation
   generate_readme_charts.py     Rebuild docs/images/*.png from experiment JSON
 state/
@@ -268,7 +272,7 @@ Local DuckDB lives at `data/mlb.duckdb` (gitignored, ~1GB). Copy it between mach
 ### Requirements
 
 - Python 3.11+ recommended  
-- Dependencies: `pip install -r requirements.txt` (or project `pyproject.toml`)  
+- Dependencies: `pip install -r requirements.txt` (editable install includes the `app` extra for Streamlit)  
 - `THE_ODDS_API_KEY` for live odds  
 - A local certified DuckDB build under `data/`
 
@@ -280,7 +284,7 @@ Create `.env` in the repo root (gitignored):
 THE_ODDS_API_KEY=paste_your_key_here
 ```
 
-PowerShell:
+PowerShell (load `.env` into the current session):
 
 ```powershell
 Get-Content .env | ForEach-Object {
@@ -290,38 +294,88 @@ Get-Content .env | ForEach-Object {
 }
 ```
 
-### Run today's predictions
+Activate the project venv if you use one:
 
 ```powershell
-python.exe scripts\daily_predictions.py --date 2026-08-13
+.\.venv\Scripts\Activate.ps1
 ```
 
-If Silver starters were already refreshed earlier today:
+### Day-to-day commands
+
+**1. Run today's predictions** (XGBoost moneyline + market edge; Monte Carlo skipped):
 
 ```powershell
-python.exe scripts\daily_predictions.py --date 2026-08-13 --skip-detail-refresh
+python scripts\daily_predictions.py --date 2026-08-14
 ```
 
-Outputs:
+Skip MLB game-detail refresh when starters were already updated earlier today:
+
+```powershell
+python scripts\daily_predictions.py --date 2026-08-14 --skip-detail-refresh
+```
+
+**2. After games finish — enrich results** (powers win/loss on the board and homepage):
+
+```powershell
+python scripts\enrich_prediction_results.py --date 2026-08-14
+```
+
+**3. Open the dashboard:**
+
+```powershell
+python -m streamlit run streamlit_app.py
+```
+
+Sidebar pages:
+
+- **Home** — 7-day play win rate, today's slate charts, minimal holdout context  
+- **Daily Predictions** — full slate, PLAY/PASS, best plays  
+- **Model Performance** — development vs 2026 holdout evidence  
+- **Game Detail** — per-game features and multi-book odds  
+- **About** — plain-English methodology  
+
+**4. Rebuild README charts** (optional, after experiment JSON changes):
+
+```powershell
+python scripts\generate_readme_charts.py
+```
+
+### Operator outputs
 
 | File | Contents |
 |------|----------|
-| `state/predictions/daily.jsonl` | Append-only predictions (latest row per `game_pk` shown on the board) |
+| `state/predictions/daily.jsonl` | Append-only predictions (latest row per `game_pk` on the board) |
 | `state/predictions/game_features.jsonl` | Feature snapshot per game |
 | `state/predictions/odds_books.jsonl` | Multi-book comparison odds |
 | `state/predictions/skipped.jsonl` | Games waiting on starters / other skips |
+| `state/predictions/journal.jsonl` | Post-game enrichment (correct / actual winner) |
 
-### Streamlit
+`simulation.jsonl` is **not** written unless you opt in with `--enable-simulation`.
+
+### Monte Carlo simulation (paused)
+
+V2 added a game-level Monte Carlo layer: fit Poisson run-rate models on Gold features, sample home/away runs, derive win and total-run distributions. After smoke-testing the **2026-08-13** slate, we **disabled it in the default daily operator**:
+
+- Sim expected totals clustered around **8–9 runs** for almost every game.
+- Blowouts and low-scoring games were missed badly (e.g. SEA@NYY actual **1** run; CIN@CWS actual **17**).
+- Moneyline picks often disagreed with the locked XGBoost model without clear benefit.
+- Each run added **minutes** of Poisson fitting on 240 features plus sklearn convergence warnings.
+
+![Monte Carlo smoke: sim E[total] vs actual totals on 2026-08-13](docs/images/monte_carlo_smoke_totals.png)
+
+The code under `src/simulation/` stays for research. To run an offline smoke on a past slate:
 
 ```powershell
-python.exe -m streamlit run streamlit_app.py
+python scripts\smoke_sim_yesterday.py --date 2026-08-13 --count 8
 ```
 
-Or individual pages under `src/app/` / `pages/`.
+To write `simulation.jsonl` from the daily operator (not recommended for routine use):
 
-- **Daily board** — slate, model vs market, PLAY/PASS display, Pacific timestamps  
-- **Model performance** — historical quality / calibration views  
-- **Game detail** — starters, bullpen, multi-book lines  
+```powershell
+python scripts\daily_predictions.py --date 2026-08-14 --enable-simulation
+```
+
+**Production path:** ADR-006 XGBoost moneyline + market edge only.
 
 ---
 
