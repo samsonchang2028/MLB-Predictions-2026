@@ -182,6 +182,42 @@ def test_probability_to_american_does_not_crash_on_extreme_small_probability(pro
         probability_to_american(probability)
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_probability_to_american_rejects_non_finite(bad):
+    # NaN/inf are numeric per isinstance but outside [0, 1]; `_validate_probability`'s
+    # closed-range check catches them before the branch/round/overflow logic runs.
+    with pytest.raises(ValueError):
+        probability_to_american(bad)
+
+
+@pytest.mark.parametrize(
+    "probability, expect_positive",
+    [
+        (0.5 - 1e-15, True),  # just under 0.5 -> underdog branch -> positive
+        (0.5 + 1e-15, False),  # just at/over 0.5 -> favorite branch -> negative
+        (0.5, False),  # exact boundary -> documented favorite-side convention
+    ],
+)
+def test_probability_to_american_branch_selection_near_half(probability, expect_positive):
+    american = probability_to_american(probability)
+    assert (american > 0) is expect_positive
+    assert abs(american) == 100
+
+
+@pytest.mark.parametrize("probability", [1e-6, 1e-50, 1e-100, 1e-200, 1e-300, 1e-306])
+def test_probability_to_american_does_not_crash_below_cent_precision_but_above_overflow(
+    probability,
+):
+    # Gap between the smallest realistic Kalshi price (0.01, see the existing
+    # known-value/roundtrip tests) and the known-overflow xfail range just above
+    # (~5.5e-307 and smaller): the underdog formula still returns a valid, if
+    # astronomically large, integer here -- no crash, no silent truncation.
+    american = probability_to_american(probability)
+    assert isinstance(american, int)
+    assert american > 0  # underdog branch, p < 0.5
+    assert american >= 100
+
+
 # --------------------------------------------------------------------------- #
 # Two-way no-vig normalization + vig/overround
 # --------------------------------------------------------------------------- #
