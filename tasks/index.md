@@ -76,6 +76,11 @@ state source of truth.
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
 | APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
 | PIPE-005 | done | PIPE-003, DATA-018 | refresh today's MLB game-detail payloads before daily predictions (probable starters) |
+| DATA-022 | backlog | DATA-001 | Kalshi MLB market data ingestion (Bronze, public API, no auth) |
+| DATA-023 | backlog | DATA-022, DATA-002 | Kalshi event -> game_pk matching (mirrors sportsbook matching, own logic) |
+| MARKET-003 | backlog | MARKET-001 | probability<->American-odds helper so Kalshi reuses the existing odds_books.jsonl schema |
+| PIPE-006 | backlog | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp |
+| APP-012 | backlog | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table (renamed from APP-010 to avoid collision with the merged V2 simulation-dashboard APP-010) |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 

@@ -1,0 +1,47 @@
+{
+  "cursor": "CgwI88v40wYQiJK7vAISH0tYTUxCR0FNRS0yNkFVRzE2MTYxME1JTExBRC1NSUw",
+  "markets": [
+    {
+      "ticker": "KXMLBGAME-26AUG161920SEAHOU-SEA",
+      "event_ticker": "KXMLBGAME-26AUG161920SEAHOU",
+      "market_type": "binary",
+      "title": "Seattle vs Houston Winner?",
+      "yes_sub_title": "Seattle",
+      "no_sub_title": "Houston",
+      "status": "active",
+      "result": "",
+      "yes_bid_dollars": "0.4400",
+      "yes_ask_dollars": "0.4700",
+      "no_bid_dollars": "0.5300",
+      "no_ask_dollars": "0.5600",
+      "last_price_dollars": "0.4800",
+      "volume_fp": "9.98",
+      "open_interest_fp": "9.98",
+      "open_time": "2026-08-13T23:40:00Z",
+      "close_time": "2026-08-19T23:20:00Z",
+      "occurrence_datetime": "2026-08-17T02:20:00Z",
+      "updated_time": "2026-08-13T23:40:00.213197Z"
+    },
+    {
+      "ticker": "KXMLBGAME-26AUG161920SEAHOU-HOU",
+      "event_ticker": "KXMLBGAME-26AUG161920SEAHOU",
+      "market_type": "binary",
+      "title": "Seattle vs Houston Winner?",
+      "yes_sub_title": "Houston",
+      "no_sub_title": "Seattle",
+      "status": "active",
+      "result": "",
+      "yes_bid_dollars": "0.5300",
+      "yes_ask_dollars": "0.5500",
+      "no_bid_dollars": "0.4500",
+      "no_ask_dollars": "0.4700",
+      "last_price_dollars": "0.5500",
+      "volume_fp": "15.00",
+      "open_interest_fp": "15.00",
+      "open_time": "2026-08-13T23:40:00Z",
+      "close_time": "2026-08-19T23:20:00Z",
+      "occurrence_datetime": "2026-08-17T02:20:00Z",
+      "updated_time": "2026-08-13T23:40:00.213197Z"
+    }
+  ]
+}
