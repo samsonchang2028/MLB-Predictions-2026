@@ -1,4 +1,4 @@
-# APP-010 — Show Kalshi in the Odds-by-Book Comparison
+# APP-012 — Show Kalshi in the Odds-by-Book Comparison
 
 ## Status
 

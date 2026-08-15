@@ -92,7 +92,7 @@ American-odds prices — reuse, not a parallel display path for Kalshi.
 
 - This function must not be used anywhere in the canonical prediction path
   (`daily.jsonl`, `market_probability`, `edge`) — it exists solely for
-  display-layer reuse of comparison-book data (Kalshi via PIPE-006/APP-010),
+  display-layer reuse of comparison-book data (Kalshi via PIPE-006/APP-012),
   same non-negotiable boundary PIPE-004 already established for other
   bookmakers.
 
