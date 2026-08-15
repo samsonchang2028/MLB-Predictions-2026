@@ -175,6 +175,22 @@ def test_summarize_match_results_surfaces_unmatched_reasons_like_odds_stats() ->
     assert stats["unmatched_events.ambiguous_nearest_time"] == 1
 
 
+def test_summarize_match_results_dedupes_mapped_games_across_yes_no_market_sides() -> None:
+    # Kalshi issues two markets (yes/no) per real game. mapped_games must
+    # count unique real games, not matched markets, or it double-counts
+    # (2N markets -> N games).
+    schedule = [_candidate(776001, "Houston Astros", "Seattle Mariners", EVENT_TIME)]
+    yes_side = match_kalshi_market(load_fixture_market(0), schedule)
+    no_side = match_kalshi_market(load_fixture_market(1), schedule)
+    assert yes_side.status == MATCHED and no_side.status == MATCHED
+    assert yes_side.game_pk == no_side.game_pk == 776001
+
+    stats = summarize_match_results([yes_side, no_side])
+
+    assert stats["matched_events"] == 2
+    assert stats["mapped_games"] == 1
+
+
 def test_kalshi_game_candidates_from_schedule_extracts_team_names_from_source_game_json() -> None:
     games = [
         {
@@ -254,10 +270,10 @@ def test_reciprocal_multi_city_ambiguity_with_tied_times_is_explicit_ambiguous()
     # Adversarial worst case: BOTH sides of the market are city names shared
     # by two clubs (Chicago -> Cubs/White Sox, Los Angeles -> Dodgers/
     # Angels), and two *different* real games each satisfy the loose
-    # containment test -- Cubs @ Dodgers, and White Sox @ Angels. If the two
-    # candidates are equidistant in time from occurrence_datetime, the
-    # matcher must not silently guess; it must surface AMBIGUOUS with both
-    # game_pks visible, never a bare pick.
+    # containment test -- Cubs @ Dodgers, and White Sox @ Angels. The
+    # candidates span more than one distinct team pair, so this is team-
+    # identity ambiguity: it must surface AMBIGUOUS with both game_pks
+    # visible, never a bare pick, regardless of the (here, tied) time gap.
     market = deepcopy(load_fixture_market(0))
     market["yes_sub_title"] = "Chicago"
     market["no_sub_title"] = "Los Angeles"
@@ -269,22 +285,20 @@ def test_reciprocal_multi_city_ambiguity_with_tied_times_is_explicit_ambiguous()
     result = match_kalshi_market(market, schedule)
 
     assert result.status == AMBIGUOUS
-    assert result.reason == "ambiguous_nearest_time"
+    assert result.reason == "ambiguous_team_identity"
     assert result.game_pk is None
     assert result.candidate_game_pks == (201, 202)
 
 
-def test_reciprocal_multi_city_ambiguity_near_tie_resolves_by_time_not_team_identity() -> None:
+def test_reciprocal_multi_city_ambiguity_near_tie_is_ambiguous_not_resolved_by_time() -> None:
     # Same reciprocal double-ambiguity setup as above, but the two candidate
-    # start times are close-not-equal. Current behavior: nearest-time wins
-    # even though team-name evidence alone never distinguished the two
-    # specific clubs -- this pins the existing behavior (mirrors
-    # _match_schedule_game's nearest-wins-if-unique pattern) rather than
-    # asserting it is unreachable. See tester report: flagged as a P2
-    # residual risk, not a P1, because it additionally requires two
-    # reciprocal same-city matchups on the identical day with near-
-    # simultaneous start times, which real MLB scheduling essentially never
-    # produces by coincidence.
+    # start times are close-not-equal. Team-name evidence alone never
+    # distinguished the two specific clubs, so nearest-time must NOT be
+    # consulted to silently pick a winner -- this must resolve AMBIGUOUS with
+    # reason "ambiguous_team_identity", the same as the tied-time case,
+    # because no timestamp can safely arbitrate between two genuinely
+    # different real games. (Previously pinned as MATCHED-by-nearest-time;
+    # that was the Reviewer's P1 finding -- fixed here.)
     market = deepcopy(load_fixture_market(0))
     market["yes_sub_title"] = "Chicago"
     market["no_sub_title"] = "Los Angeles"
@@ -295,12 +309,37 @@ def test_reciprocal_multi_city_ambiguity_near_tie_resolves_by_time_not_team_iden
 
     result = match_kalshi_market(market, schedule)
 
-    assert result.status == MATCHED
-    assert result.game_pk == 301
-    # candidate_game_pks on a MATCHED result only carries the winner (not
-    # every team-name candidate); the fact that 302 also passed the loose
-    # team-name filter is what makes this scenario adversarial, not
-    # something the result object surfaces directly.
+    assert result.status == AMBIGUOUS
+    assert result.reason == "ambiguous_team_identity"
+    assert result.game_pk is None
+    assert result.candidate_game_pks == (301, 302)
+
+
+def test_reviewer_p1_regression_unrelated_same_day_collision_does_not_win_on_time() -> None:
+    # Exact scenario from the Reviewer's P1 report: a Kalshi market titled
+    # "Chicago" vs "New York" should match Cubs@Mets, but an UNRELATED
+    # same-day White Sox@Yankees game (also a "Chicago"/"New York" collision
+    # under word-subset containment) has a start time that happens to be
+    # closer to occurrence_datetime. Before the fix this returned a
+    # confident MATCHED on the wrong game_pk (the White Sox@Yankees game);
+    # team-name evidence alone cannot distinguish which real game the market
+    # refers to, so this must be AMBIGUOUS instead.
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "Chicago"
+    market["no_sub_title"] = "New York"
+    schedule = [
+        # True target, further from occurrence_datetime in this fixture.
+        _candidate(401, "Chicago Cubs", "New York Mets", EVENT_TIME - timedelta(hours=2)),
+        # Unrelated same-day collision, closer in time -- must NOT win.
+        _candidate(402, "Chicago White Sox", "New York Yankees", EVENT_TIME + timedelta(minutes=5)),
+    ]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == AMBIGUOUS
+    assert result.reason == "ambiguous_team_identity"
+    assert result.game_pk is None
+    assert result.candidate_game_pks == (401, 402)
 
 
 # ---------------------------------------------------------------------------

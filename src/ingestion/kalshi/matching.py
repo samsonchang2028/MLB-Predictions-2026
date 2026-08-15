@@ -106,6 +106,22 @@ def match_kalshi_market(
         return _result(market_ticker, event_ticker, UNMATCHED, "no_team_match", None, ())
 
     candidate_pks = tuple(sorted(game.game_pk for game in candidates))
+
+    # Candidates can span more than one genuinely distinct team pair when
+    # Kalshi's word-subset city-name matching hits a shared-city collision on
+    # both sides at once (e.g. "Chicago" vs "Los Angeles" loosely matching
+    # both Cubs@Dodgers and White Sox@Angels on the same day). No timestamp
+    # can safely arbitrate between two different real games, so this is
+    # ambiguous regardless of how close one candidate happens to be in time --
+    # checked before the nearest-time tie-break, not as a fallback from it.
+    distinct_team_pairs = {
+        frozenset((game.home_team_norm, game.away_team_norm)) for game in candidates
+    }
+    if len(distinct_team_pairs) > 1:
+        return _result(
+            market_ticker, event_ticker, AMBIGUOUS, "ambiguous_team_identity", None, candidate_pks
+        )
+
     ranked = sorted(
         (
             (abs((game.start_time - game_datetime).total_seconds()), game)
@@ -139,7 +155,9 @@ def summarize_match_results(results: Sequence[KalshiMatchResult]) -> dict[str, i
             stats["matched_events"] += 1
         else:
             stats[f"unmatched_events.{result.reason}"] += 1
-    stats["mapped_games"] = sum(1 for result in results if result.status == MATCHED)
+    # Kalshi issues two markets (yes/no) per real game, so dedupe by game_pk
+    # rather than counting one increment per matched market.
+    stats["mapped_games"] = len({result.game_pk for result in results if result.status == MATCHED})
     return dict(stats)
 
 
