@@ -26,6 +26,7 @@ from market import (
     expected_value,
     no_vig_two_way,
     opening_market_benchmark_from_archive,
+    probability_to_american,
     snapshot_is_pregame_valid,
 )
 
@@ -94,6 +95,127 @@ def test_invalid_american_rejected(bad):
 def test_decimal_to_implied_probability_rejects_non_positive_payout(bad):
     with pytest.raises(ValueError):
         decimal_to_implied_probability(bad)
+
+
+# --------------------------------------------------------------------------- #
+# Probability -> American odds (MARKET-003, inverse of american_to_implied_probability)
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "probability, expected_american",
+    [
+        (110.0 / 210.0, -110),  # hand-verified: implied of -110
+        (100.0 / 210.0, 110),  # hand-verified: implied of +110
+        (200.0 / 300.0, -200),  # hand-verified: implied of -200
+        (100.0 / 250.0, 150),  # hand-verified: implied of +150
+        (0.5, -100),  # boundary: favorite-side convention (see docstring)
+    ],
+)
+def test_probability_to_american_known_values(probability, expected_american):
+    assert probability_to_american(probability) == expected_american
+
+
+def test_probability_to_american_is_integer():
+    assert isinstance(probability_to_american(0.3), int)
+
+
+@pytest.mark.parametrize(
+    "american",
+    [-110, 110, -200, 150, -100],  # -100 covered separately (boundary asymmetry)
+)
+def test_probability_to_american_roundtrips_implied_probability(american):
+    probability = american_to_implied_probability(american)
+    assert probability_to_american(probability) == american
+
+
+def test_probability_to_american_roundtrip_at_plus_100_boundary():
+    # +100 and -100 both imply exactly 0.5; probability_to_american(0.5) picks
+    # the favorite-side convention (-100), so +100 round-trips to the nearest
+    # valid equal-magnitude price rather than itself.
+    probability = american_to_implied_probability(100)
+    assert probability_to_american(probability) == -100
+
+
+@pytest.mark.parametrize("probability", [0.01, 0.1, 0.3, 0.5, 0.7, 0.9, 0.99])
+def test_probability_to_american_roundtrip_property_across_range(probability):
+    american = probability_to_american(probability)
+    recovered = american_to_implied_probability(american)
+    # Integer rounding of the American price means recovery is approximate,
+    # not exact, except where the theoretical price is already an integer.
+    assert recovered == pytest.approx(probability, abs=5e-3)
+
+
+@pytest.mark.parametrize("bad", [0, 0.0, 1, 1.0, -0.1, 1.1, None, "0.5", True, False])
+def test_probability_to_american_rejects_invalid_probability(bad):
+    with pytest.raises(ValueError):
+        probability_to_american(bad)
+
+
+def test_probability_to_american_result_never_below_american_floor():
+    # Minimum magnitude occurs at the 0.5 boundary and equals exactly 100,
+    # which is valid (_validate_american rejects only magnitude < 100).
+    for probability in (0.001, 0.2, 0.5, 0.8, 0.999):
+        assert abs(probability_to_american(probability)) >= 100
+
+
+@pytest.mark.xfail(
+    raises=OverflowError,
+    strict=True,
+    reason=(
+        "KNOWN DEFECT (MARKET-003 tester pass): `probability` is strictly "
+        "inside the documented valid domain (0, 1) -- `_validate_probability` "
+        "accepts it and the explicit (0, 1) exclusive check passes -- yet the "
+        "underdog formula `100 * (1 - p) / p` overflows float range for "
+        "sufficiently small p, and `round(inf)` raises a raw `OverflowError`, "
+        "not the documented `ValueError`. Not reachable by any current real "
+        "caller (no Kalshi integration exists yet, and Kalshi prices are "
+        "cents-precision, i.e. always >= 0.01), so this is low real-world "
+        "severity, but it violates the function's own input contract "
+        "('Rejects probability <= 0 or probability >= 1 ... in the same "
+        "ValueError style' implies every other value in (0, 1) succeeds or "
+        "raises ValueError, never an uncontrolled exception type). Remove "
+        "this xfail once the Implementer guards against float overflow."
+    ),
+)
+@pytest.mark.parametrize("probability", [1e-307, 1e-310, 1e-320, 5e-324])
+def test_probability_to_american_does_not_crash_on_extreme_small_probability(probability):
+    with pytest.raises(ValueError):
+        probability_to_american(probability)
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
+def test_probability_to_american_rejects_non_finite(bad):
+    # NaN/inf are numeric per isinstance but outside [0, 1]; `_validate_probability`'s
+    # closed-range check catches them before the branch/round/overflow logic runs.
+    with pytest.raises(ValueError):
+        probability_to_american(bad)
+
+
+@pytest.mark.parametrize(
+    "probability, expect_positive",
+    [
+        (0.5 - 1e-15, True),  # just under 0.5 -> underdog branch -> positive
+        (0.5 + 1e-15, False),  # just at/over 0.5 -> favorite branch -> negative
+        (0.5, False),  # exact boundary -> documented favorite-side convention
+    ],
+)
+def test_probability_to_american_branch_selection_near_half(probability, expect_positive):
+    american = probability_to_american(probability)
+    assert (american > 0) is expect_positive
+    assert abs(american) == 100
+
+
+@pytest.mark.parametrize("probability", [1e-6, 1e-50, 1e-100, 1e-200, 1e-300, 1e-306])
+def test_probability_to_american_does_not_crash_below_cent_precision_but_above_overflow(
+    probability,
+):
+    # Gap between the smallest realistic Kalshi price (0.01, see the existing
+    # known-value/roundtrip tests) and the known-overflow xfail range just above
+    # (~5.5e-307 and smaller): the underdog formula still returns a valid, if
+    # astronomically large, integer here -- no crash, no silent truncation.
+    american = probability_to_american(probability)
+    assert isinstance(american, int)
+    assert american > 0  # underdog branch, p < 0.5
+    assert american >= 100
 
 
 # --------------------------------------------------------------------------- #

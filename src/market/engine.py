@@ -15,6 +15,17 @@ American -> decimal odds:
 Decimal -> implied probability:
     implied = 1 / decimal
 
+Probability -> American odds (inverse of American -> implied probability):
+    favorite (probability >= 0.5):  american = -100 * probability / (1 - probability)
+    underdog (probability <  0.5):  american =  100 * (1 - probability) / probability
+    (At exactly ``0.5`` both branches agree in magnitude -- ``+100``/``-100`` both
+    imply ``0.5``, mirroring ``american_to_implied_probability``. This function
+    picks ``-100`` (favorite side) at the boundary; see
+    :func:`probability_to_american`.) Result is rounded to the nearest integer
+    American price; the formula's minimum magnitude is exactly ``100`` at
+    ``probability == 0.5`` and grows monotonically away from it, so the result
+    never violates ``_validate_american``'s ``>= 100`` floor.
+
 Two-way no-vig (simple proportional normalization):
     raw_home = implied(home_american)
     raw_away = implied(away_american)
@@ -112,6 +123,32 @@ def decimal_to_implied_probability(decimal_odds: float) -> float:
     if decimal_odds <= 1.0:
         raise ValueError(f"decimal odds must be > 1.0, got {decimal_odds!r}")
     return 1.0 / float(decimal_odds)
+
+
+def probability_to_american(probability: object) -> int:
+    """Convert a win probability to its American-odds equivalent.
+
+    The inverse of :func:`american_to_implied_probability`: for any valid
+    American price ``x``, ``probability_to_american(american_to_implied_probability(x))``
+    returns ``x`` (or the nearest valid integer American price, since the
+    result is rounded to an integer).
+
+    ``probability`` must be strictly inside ``(0, 1)`` -- at ``0`` or ``1``
+    there is no finite American-odds equivalent (an event that is certain to
+    lose or certain to win has no break-even price).
+
+    At exactly ``probability == 0.5`` -- the boundary where the theoretical
+    price is exactly ``+100``/``-100`` -- this function returns ``-100``
+    (favorite-side convention); it cannot return both.
+    """
+    p = _validate_probability(probability, "probability")
+    if p <= 0.0 or p >= 1.0:
+        raise ValueError(f"probability must be in (0, 1) exclusive, got {p!r}")
+    if p >= 0.5:
+        american = -100.0 * p / (1.0 - p)
+    else:
+        american = 100.0 * (1.0 - p) / p
+    return _validate_american(round(american))
 
 
 # --------------------------------------------------------------------------- #

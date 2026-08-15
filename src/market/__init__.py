@@ -25,6 +25,7 @@ from market.engine import (
     expected_value,
     no_vig_two_way,
     opening_market_benchmark_from_archive,
+    probability_to_american,
     snapshot_is_pregame_valid,
 )
 
@@ -46,5 +47,6 @@ __all__ = [
     "expected_value",
     "no_vig_two_way",
     "opening_market_benchmark_from_archive",
+    "probability_to_american",
     "snapshot_is_pregame_valid",
 ]
