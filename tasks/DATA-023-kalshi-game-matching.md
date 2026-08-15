@@ -202,3 +202,67 @@ the function itself:
   orchestrator's existing "Recently shipped (Kalshi integration, wave 1)"
   section names DATA-023 as unblocked next -- updating that ledger is left to
   the orchestrator/reviewer per this repo's normal handoff flow).
+
+### Re-review fix (P1 + P2)
+
+An independent Reviewer returned CHANGES REQUIRED with one P1 and one P2 in
+`src/ingestion/kalshi/matching.py`; an independent Tester (PASS) had also
+found and pinned a lower-severity version of the same P1 issue plus an
+unrelated cosmetic P3.
+
+**P1 fixed.** `match_kalshi_market` could silently resolve to the WRONG
+`game_pk` when word-subset city-name matching produced candidates spanning
+more than one genuinely distinct team pair (e.g. a Kalshi "Chicago"/"New
+York" market meant for Cubs@Mets, but an unrelated same-day White Sox@Yankees
+game happened to be closer in time and won on nearest-time ranking). Fix:
+before nearest-time tie-breaking, group surviving candidates by
+`frozenset({home_team_norm, away_team_norm})`. If more than one distinct team
+pair survives, this is team-identity ambiguity, not doubleheader-timing
+ambiguity -- return `AMBIGUOUS` with a new reason string,
+`"ambiguous_team_identity"`, unconditionally, without consulting time
+distance at all. If exactly one distinct team pair survives (the normal
+doubleheader case), behavior is unchanged: falls through to the existing
+nearest-time logic. Evidence: new test
+`test_reviewer_p1_regression_unrelated_same_day_collision_does_not_win_on_time`
+reproduces the Reviewer's exact scenario (true target Cubs@Mets further from
+`occurrence_datetime` than an unrelated closer White Sox@Yankees candidate)
+and asserts `AMBIGUOUS` / `ambiguous_team_identity`, not a wrong `MATCHED`.
+
+Two existing tests were built on the pre-fix behavior and required updating
+(not weakening -- both still assert a correct, now-different outcome):
+- `test_reciprocal_multi_city_ambiguity_with_tied_times_is_explicit_ambiguous`:
+  still `AMBIGUOUS`, but reason changed from `"ambiguous_nearest_time"` to
+  `"ambiguous_team_identity"` (team-identity ambiguity is now detected before
+  the time tie-break is ever reached).
+- Renamed
+  `test_reciprocal_multi_city_ambiguity_near_tie_resolves_by_time_not_team_identity`
+  to `test_reciprocal_multi_city_ambiguity_near_tie_is_ambiguous_not_resolved_by_time`
+  and changed its assertion from `MATCHED`/`game_pk == 301` to `AMBIGUOUS`/
+  `reason == "ambiguous_team_identity"` -- this was the exact near-tie
+  scenario the Tester had pinned as a documented P2 risk; the fix
+  deliberately changes that documented behavior on purpose, so the test now
+  documents the corrected behavior instead of the bug.
+
+**P2 fixed.** `summarize_match_results`'s `mapped_games` counted one
+increment per matched *market*, but Kalshi issues two markets per real game
+(yes/no sides), so it double-counted real games. Fix:
+`stats["mapped_games"] = len({result.game_pk for result in results if
+result.status == MATCHED})` (dedupe by `game_pk`). Evidence: new test
+`test_summarize_match_results_dedupes_mapped_games_across_yes_no_market_sides`
+matches both real fixture markets (yes/no sides of the same Seattle@Houston
+event) and asserts `matched_events == 2` but `mapped_games == 1`.
+
+**Not touched (by design):** the Tester's P3 (`normalize_kalshi_team_name`
+period-without-space collapsing, e.g. `"St.Louis"`) -- cosmetic, currently
+unreachable with real data, left exactly as documented.
+
+**Test evidence:**
+- `python -m pytest tests/unit/ingestion/kalshi/ -q` -> **60 passed** (was 58
+  before this fix round; +2 net new tests: the P1 regression test and the
+  P2 `mapped_games` dedupe test; the two updated tests are edits, not new
+  additions).
+- `python -m pytest -q` (full repo suite) -> **841 passed, 5 xfailed** (was
+  821 passed, 5 xfailed before this fix round; delta matches the +20 kalshi
+  test file changes/additions net of edits, no regressions elsewhere).
+
+Commit: `c6e8e5c` on `agent/DATA-023-kalshi-game-matching`.
