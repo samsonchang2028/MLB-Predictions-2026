@@ -110,7 +110,95 @@ not a reuse of the existing function as-is.
 
 ## Handoff
 
-Record: summary, files changed, commands run, test results, known
-limitations (especially: confirmed Kalshi title/ticker format from a real
-payload, or still working from the research doc's unverified description?),
-any new ADR/state changes.
+### Summary
+
+Added `src/ingestion/kalshi/matching.py`: `match_kalshi_market()` maps one
+Kalshi market object (the same shape DATA-022 already parses -- `ticker`,
+`event_ticker`, `yes_sub_title`, `no_sub_title`, `occurrence_datetime`) to a
+`game_pk` against a list of `KalshiGameCandidate` schedule entries, returning
+a `KalshiMatchResult` with an explicit `MATCHED` / `UNMATCHED` / `AMBIGUOUS`
+status and machine-readable `reason` (`no_team_match`,
+`time_out_of_tolerance`, `ambiguous_nearest_time`, `matched`) -- never a bare
+`None`. `summarize_match_results()` rolls a list of results into
+`matched_events` / `mapped_games` / `unmatched_events.<reason>` counts, the
+same shape `odds_stats` already uses in `scripts/daily_predictions.py`.
+`kalshi_game_candidates_from_schedule()` builds `KalshiGameCandidate` objects
+from `silver.games`-shaped rows (`game_pk`, `game_date`, `source_game_json`),
+mirroring `_mlb_team_names`/`_candidate_team_names` elsewhere in the repo, so
+a future PIPE-006 wiring pass has a ready-made loader.
+
+Matching logic, mirroring `_match_schedule_game`'s pattern without reusing
+the function itself:
+- Team identity: Kalshi's `yes_sub_title`/`no_sub_title` are short city-style
+  names ("Seattle"), not this repo's full club names ("Seattle Mariners").
+  Normalization (`normalize_kalshi_team_name`) matches `_normalize_team_name`
+  style (casefold, strip periods, collapse whitespace); matching itself is
+  word-subset containment (Kalshi's normalized words ⊆ schedule team's
+  normalized words), not equality, since equality would never match a city
+  name against a full club name. Kalshi doesn't declare which side is
+  home/away, so both team names are checked against the schedule pair in
+  either order.
+- Doubleheader disambiguation: candidates are ranked by absolute distance
+  from `occurrence_datetime`, same tie-break-is-ambiguous /
+  nearest-wins-if-unique logic as `_match_schedule_game`. The 12-hour
+  tolerance (`MATCH_TIME_TOLERANCE_SECONDS`) is the same value as
+  `scripts/daily_predictions.py`'s `ODDS_MATCH_TOLERANCE_SECONDS`, kept as a
+  local constant rather than imported (importing the operator script would
+  make an `src/` module depend on `scripts/daily_predictions.py`, which pulls
+  in duckdb/xgboost/network imports at module load time -- a backwards
+  dependency direction this repo doesn't use elsewhere).
+
+### Files changed
+
+- `src/ingestion/kalshi/matching.py` (new)
+- `tests/unit/ingestion/kalshi/test_matching.py` (new)
+
+### Commands run
+
+- `python -m pytest tests/unit/ingestion/kalshi/ -q` -> **40 passed**
+- `python -m pytest -q` (full suite) -> **821 passed, 5 xfailed**
+
+### Known limitations / judgment calls
+
+- **City-name-only team matching is unverified for multi-club cities.** The
+  only real captured Kalshi payload (`tests/unit/ingestion/kalshi/fixtures/
+  kalshi_market_snapshots.json`) is Seattle @ Houston -- no city shared by two
+  MLB clubs. The word-subset containment match would accept a bare
+  `"Chicago"` against *either* the Cubs' or White Sox' full name, `"New
+  York"` against Yankees or Mets, `"Los Angeles"` against Dodgers or Angels.
+  Since the opposing team's name is also required to match the *other* side
+  of the same candidate game, this is not expected to misroute in practice
+  (the two names together pin one specific matchup, and the near-start-time
+  tolerance still filters far-off games), but it has not been checked against
+  a real Kalshi payload for one of these shared-city matchups. If a live
+  payload for one of these teams turns out to use something other than a
+  bare city name (e.g. `"Cubs"`, `"NY Yankees"`), the containment match still
+  works (word-subset still holds); the real risk is only if Kalshi ever
+  produces an identical bare-city string for both clubs *and* the matching
+  logic downstream needs to know which specific club, which this module
+  fully requires (opponent name + start time) already provides.
+- **Home/away is not inferred from Kalshi's title/ticker.** The title format
+  (`"Seattle vs Houston Winner?"`) does not reliably declare which side is
+  home; this module deliberately does not guess and checks the two team
+  names against the schedule pair unordered. This is a strictly safer
+  simplification (no orientation claim is made), not a scope gap.
+- **`occurrence_datetime` is confirmed** as the correct implied-game-datetime
+  field to use (not `open_time`/`close_time`, which are the market's trading
+  window) via the real DATA-022 fixture and the orchestrator-supplied
+  context; not directly re-verified against a fresh live API fetch in this
+  task.
+- **`bronze.kalshi_market_snapshots` (DATA-022) does not currently persist
+  `occurrence_datetime`, `title`, `yes_sub_title`, or `no_sub_title`** --
+  only `side` (which stores `yes_sub_title`'s value) survives into Bronze.
+  `match_kalshi_market()` is written against the raw Kalshi market-object
+  shape (same shape as the fixture/API response), not the Bronze row shape,
+  because the Bronze row alone is insufficient to reconstruct a match
+  (`no_sub_title` and `occurrence_datetime` are absent). Wiring this into a
+  live pipeline (PIPE-006) will need either a Bronze schema addition to
+  persist those fields or a call site that matches at fetch time before/
+  alongside Bronze storage rather than after. Flagging this now since it
+  will otherwise resurface as a confusing gap when PIPE-006 starts.
+- No ADR change needed; no `state/CURRENT.md` update made by this task (the
+  orchestrator's existing "Recently shipped (Kalshi integration, wave 1)"
+  section names DATA-023 as unblocked next -- updating that ledger is left to
+  the orchestrator/reviewer per this repo's normal handoff flow).
