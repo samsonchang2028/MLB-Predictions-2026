@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -117,3 +118,33 @@ def test_zero_price_is_valid_for_a_thin_book() -> None:
 
     snapshots = parse_kalshi_market_snapshots(payload)
     assert snapshots[0]["yes_bid"] == Decimal("0")
+
+
+def test_markets_preserve_input_order_not_sorted_by_ticker_or_side() -> None:
+    # Deterministic ordering: the parser must not silently reorder markets
+    # (e.g. by sorting on ticker), which would break any downstream code
+    # relying on payload order for pairing/debugging.
+    payload = load_fixture()
+    third = deepcopy(payload["markets"][0])
+    third["ticker"] = "KXMLBGAME-26AUG161920SEAHOU-AAA-LAST"
+    third["yes_sub_title"] = "ZZZ-Last"
+    payload["markets"] = [payload["markets"][1], third, payload["markets"][0]]
+
+    snapshots = parse_kalshi_market_snapshots(payload)
+
+    assert [snapshot["side"] for snapshot in snapshots] == [
+        "Houston",
+        "ZZZ-Last",
+        "Seattle",
+    ]
+
+
+def test_one_malformed_market_rejects_the_whole_batch_not_a_partial_parse() -> None:
+    # Fail-fast batch semantics: a payload with N markets where one is broken
+    # must not silently drop the bad one and return N-1 good snapshots. This
+    # pins the current all-or-nothing behavior as an explicit regression test.
+    payload = load_fixture()
+    payload["markets"][1]["ticker"] = None
+
+    with pytest.raises(KalshiDataError, match="ticker is required"):
+        parse_kalshi_market_snapshots(payload)

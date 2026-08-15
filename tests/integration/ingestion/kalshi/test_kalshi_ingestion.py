@@ -132,3 +132,150 @@ def test_does_not_touch_the_sportsbook_odds_table(tmp_path: Path) -> None:
 
     assert "kalshi_market_snapshots" in tables
     assert "odds_moneyline_snapshots" not in tables
+
+
+def test_duplicate_identical_market_within_one_payload_inserts_once(tmp_path: Path) -> None:
+    # Not a conflict (values match) -- this is a within-payload duplicate,
+    # distinct from the already-covered within-payload *conflict* case.
+    paths = initialize_storage(tmp_path / "data")
+    payload = load_fixture()
+    payload["markets"] = [payload["markets"][0], deepcopy(payload["markets"][0])]
+
+    with connect_database(paths["database"]) as connection:
+        inserted = ingest_kalshi_market_snapshots(connection, payload)
+        count = connection.execute(
+            "SELECT count(*) FROM bronze.kalshi_market_snapshots"
+        ).fetchone()[0]
+
+    assert inserted == 1
+    assert count == 1
+
+
+def test_malformed_payload_never_opens_a_transaction_or_creates_the_table(
+    tmp_path: Path,
+) -> None:
+    # Validation must happen before BEGIN TRANSACTION -- a broken payload
+    # should leave zero trace, not a half-created schema/table.
+    paths = initialize_storage(tmp_path / "data")
+
+    with connect_database(paths["database"]) as connection:
+        with pytest.raises(KalshiDataError):
+            ingest_kalshi_market_snapshots(connection, {"cursor": "abc"})
+
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'bronze'"
+            ).fetchall()
+        }
+
+    assert "kalshi_market_snapshots" not in tables
+
+
+def test_one_conflicting_market_blocks_the_other_valid_market_in_the_same_call(
+    tmp_path: Path,
+) -> None:
+    # Atomicity: a payload with one brand-new valid market and one market
+    # that conflicts with an already-stored row must insert NEITHER -- a
+    # partial commit would silently accept data the caller never got to see
+    # succeed (the call raised).
+    paths = initialize_storage(tmp_path / "data")
+    first = load_fixture()
+
+    with connect_database(paths["database"]) as connection:
+        assert ingest_kalshi_market_snapshots(connection, first) == 2
+
+        mixed = load_fixture()
+        # A genuinely new market (new snapshot_timestamp) ...
+        mixed["markets"][1]["updated_time"] = "2026-08-13T23:50:00.000000Z"
+        # ... alongside a conflicting re-observation of an already-stored key.
+        mixed["markets"][0]["yes_bid_dollars"] = "0.9900"
+
+        with pytest.raises(KalshiDataError, match="immutable incoming observation"):
+            ingest_kalshi_market_snapshots(connection, mixed)
+
+        count = connection.execute(
+            "SELECT count(*) FROM bronze.kalshi_market_snapshots"
+        ).fetchone()[0]
+        new_market_rows = connection.execute(
+            """
+            SELECT count(*) FROM bronze.kalshi_market_snapshots
+            WHERE snapshot_timestamp = '2026-08-13 23:50:00'
+            """
+        ).fetchone()[0]
+
+    # Still just the original 2 rows -- the new-timestamp Houston row from
+    # the mixed payload must NOT have snuck in even though its own key had
+    # no conflict.
+    assert count == 2
+    assert new_market_rows == 0
+
+
+def test_all_fields_round_trip_losslessly_for_both_real_markets(tmp_path: Path) -> None:
+    # No-silent-row-loss + full field fidelity against the real captured
+    # 2-market fixture, not just the first row / a single column.
+    paths = initialize_storage(tmp_path / "data")
+
+    with connect_database(paths["database"]) as connection:
+        assert ingest_kalshi_market_snapshots(connection, load_fixture()) == 2
+        rows = connection.execute(
+            """
+            SELECT market_ticker, event_ticker, side, yes_bid, yes_ask, no_bid, no_ask
+            FROM bronze.kalshi_market_snapshots
+            ORDER BY market_ticker
+            """
+        ).fetchall()
+
+    assert rows == [
+        (
+            "KXMLBGAME-26AUG161920SEAHOU-HOU",
+            "KXMLBGAME-26AUG161920SEAHOU",
+            "Houston",
+            Decimal("0.5300"),
+            Decimal("0.5500"),
+            Decimal("0.4500"),
+            Decimal("0.4700"),
+        ),
+        (
+            "KXMLBGAME-26AUG161920SEAHOU-SEA",
+            "KXMLBGAME-26AUG161920SEAHOU",
+            "Seattle",
+            Decimal("0.4400"),
+            Decimal("0.4700"),
+            Decimal("0.5300"),
+            Decimal("0.5600"),
+        ),
+    ]
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "P2 known defect (unreachable with real Kalshi payloads observed so far, "
+        "which are always 4-decimal-place price strings): a price string with "
+        "more than 4 fractional digits passes _price()'s [0,1] bounds check "
+        "unchanged, but the bronze.kalshi_market_snapshots.yes_bid column is "
+        "DECIMAL(5,4), so DuckDB silently ROUNDS it on insert instead of "
+        "raising -- e.g. '0.12345' is stored as 0.1235 with no error and no "
+        "trace of the loss. This violates the task's 'store raw price strings "
+        "losslessly' requirement and the repo's 'raw API responses are "
+        "immutable' rule. Fix: reject values with more than 4 fractional "
+        "digits in _price(), or widen/round explicitly with a documented "
+        "policy, before this DB write."
+    ),
+)
+def test_price_with_more_than_four_decimal_digits_is_not_silently_rounded(
+    tmp_path: Path,
+) -> None:
+    paths = initialize_storage(tmp_path / "data")
+    payload = load_fixture()
+    payload["markets"] = [payload["markets"][0]]
+    payload["markets"][0]["yes_bid_dollars"] = "0.12345"
+
+    with connect_database(paths["database"]) as connection:
+        ingest_kalshi_market_snapshots(connection, payload)
+        stored = connection.execute(
+            "SELECT yes_bid FROM bronze.kalshi_market_snapshots"
+        ).fetchone()[0]
+
+    assert stored == Decimal("0.12345")
