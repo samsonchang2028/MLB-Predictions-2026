@@ -60,14 +60,41 @@ task's actual implementation.
   break the canonical prediction run" principle PIPE-004's post-review fixes
   established)
 
+## Orchestrator-resolved decisions (confirmed with user, do not re-litigate)
+
+- **Scheduling mechanism: new standalone script + external scheduler.** Build
+  `scripts/kalshi_pregame_capture.py` as its own entry point, intended to run
+  frequently (e.g. every 10-15 minutes via cron/Task Scheduler) and capture
+  any game whose first pitch falls within the tolerance window and hasn't
+  been captured yet. Do not fold this into `scripts/daily_predictions.py`'s
+  own run loop. The actual scheduler wiring (cron entry, Task Scheduler job,
+  etc.) is out of scope for this task — implement and document the script's
+  own idempotent "capture whatever's due right now" behavior; a later
+  OPS-001/OPS-003 task owns the actual scheduler registration.
+- **Bronze schema gap: add columns to `bronze.kalshi_market_snapshots`.**
+  DATA-022's table does not currently persist `occurrence_datetime`,
+  `title`, or `no_sub_title` — fields DATA-023's `matching.py` needs and
+  currently expects on the raw Kalshi market-object shape, not the Bronze
+  row shape. Extend the Bronze table/ingestion (`src/ingestion/kalshi/
+  snapshots.py`) to persist these additively (new nullable columns, existing
+  rows unaffected), then have this task's capture script read matching
+  inputs from Bronze like every other ingestion-consumer in this repo,
+  rather than matching directly against the raw API response before
+  persistence. This keeps ingestion and matching decoupled, consistent with
+  how the rest of the Bronze layer works.
+
 ## Allowed files
 
-- `scripts/daily_predictions.py` (or a new small dedicated script, e.g.
-  `scripts/kalshi_pregame_capture.py`, if the near-first-pitch scheduling
-  shape doesn't fit naturally as a code path inside the existing once-daily
-  script — this is an open design question for the implementer to resolve
-  and document, not decided here)
-- `tests/unit/scripts/` (matching whichever file above)
+- `scripts/kalshi_pregame_capture.py` (new)
+- `tests/unit/scripts/test_kalshi_pregame_capture.py` (new)
+- `src/ingestion/kalshi/snapshots.py` (additive schema change only — new
+  nullable columns + parsing for `occurrence_datetime`/`title`/
+  `no_sub_title`; do not change existing column semantics or break DATA-022's
+  existing tests)
+- `tests/unit/ingestion/kalshi/test_kalshi_snapshots.py` (extend for the new
+  columns)
+- `tests/integration/ingestion/kalshi/test_kalshi_ingestion.py` (extend if
+  needed for the new columns)
 
 ## May modify if necessary
 
