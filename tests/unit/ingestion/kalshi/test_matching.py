@@ -205,3 +205,258 @@ def test_kalshi_game_candidates_from_schedule_raises_on_missing_team_names() -> 
 
     with pytest.raises(KalshiMatchingError, match="missing team names"):
         kalshi_game_candidates_from_schedule(games)
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: multi-team-city disambiguation
+# ---------------------------------------------------------------------------
+
+
+def test_multi_team_city_disambiguated_by_distinct_opponent_name() -> None:
+    # Two same-city clubs (Cubs, White Sox) both play on the same day, but
+    # against opponents whose city names are NOT themselves shared by two
+    # clubs. The market only names "Chicago" + "Houston" -- containment
+    # matching must use the opponent's name to pick the White Sox/Astros game
+    # and must NOT let "Chicago" alone drag in the Cubs/Dodgers game.
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "Chicago"
+    market["no_sub_title"] = "Houston"
+    schedule = [
+        _candidate(101, "Chicago Cubs", "Los Angeles Dodgers", EVENT_TIME),
+        _candidate(102, "Chicago White Sox", "Houston Astros", EVENT_TIME),
+    ]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == MATCHED
+    assert result.reason == "matched"
+    assert result.game_pk == 102
+    assert result.candidate_game_pks == (102,)
+
+
+def test_crosstown_same_city_both_sides_matches_unambiguously() -> None:
+    # A real Cubs-vs-White-Sox "Crosstown Classic" game: both sides are
+    # "Chicago" clubs. A bare "Chicago"/"Chicago" market must still resolve
+    # to the single game that actually pairs those two clubs, not raise or
+    # silently drop.
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "Chicago"
+    market["no_sub_title"] = "Chicago"
+    schedule = [_candidate(103, "Chicago Cubs", "Chicago White Sox", EVENT_TIME)]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == MATCHED
+    assert result.game_pk == 103
+
+
+def test_reciprocal_multi_city_ambiguity_with_tied_times_is_explicit_ambiguous() -> None:
+    # Adversarial worst case: BOTH sides of the market are city names shared
+    # by two clubs (Chicago -> Cubs/White Sox, Los Angeles -> Dodgers/
+    # Angels), and two *different* real games each satisfy the loose
+    # containment test -- Cubs @ Dodgers, and White Sox @ Angels. If the two
+    # candidates are equidistant in time from occurrence_datetime, the
+    # matcher must not silently guess; it must surface AMBIGUOUS with both
+    # game_pks visible, never a bare pick.
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "Chicago"
+    market["no_sub_title"] = "Los Angeles"
+    schedule = [
+        _candidate(201, "Chicago Cubs", "Los Angeles Dodgers", EVENT_TIME - timedelta(minutes=30)),
+        _candidate(202, "Chicago White Sox", "Los Angeles Angels", EVENT_TIME + timedelta(minutes=30)),
+    ]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == AMBIGUOUS
+    assert result.reason == "ambiguous_nearest_time"
+    assert result.game_pk is None
+    assert result.candidate_game_pks == (201, 202)
+
+
+def test_reciprocal_multi_city_ambiguity_near_tie_resolves_by_time_not_team_identity() -> None:
+    # Same reciprocal double-ambiguity setup as above, but the two candidate
+    # start times are close-not-equal. Current behavior: nearest-time wins
+    # even though team-name evidence alone never distinguished the two
+    # specific clubs -- this pins the existing behavior (mirrors
+    # _match_schedule_game's nearest-wins-if-unique pattern) rather than
+    # asserting it is unreachable. See tester report: flagged as a P2
+    # residual risk, not a P1, because it additionally requires two
+    # reciprocal same-city matchups on the identical day with near-
+    # simultaneous start times, which real MLB scheduling essentially never
+    # produces by coincidence.
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "Chicago"
+    market["no_sub_title"] = "Los Angeles"
+    schedule = [
+        _candidate(301, "Chicago Cubs", "Los Angeles Dodgers", EVENT_TIME - timedelta(minutes=20)),
+        _candidate(302, "Chicago White Sox", "Los Angeles Angels", EVENT_TIME + timedelta(minutes=25)),
+    ]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == MATCHED
+    assert result.game_pk == 301
+    # candidate_game_pks on a MATCHED result only carries the winner (not
+    # every team-name candidate); the fact that 302 also passed the loose
+    # team-name filter is what makes this scenario adversarial, not
+    # something the result object surfaces directly.
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: normalization variants (case/punctuation/whitespace)
+# ---------------------------------------------------------------------------
+
+
+def test_matches_with_case_punctuation_and_whitespace_variants_in_market_fields() -> None:
+    market = deepcopy(load_fixture_market(0))
+    market["yes_sub_title"] = "  SEATTLE.  "
+    market["no_sub_title"] = "HOUSTON"
+    schedule = [_candidate(401, "Houston Astros", "Seattle Mariners", EVENT_TIME)]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == MATCHED
+    assert result.game_pk == 401
+
+
+def test_normalize_kalshi_team_name_handles_mixed_variants() -> None:
+    variants = ["St. Louis", "st louis", "ST LOUIS", "  St.  Louis  "]
+    normalized = {normalize_kalshi_team_name(v) for v in variants}
+    assert normalized == {"st louis"}
+
+
+def test_normalize_kalshi_team_name_period_without_following_space_collapses_words() -> None:
+    # Documents a real edge case: stripping "." before whitespace-splitting
+    # means an abbreviation written with NO space after the period
+    # ("St.Louis") concatenates into one word instead of two, unlike
+    # "St. Louis". Inherited from the same implementation pattern as
+    # scripts/daily_predictions.py's _normalize_team_name (not a
+    # Kalshi-specific regression) -- see tester report, P3, currently
+    # unreachable since real Kalshi city names use a space after the period
+    # (e.g. "St. Louis").
+    assert normalize_kalshi_team_name("St.Louis") == "stlouis"
+    assert normalize_kalshi_team_name("St. Louis") == "st louis"
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: 12h tolerance boundary
+# ---------------------------------------------------------------------------
+
+
+def test_time_tolerance_boundary_exactly_at_limit_matches() -> None:
+    # Exactly 12h away is still within tolerance (strict > comparison).
+    market = load_fixture_market(0)
+    schedule = [_candidate(501, "Houston Astros", "Seattle Mariners", EVENT_TIME + timedelta(hours=12))]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == MATCHED
+    assert result.game_pk == 501
+
+
+def test_time_tolerance_boundary_one_second_past_limit_is_unmatched() -> None:
+    market = load_fixture_market(0)
+    schedule = [
+        _candidate(
+            502, "Houston Astros", "Seattle Mariners", EVENT_TIME + timedelta(hours=12, seconds=1)
+        )
+    ]
+
+    result = match_kalshi_market(market, schedule)
+
+    assert result.status == UNMATCHED
+    assert result.reason == "time_out_of_tolerance"
+    assert result.game_pk is None
+    assert result.candidate_game_pks == (502,)
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: malformed/partial market objects and empty schedule
+# ---------------------------------------------------------------------------
+
+
+def test_empty_schedule_is_explicit_unmatched_not_exception() -> None:
+    market = load_fixture_market(0)
+
+    result = match_kalshi_market(market, [])
+
+    assert result.status == UNMATCHED
+    assert result.reason == "no_team_match"
+    assert result.game_pk is None
+    assert result.candidate_game_pks == ()
+
+
+@pytest.mark.parametrize("field", ["yes_sub_title", "no_sub_title", "ticker", "event_ticker"])
+def test_blank_string_required_field_raises_not_silently_treated_as_missing(field: str) -> None:
+    # Distinct from the "key deleted" case already covered: a present-but-
+    # blank/whitespace-only string must also raise explicitly, not be
+    # coerced into an empty team name that could accidentally match nothing
+    # or something.
+    market = deepcopy(load_fixture_market(0))
+    market[field] = "   "
+
+    with pytest.raises(KalshiMatchingError, match=field):
+        match_kalshi_market(market, [])
+
+
+def test_non_string_occurrence_datetime_raises() -> None:
+    market = deepcopy(load_fixture_market(0))
+    market["occurrence_datetime"] = None
+
+    with pytest.raises(KalshiMatchingError, match="occurrence_datetime"):
+        match_kalshi_market(market, [])
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: determinism
+# ---------------------------------------------------------------------------
+
+
+def test_match_result_is_deterministic_regardless_of_schedule_order() -> None:
+    market = load_fixture_market(0)
+    forward = [
+        _candidate(601, "Houston Astros", "Seattle Mariners", EVENT_TIME - timedelta(hours=1)),
+        _candidate(602, "Houston Astros", "Seattle Mariners", EVENT_TIME + timedelta(hours=1)),
+    ]
+    backward = list(reversed(forward))
+
+    result_forward = match_kalshi_market(market, forward)
+    result_backward = match_kalshi_market(market, backward)
+
+    assert result_forward == result_backward
+    assert result_forward.status == AMBIGUOUS
+    assert result_forward.candidate_game_pks == (601, 602)
+
+
+def test_match_result_is_deterministic_across_repeated_calls() -> None:
+    market = load_fixture_market(0)
+    schedule = [_candidate(701, "Houston Astros", "Seattle Mariners", EVENT_TIME)]
+
+    first = match_kalshi_market(market, schedule)
+    second = match_kalshi_market(market, schedule)
+
+    assert first == second
+
+
+# ---------------------------------------------------------------------------
+# Adversarial coverage: no-silent-drop invariant across every non-matched case
+# ---------------------------------------------------------------------------
+
+
+def test_every_non_matched_result_carries_an_explicit_non_empty_reason() -> None:
+    market = load_fixture_market(0)
+    cases = [
+        [],  # no_team_match
+        [_candidate(801, "Houston Astros", "Seattle Mariners", EVENT_TIME + timedelta(days=3))],  # time_out_of_tolerance
+        [
+            _candidate(802, "Houston Astros", "Seattle Mariners", EVENT_TIME - timedelta(hours=1)),
+            _candidate(803, "Houston Astros", "Seattle Mariners", EVENT_TIME + timedelta(hours=1)),
+        ],  # ambiguous_nearest_time
+    ]
+
+    for schedule in cases:
+        result = match_kalshi_market(market, schedule)
+        if result.status != MATCHED:
+            assert isinstance(result.reason, str) and result.reason
+            assert result.game_pk is None
