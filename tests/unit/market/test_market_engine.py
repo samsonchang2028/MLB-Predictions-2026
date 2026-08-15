@@ -157,6 +157,31 @@ def test_probability_to_american_result_never_below_american_floor():
         assert abs(probability_to_american(probability)) >= 100
 
 
+@pytest.mark.xfail(
+    raises=OverflowError,
+    strict=True,
+    reason=(
+        "KNOWN DEFECT (MARKET-003 tester pass): `probability` is strictly "
+        "inside the documented valid domain (0, 1) -- `_validate_probability` "
+        "accepts it and the explicit (0, 1) exclusive check passes -- yet the "
+        "underdog formula `100 * (1 - p) / p` overflows float range for "
+        "sufficiently small p, and `round(inf)` raises a raw `OverflowError`, "
+        "not the documented `ValueError`. Not reachable by any current real "
+        "caller (no Kalshi integration exists yet, and Kalshi prices are "
+        "cents-precision, i.e. always >= 0.01), so this is low real-world "
+        "severity, but it violates the function's own input contract "
+        "('Rejects probability <= 0 or probability >= 1 ... in the same "
+        "ValueError style' implies every other value in (0, 1) succeeds or "
+        "raises ValueError, never an uncontrolled exception type). Remove "
+        "this xfail once the Implementer guards against float overflow."
+    ),
+)
+@pytest.mark.parametrize("probability", [1e-307, 1e-310, 1e-320, 5e-324])
+def test_probability_to_american_does_not_crash_on_extreme_small_probability(probability):
+    with pytest.raises(ValueError):
+        probability_to_american(probability)
+
+
 # --------------------------------------------------------------------------- #
 # Two-way no-vig normalization + vig/overround
 # --------------------------------------------------------------------------- #
