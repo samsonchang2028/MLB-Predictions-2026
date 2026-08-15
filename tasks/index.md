@@ -70,17 +70,19 @@ state source of truth.
 | APP-007 | candidate | APP-006, OBS-002 | friendlier daily picks board for non-technical users |
 | APP-008 | candidate | APP-007 | best plays of the day chart/ranking |
 | APP-009 | candidate | APP-006 | plain-English about/methodology page |
-| APP-011 | ready | APP-006 | chart-first homepage (7-day win rate, slate charts, minimal holdout) |
+| APP-011 | done | APP-006 | chart-first homepage (merged) |
+| API-001 | ready | APP-001 | minimal read-only FastAPI prediction adapter |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
 | APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
 | PIPE-005 | done | PIPE-003, DATA-018 | refresh today's MLB game-detail payloads before daily predictions (probable starters) |
-| DATA-022 | backlog | DATA-001 | Kalshi MLB market data ingestion (Bronze, public API, no auth) |
-| DATA-023 | backlog | DATA-022, DATA-002 | Kalshi event -> game_pk matching (mirrors sportsbook matching, own logic) |
-| MARKET-003 | backlog | MARKET-001 | probability<->American-odds helper so Kalshi reuses the existing odds_books.jsonl schema |
-| PIPE-006 | backlog | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp |
-| APP-012 | backlog | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table (renamed from APP-010 to avoid collision with the merged V2 simulation-dashboard APP-010) |
+| DATA-022 | done | DATA-001 | Kalshi MLB market data ingestion (Bronze, public API, no auth) — merged, Reviewer APPROVE + Tester PASS, 1 non-blocking P2 xfail-pinned (>4-decimal price rounding) |
+| DATA-023 | ready | DATA-022, DATA-002 | Kalshi event -> game_pk matching (mirrors sportsbook matching, own logic) |
+| MARKET-003 | done | MARKET-001 | probability<->American-odds helper so Kalshi reuses the existing odds_books.jsonl schema — merged, Reviewer APPROVE + Tester PASS, 1 non-blocking P2 xfail-pinned (OverflowError below ~5.5e-307) |
+| PIPE-006 | blocked | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's first pitch, not on the daily batch timestamp; unblocks once DATA-023 merges |
+| APP-012 | blocked | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table (renamed from APP-010 to avoid collision with the merged V2 simulation-dashboard APP-010) |
+| ML-012 | ready | ML-009, FEAT-006 | feature-family ablation study (KEEP/INVESTIGATE/REMOVE per family, top-3 next-experiment recommendations); does not change production model selection |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 

@@ -244,6 +244,34 @@ to certify cleanly.
 
 ## In progress
 
+- ML-012 — feature-family ablation study, dispatched to Implementer.
+
+## Recently shipped (Kalshi integration, wave 1)
+
+- **DATA-022** — Bronze ingestion for Kalshi's public MLB market API
+  (`api.elections.kalshi.com`, series `KXMLBGAME`, no auth) into
+  `bronze.kalshi_market_snapshots`. Reviewer APPROVE, Tester PASS (763
+  passed, 1 xfailed). One non-blocking P2, xfail-pinned: `_price()` stores
+  Kalshi prices in a `DECIMAL(5,4)` column without rejecting >4 fractional
+  digits, so a price with unexpected precision would silently round instead
+  of raising. Currently unreachable — real captured Kalshi payloads always
+  use exactly 4 fractional digits.
+- **MARKET-003** — `probability_to_american()` in `src/market/engine.py`,
+  the inverse of the existing American-odds→probability path, needed so
+  Kalshi's already-a-probability prices can reuse the existing
+  `odds_books.jsonl` schema once PIPE-006 lands. Reviewer APPROVE, Tester
+  PASS (771 passed, 4 xfailed). One non-blocking P2, xfail-pinned: raises a
+  raw `OverflowError` instead of the documented `ValueError` for
+  probabilities below ~5.5e-307 — unreachable, Kalshi prices are
+  cent-precision (>= 0.01).
+
+Unblocked next: **DATA-023** (Kalshi event → `game_pk` matching). Still
+blocked: **PIPE-006** (needs DATA-023 too), **APP-012** (renamed from
+APP-010 to avoid colliding with the merged V2 simulation-dashboard APP-010;
+needs PIPE-006).
+
+## In progress (V2 simulation)
+
 - None (V2 simulation stack merged to `main` — run operator + Streamlit to populate artifacts).
 
 ## Recently shipped (V2 simulation)
