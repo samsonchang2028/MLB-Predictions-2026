@@ -91,16 +91,9 @@ def parse_the_odds_api_moneylines(
                         )
                     seen_sides.add(side)
 
-                    price = outcome.get("price")
-                    if (
-                        isinstance(price, bool)
-                        or not isinstance(price, int)
-                        or abs(price) < 100
-                        or not MIN_INTEGER <= price <= MAX_INTEGER
-                    ):
-                        raise OddsDataError(
-                            f"{outcome_prefix}.price must be a valid 32-bit American integer price"
-                        )
+                    price = _american_price(
+                        outcome.get("price"), f"{outcome_prefix}.price"
+                    )
 
                     snapshots.append(
                         {
@@ -118,6 +111,109 @@ def parse_the_odds_api_moneylines(
                 if seen_sides != {"home", "away"}:
                     raise OddsDataError(
                         f"{market_prefix} must contain one home and one away outcome"
+                    )
+
+    return snapshots
+
+
+def _american_price(value: Any, field: str) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or abs(value) < 100
+        or not MIN_INTEGER <= value <= MAX_INTEGER
+    ):
+        raise OddsDataError(f"{field} must be a valid 32-bit American integer price")
+    return value
+
+
+def _point(value: Any, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise OddsDataError(f"{field} must be a numeric total-runs line")
+    return float(value)
+
+
+def parse_the_odds_api_totals(
+    payload: Any, *, source: str = "the_odds_api"
+) -> list[dict[str, Any]]:
+    """Map The Odds API event payloads to canonical over/under observations."""
+    source_name = _required_text(source, "source")
+    events = _objects(payload, "payload")
+    snapshots: list[dict[str, Any]] = []
+
+    for event_index, event in enumerate(events):
+        prefix = f"payload[{event_index}]"
+        event_id = _required_text(event.get("id"), f"{prefix}.id")
+        commence_time = _timestamp(
+            event.get("commence_time"), f"{prefix}.commence_time"
+        )
+        home_team = _required_text(event.get("home_team"), f"{prefix}.home_team")
+        away_team = _required_text(event.get("away_team"), f"{prefix}.away_team")
+        if home_team == away_team:
+            raise OddsDataError(f"{prefix} home_team and away_team must differ")
+
+        bookmakers = _objects(event.get("bookmakers"), f"{prefix}.bookmakers")
+        for book_index, book in enumerate(bookmakers):
+            book_prefix = f"{prefix}.bookmakers[{book_index}]"
+            bookmaker = _required_text(book.get("key"), f"{book_prefix}.key")
+            snapshot_timestamp = _timestamp(
+                book.get("last_update"), f"{book_prefix}.last_update"
+            )
+            markets = _objects(book.get("markets"), f"{book_prefix}.markets")
+
+            for market_index, market in enumerate(markets):
+                if market.get("key") != "totals":
+                    continue
+                market_prefix = f"{book_prefix}.markets[{market_index}]"
+                outcomes = _objects(market.get("outcomes"), f"{market_prefix}.outcomes")
+                seen_sides: set[str] = set()
+                line_points: dict[str, float] = {}
+                for outcome_index, outcome in enumerate(outcomes):
+                    outcome_prefix = f"{market_prefix}.outcomes[{outcome_index}]"
+                    outcome_name = _required_text(
+                        outcome.get("name"), f"{outcome_prefix}.name"
+                    )
+                    if outcome_name == "Over":
+                        side = "over"
+                    elif outcome_name == "Under":
+                        side = "under"
+                    else:
+                        raise OddsDataError(
+                            f"{outcome_prefix}.name must be Over or Under"
+                        )
+                    if side in seen_sides:
+                        raise OddsDataError(
+                            f"{market_prefix} contains duplicate {side} outcomes"
+                        )
+                    seen_sides.add(side)
+
+                    point = _point(outcome.get("point"), f"{outcome_prefix}.point")
+                    line_points[side] = point
+                    price = _american_price(
+                        outcome.get("price"), f"{outcome_prefix}.price"
+                    )
+
+                    snapshots.append(
+                        {
+                            "source": source_name,
+                            "source_event_id": event_id,
+                            "bookmaker": bookmaker,
+                            "outcome": side,
+                            "point": point,
+                            "american_price": price,
+                            "snapshot_timestamp": snapshot_timestamp,
+                            "commence_time": commence_time,
+                            "home_team": home_team,
+                            "away_team": away_team,
+                        }
+                    )
+                if seen_sides != {"over", "under"}:
+                    raise OddsDataError(
+                        f"{market_prefix} must contain one over and one under outcome"
+                    )
+                if line_points["over"] != line_points["under"]:
+                    raise OddsDataError(
+                        f"{market_prefix} over and under outcomes must share the same point"
                     )
 
     return snapshots
@@ -212,6 +308,97 @@ def ingest_the_odds_api_moneylines(
     return inserted
 
 
+def ingest_the_odds_api_totals(
+    connection: duckdb.DuckDBPyConnection,
+    payload: Any,
+    *,
+    source: str = "the_odds_api",
+) -> int:
+    """Append new canonical totals observations and return the number inserted."""
+    snapshots = parse_the_odds_api_totals(payload, source=source)
+    unique_snapshots: dict[tuple[object, ...], dict[str, Any]] = {}
+    for snapshot in snapshots:
+        key = (
+            snapshot["source"],
+            snapshot["source_event_id"],
+            snapshot["bookmaker"],
+            snapshot["outcome"],
+            snapshot["point"],
+            snapshot["snapshot_timestamp"],
+        )
+        previous = unique_snapshots.get(key)
+        if previous is not None and (
+            previous["american_price"] != snapshot["american_price"]
+            or previous["commence_time"] != snapshot["commence_time"]
+            or previous["home_team"] != snapshot["home_team"]
+            or previous["away_team"] != snapshot["away_team"]
+        ):
+            raise OddsDataError(
+                "payload contains conflicting values for the same odds snapshot"
+            )
+        unique_snapshots[key] = snapshot
+
+    connection.execute("BEGIN TRANSACTION")
+    try:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
+        _ensure_odds_totals_table(connection)
+
+        for key, snapshot in unique_snapshots.items():
+            existing = connection.execute(
+                """
+                SELECT american_price, commence_time, home_team, away_team
+                FROM bronze.odds_totals_snapshots
+                WHERE source = ? AND source_event_id = ? AND bookmaker = ?
+                    AND outcome = ? AND point = ? AND snapshot_timestamp = ?
+                """,
+                list(key),
+            ).fetchone()
+            if existing is not None and (
+                existing[0] != snapshot["american_price"]
+                or existing[1] != snapshot["commence_time"]
+                or (
+                    existing[2] is not None
+                    and existing[2] != snapshot["home_team"]
+                )
+                or (
+                    existing[3] is not None
+                    and existing[3] != snapshot["away_team"]
+                )
+            ):
+                raise OddsDataError(
+                    "stored snapshot conflicts with the immutable incoming observation"
+                )
+
+        inserted = 0
+        for snapshot in unique_snapshots.values():
+            row = connection.execute(
+                """
+                INSERT INTO bronze.odds_totals_snapshots
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                RETURNING 1
+                """,
+                [
+                    snapshot["source"],
+                    snapshot["source_event_id"],
+                    snapshot["bookmaker"],
+                    snapshot["outcome"],
+                    snapshot["point"],
+                    snapshot["american_price"],
+                    snapshot["snapshot_timestamp"],
+                    snapshot["commence_time"],
+                    snapshot["home_team"],
+                    snapshot["away_team"],
+                ],
+            ).fetchone()
+            inserted += row is not None
+        connection.execute("COMMIT")
+    except Exception:
+        connection.execute("ROLLBACK")
+        raise
+    return inserted
+
+
 def _ensure_odds_moneyline_table(connection: duckdb.DuckDBPyConnection) -> None:
     """Create or migrate bronze odds snapshots; PK unchanged, team names retained."""
     connection.execute(
@@ -259,3 +446,33 @@ def _ensure_odds_moneyline_table(connection: duckdb.DuckDBPyConnection) -> None:
         connection.execute(
             "ALTER TABLE bronze.odds_moneyline_snapshots ADD COLUMN away_team VARCHAR"
         )
+
+
+def _ensure_odds_totals_table(connection: duckdb.DuckDBPyConnection) -> None:
+    """Create bronze totals snapshots; PK includes point for multiple lines."""
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bronze.odds_totals_snapshots (
+            source VARCHAR NOT NULL,
+            source_event_id VARCHAR NOT NULL,
+            bookmaker VARCHAR NOT NULL,
+            outcome VARCHAR NOT NULL CHECK (outcome IN ('over', 'under')),
+            point DOUBLE NOT NULL,
+            american_price INTEGER NOT NULL CHECK (
+                american_price <= -100 OR american_price >= 100
+            ),
+            snapshot_timestamp TIMESTAMPTZ NOT NULL,
+            commence_time TIMESTAMPTZ NOT NULL,
+            home_team VARCHAR NOT NULL,
+            away_team VARCHAR NOT NULL,
+            PRIMARY KEY (
+                source,
+                source_event_id,
+                bookmaker,
+                outcome,
+                point,
+                snapshot_timestamp
+            )
+        )
+        """
+    )

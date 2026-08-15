@@ -11,19 +11,24 @@ from scripts.daily_predictions import (
     SKIP_NO_STARTER_ANNOUNCED,
     _bullpen_placeholder_rows,
     _format_duration,
+    _runs_by_game_pk,
     _starter_is_announced,
     _starter_placeholder_rows,
     all_book_snapshots_for_schedule,
     append_jsonl_records,
+    build_simulation_records,
     main,
     odds_snapshots_for_schedule,
     partition_schedule_by_announced_starters,
     refresh_pregame_game_details,
     replace_skipped_for_run_date,
+    score_training_rows_from_matrix,
     slate_game_pks_for_detail_refresh,
+    totals_lines_for_schedule,
 )
 from features.bullpen import build_bullpen_features
 from features.starter import build_starter_features
+from simulation.score_model import fit_score_model
 
 
 def _schedule_row(game_pk=1):
@@ -809,8 +814,417 @@ def test_main_sets_prediction_timestamp_after_odds_fetch(monkeypatch, tmp_path):
     monkeypatch.setattr(dp, "run_daily_predictions", fake_run_daily_predictions)
     monkeypatch.setattr(dp, "append_jsonl_records", lambda *args, **kwargs: 0)
     monkeypatch.setattr(dp, "JsonLinesPredictionStore", lambda path: object())
+    monkeypatch.setattr(
+        dp,
+        "train_locked_score_model",
+        lambda *args, **kwargs: (object(), "hist-build", 100),
+    )
 
-    assert dp.main(["--skip-detail-refresh", "--database", str(tmp_path / "mlb.duckdb"), "--date", "2026-08-13"]) == 0
+    assert dp.main(
+        [
+            "--skip-detail-refresh",
+            "--database",
+            str(tmp_path / "mlb.duckdb"),
+            "--date",
+            "2026-08-13",
+        ]
+    ) == 0
     assert events.index("odds_fetch") < events.index("prediction_timestamp")
     assert captured["prediction_timestamp"] == pred_ts
     assert odds_ts < pred_ts
+
+
+def _minimal_score_training_rows() -> list[dict]:
+    rows: list[dict] = []
+    for i in range(30):
+        offense = 4.0 + (i % 4) * 0.2
+        rows.append(
+            {
+                "features": {
+                    "home_team_runs_scored_avg_before": offense,
+                    "home_team_runs_scored_avg_L7": offense - 0.1,
+                    "away_team_runs_scored_avg_before": offense - 0.2,
+                    "away_team_runs_scored_avg_L7": offense - 0.3,
+                    "home_team_runs_allowed_avg_before": offense - 0.1,
+                    "home_team_runs_allowed_avg_L7": offense - 0.2,
+                    "away_team_runs_allowed_avg_before": offense,
+                    "away_team_runs_allowed_avg_L7": offense - 0.1,
+                },
+                "home_runs": int(round(offense)),
+                "away_runs": int(round(offense - 0.5)),
+            }
+        )
+    return rows
+
+
+def test_runs_by_game_pk_extracts_home_and_away_scores():
+    team_stats = [
+        {"game_pk": 1, "team_id": 10, "side": "home", "score": 5},
+        {"game_pk": 1, "team_id": 20, "side": "away", "score": 3},
+        {"game_pk": 2, "team_id": 11, "side": "home", "score": None},
+        {"game_pk": 2, "team_id": 21, "side": "away", "score": 2},
+    ]
+
+    assert _runs_by_game_pk(team_stats) == {1: (5, 3)}
+
+
+def test_score_training_rows_from_matrix_joins_gold_features_to_final_scores():
+    matrix = {
+        "rows": [
+            {"game_pk": 100, "features": {"f1": 1.0}},
+            {"game_pk": 101, "features": {"f1": 2.0}},
+        ]
+    }
+    team_stats = [
+        {"game_pk": 100, "side": "home", "score": 4},
+        {"game_pk": 100, "side": "away", "score": 2},
+    ]
+
+    rows = score_training_rows_from_matrix(matrix, team_stats)
+
+    assert len(rows) == 1
+    assert rows[0]["features"] == {"f1": 1.0}
+    assert rows[0]["home_runs"] == 4
+    assert rows[0]["away_runs"] == 2
+
+
+def test_build_simulation_records_shapes_operator_artifact_fields():
+    score_model = fit_score_model(_minimal_score_training_rows(), random_state=0)
+    feature_rows = [
+        {
+            "game_pk": 823915,
+            "features": _minimal_score_training_rows()[0]["features"],
+        }
+    ]
+
+    records = build_simulation_records(
+        feature_rows,
+        score_model=score_model,
+        run_date=date(2026, 8, 13),
+        build_id="gold-build-abc",
+        n_trials=500,
+        random_state=7,
+        totals_lines={823915: 8.5},
+    )
+
+    assert len(records) == 1
+    row = records[0]
+    assert row["run_date"] == "2026-08-13"
+    assert row["game_pk"] == 823915
+    assert row["model_version"] == "sim-game-level-v1"
+    assert row["build_id"] == "gold-build-abc"
+    assert row["n_trials"] == 500
+    assert 0.0 <= row["p_home_win"] <= 1.0
+    assert row["total_runs_mean"] == pytest.approx(
+        row["home_runs_mean"] + row["away_runs_mean"]
+    )
+    assert row["totals_line"] == 8.5
+    assert row["p_over"] + row["p_under"] <= 1.0
+
+
+def test_totals_lines_for_schedule_maps_primary_bookmaker_line_to_game_pk():
+    payload = [
+        {
+            "id": "event-1",
+            "commence_time": "2026-08-12T23:05:00Z",
+            "home_team": "Minnesota Twins",
+            "away_team": "Baltimore Orioles",
+            "bookmakers": [
+                {
+                    "key": "draftkings",
+                    "last_update": "2026-08-12T20:01:00Z",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": -110, "point": 8.5},
+                                {"name": "Under", "price": -110, "point": 8.5},
+                            ],
+                        }
+                    ],
+                },
+                {
+                    "key": "fanduel",
+                    "last_update": "2026-08-12T20:01:00Z",
+                    "markets": [
+                        {
+                            "key": "totals",
+                            "outcomes": [
+                                {"name": "Over", "price": -105, "point": 9.0},
+                                {"name": "Under", "price": -115, "point": 9.0},
+                            ],
+                        }
+                    ],
+                },
+            ],
+        }
+    ]
+
+    lines, stats = totals_lines_for_schedule(
+        payload, [_schedule_row(823672)], bookmaker="draftkings"
+    )
+    fanduel_lines, _ = totals_lines_for_schedule(
+        payload, [_schedule_row(823672)], bookmaker="fanduel"
+    )
+
+    assert stats["mapped_games"] == 1
+    assert lines[823672] == 8.5
+    assert fanduel_lines[823672] == 9.0
+
+
+def test_main_skips_simulation_by_default(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(
+        dp,
+        "train_locked_model",
+        lambda *args, **kwargs: (object(), ["f1"], "build", 10),
+    )
+    fit_calls: list[tuple] = []
+
+    def fail_fit(*args, **kwargs):
+        fit_calls.append((args, kwargs))
+        raise AssertionError("score model fit should not run unless --enable-simulation")
+
+    monkeypatch.setattr(dp, "train_locked_score_model", fail_fit)
+    monkeypatch.setattr(
+        dp,
+        "refresh_pregame_game_details",
+        lambda *args, **kwargs: {
+            "targeted": 0,
+            "invalidated": 0,
+            "fetched": 0,
+            "normalized": False,
+        },
+    )
+    schedule_row = _schedule_row(823915)
+    schedule_row.update({"home_team_id": 119, "away_team_id": 158})
+    starter_rows = [
+        {
+            "game_pk": 823915,
+            "team_id": 119,
+            "side": "home",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 808963,
+        },
+        {
+            "game_pk": 823915,
+            "team_id": 158,
+            "side": "away",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 675660,
+        },
+    ]
+    monkeypatch.setattr(
+        dp,
+        "load_prediction_inputs",
+        lambda *args, **kwargs: {
+            "certification": {"build_id": "build"},
+            "schedule": [schedule_row],
+            "games_for_features": [],
+            "games_for_today": [],
+            "team_stats": [],
+            "appearances": [],
+            "starters": starter_rows,
+        },
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_today_feature_components",
+        lambda inputs: {"team": [], "starter": [], "bullpen": []},
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_feature_matrix",
+        lambda *args, **kwargs: {
+            "build_id": "build",
+            "rows": [{"game_pk": 823915, "features": {"f1": 1.0}}],
+            "excluded": [],
+            "feature_columns": ["f1"],
+            "feature_completeness": {"status": "PASS"},
+        },
+    )
+    monkeypatch.setattr(dp, "fetch_odds_payload", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        dp,
+        "odds_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: ({}, {"mapped_games": 0}),
+    )
+    monkeypatch.setattr(
+        dp,
+        "all_book_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: ({}, {"mapped_game_books": 0}),
+    )
+    monkeypatch.setattr(
+        dp,
+        "run_daily_predictions",
+        lambda **kwargs: type(
+            "Result",
+            (),
+            {"records": (), "written": (), "skipped": ()},
+        )(),
+    )
+    monkeypatch.setattr(dp, "append_jsonl_records", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(dp, "JsonLinesPredictionStore", lambda path: object())
+
+    assert main(
+        [
+            "--skip-detail-refresh",
+            "--database",
+            str(tmp_path / "mlb.duckdb"),
+            "--date",
+            "2026-08-13",
+        ]
+    ) == 0
+    assert fit_calls == []
+    assert "[simulation] skipped" in capsys.readouterr().out
+
+
+def test_main_writes_simulation_jsonl_with_mocked_score_model(monkeypatch, tmp_path):
+    monkeypatch.setenv("THE_ODDS_API_KEY", "test-key")
+    monkeypatch.setattr(
+        dp,
+        "train_locked_model",
+        lambda *args, **kwargs: (object(), ["f1"], "build", 10),
+    )
+    monkeypatch.setattr(
+        dp,
+        "refresh_pregame_game_details",
+        lambda *args, **kwargs: {
+            "targeted": 0,
+            "invalidated": 0,
+            "fetched": 0,
+            "normalized": False,
+        },
+    )
+    schedule_row = _schedule_row(823915)
+    schedule_row.update({"home_team_id": 119, "away_team_id": 158})
+    starter_rows = [
+        {
+            "game_pk": 823915,
+            "team_id": 119,
+            "side": "home",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 808963,
+        },
+        {
+            "game_pk": 823915,
+            "team_id": 158,
+            "side": "away",
+            "actual_pitcher_id": None,
+            "probable_pitcher_id": 675660,
+        },
+    ]
+    monkeypatch.setattr(
+        dp,
+        "load_prediction_inputs",
+        lambda *args, **kwargs: {
+            "certification": {"build_id": "build"},
+            "schedule": [schedule_row],
+            "games_for_features": [],
+            "games_for_today": [],
+            "team_stats": [],
+            "appearances": [],
+            "starters": starter_rows,
+        },
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_today_feature_components",
+        lambda inputs: {"team": [], "starter": [], "bullpen": []},
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_feature_matrix",
+        lambda *args, **kwargs: {
+            "build_id": "gold-build-xyz",
+            "rows": [{"game_pk": 823915, "features": {"f1": 1.0}}],
+            "excluded": [],
+            "feature_columns": ["f1"],
+            "feature_completeness": {"status": "PASS"},
+        },
+    )
+    monkeypatch.setattr(
+        dp,
+        "train_locked_score_model",
+        lambda *args, **kwargs: (object(), "hist-build", 100),
+    )
+    monkeypatch.setattr(
+        dp,
+        "build_simulation_records",
+        lambda *args, **kwargs: [
+            {
+                "run_date": "2026-08-13",
+                "game_pk": 823915,
+                "p_home_win": 0.53,
+                "home_runs_mean": 4.5,
+                "away_runs_mean": 4.2,
+                "total_runs_mean": 8.7,
+                "total_runs_median": 9.0,
+                "n_trials": 10000,
+                "model_version": "sim-game-level-v1",
+                "build_id": "gold-build-xyz",
+            }
+        ],
+    )
+    monkeypatch.setattr(dp, "fetch_odds_payload", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        dp,
+        "odds_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: ({}, {"mapped_games": 0}),
+    )
+    monkeypatch.setattr(
+        dp,
+        "all_book_snapshots_for_schedule",
+        lambda payload, schedule, **kwargs: ({}, {"mapped_game_books": 0}),
+    )
+    monkeypatch.setattr(
+        dp,
+        "run_daily_predictions",
+        lambda **kwargs: type(
+            "Result",
+            (),
+            {"records": (), "written": (), "skipped": ()},
+        )(),
+    )
+    monkeypatch.setattr(dp, "JsonLinesPredictionStore", lambda path: object())
+
+    simulation_path = tmp_path / "simulation.jsonl"
+    features_path = tmp_path / "features.jsonl"
+    odds_books_path = tmp_path / "odds_books.jsonl"
+    append_calls: list[tuple] = []
+    real_append = dp.append_jsonl_records
+
+    def capture_append(path, records, **kwargs):
+        append_calls.append((path, list(records), kwargs))
+        return real_append(path, records, **kwargs)
+
+    monkeypatch.setattr(dp, "append_jsonl_records", capture_append)
+
+    assert (
+        dp.main(
+            [
+                "--skip-detail-refresh",
+                "--enable-simulation",
+                "--database",
+                str(tmp_path / "mlb.duckdb"),
+                "--date",
+                "2026-08-13",
+                "--simulation-output",
+                str(simulation_path),
+                "--features-output",
+                str(features_path),
+                "--odds-books-output",
+                str(odds_books_path),
+            ]
+        )
+        == 0
+    )
+
+    assert simulation_path.exists()
+    row = json.loads(simulation_path.read_text(encoding="utf-8").strip())
+    assert row["game_pk"] == 823915
+    assert row["model_version"] == "sim-game-level-v1"
+    simulation_calls = [call for call in append_calls if call[0] == simulation_path]
+    assert simulation_calls
+    assert simulation_calls[0][2]["key_fields"] == ("run_date", "game_pk")
+    assert simulation_calls[0][2]["on_conflict"] == "overwrite"

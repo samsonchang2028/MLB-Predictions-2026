@@ -63,6 +63,9 @@ def build_homepage_summary(paths: ArtifactPaths = ArtifactPaths()) -> dict[str, 
     ]
     wins = sum(1 for row in play_results if row.get("correct") is True)
     losses = sum(1 for row in play_results if row.get("correct") is False)
+    play_pending = len(play_rows) - wins - losses
+    full_journal = _journal_for_predictions(journal, predictions)
+    play_performance_7d = _build_play_performance_7d(predictions, full_journal)
 
     missing_artifacts = [
         str(path)
@@ -81,7 +84,16 @@ def build_homepage_summary(paths: ArtifactPaths = ArtifactPaths()) -> dict[str, 
         "finished_predictions_count": len(finished_keys),
         "play_wins": wins,
         "play_losses": losses,
-        "play_pending": len(play_rows) - wins - losses,
+        "play_pending": play_pending,
+        "play_performance_7d": play_performance_7d,
+        "slate_snapshot": {
+            "plays": len(play_rows),
+            "passes": len(no_play_rows),
+            "awaiting": len(latest_skipped),
+            "play_wins": wins,
+            "play_losses": losses,
+            "play_pending": play_pending,
+        },
         "skipped_count": len(latest_skipped),
         "awaiting_data_count": len(latest_skipped),
         "skipped_reasons": dict(Counter(str(row.get("reason")) for row in latest_skipped)),
@@ -182,6 +194,70 @@ def _is_play(row: Mapping[str, Any]) -> bool:
     )
 
 
+def _build_play_performance_7d(
+    predictions: Iterable[Mapping[str, Any]],
+    journal: Mapping[tuple[Any, str | None], Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Aggregate play-only W/L over the last seven prediction slates."""
+    prediction_list = list(predictions)
+    run_dates = sorted(
+        {
+            str(row.get("run_date"))
+            for row in prediction_list
+            if row.get("run_date") is not None
+        }
+    )[-7:]
+    daily: list[dict[str, Any]] = []
+    total_wins = 0
+    total_losses = 0
+    total_pending = 0
+    for run_date in run_dates:
+        day_predictions = [
+            row
+            for row in prediction_list
+            if str(row.get("run_date")) == run_date
+        ]
+        play_rows = [
+            row for row in _latest_prediction_per_game(day_predictions) if _is_play(row)
+        ]
+        day_wins = 0
+        day_losses = 0
+        day_pending = 0
+        for row in play_rows:
+            enrichment = journal.get(_prediction_key(row))
+            if enrichment is None:
+                day_pending += 1
+                continue
+            if enrichment.get("correct") is True:
+                day_wins += 1
+            elif enrichment.get("correct") is False:
+                day_losses += 1
+            else:
+                day_pending += 1
+        finished = day_wins + day_losses
+        daily.append(
+            {
+                "run_date": run_date,
+                "wins": day_wins,
+                "losses": day_losses,
+                "pending": day_pending,
+                "win_rate": day_wins / finished if finished else None,
+            }
+        )
+        total_wins += day_wins
+        total_losses += day_losses
+        total_pending += day_pending
+    finished_total = total_wins + total_losses
+    return {
+        "win_rate": total_wins / finished_total if finished_total else None,
+        "wins": total_wins,
+        "losses": total_losses,
+        "pending": total_pending,
+        "finished": finished_total,
+        "daily": daily,
+    }
+
+
 def _max_timestamp(values: Iterable[Any]) -> str | None:
     parsed = [_parse_timestamp(value) for value in values]
     valid = [value for value in parsed if value is not None]
@@ -216,11 +292,17 @@ def _load_holdout_metrics(path: Path) -> dict[str, Any]:
         return {}
     metrics = report.get("metrics")
     if isinstance(metrics, dict):
-        return {
+        loaded = {
             key: metrics[key]
             for key in ("log_loss", "brier", "ece", "roc_auc", "accuracy")
             if key in metrics
         }
+        secondary = metrics.get("secondary")
+        if isinstance(secondary, dict):
+            for key in ("roc_auc", "accuracy"):
+                if key in secondary and key not in loaded:
+                    loaded[key] = secondary[key]
+        return loaded
     return {
         key: report[key]
         for key in ("log_loss", "brier", "ece", "roc_auc", "accuracy")

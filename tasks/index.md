@@ -70,11 +70,28 @@ state source of truth.
 | APP-007 | candidate | APP-006, OBS-002 | friendlier daily picks board for non-technical users |
 | APP-008 | candidate | APP-007 | best plays of the day chart/ranking |
 | APP-009 | candidate | APP-006 | plain-English about/methodology page |
+| APP-011 | ready | APP-006 | chart-first homepage (7-day win rate, slate charts, minimal holdout) |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
 | APP-005 | merged, self-reviewed only | PIPE-004, APP-004 | Streamlit game detail page (pitcher/bullpen stats, multi-book odds) reachable from the daily board |
 | PIPE-005 | done | PIPE-003, DATA-018 | refresh today's MLB game-detail payloads before daily predictions (probable starters) |
+
+## V2 simulation graph (team-level Monte Carlo — no player props)
+
+| Task | Status | Depends on | Notes |
+|---|---|---|---|
+| SIM-000 | done | FEAT-004, ML-010 | game-level team score Monte Carlo from existing Gold features |
+| DATA-024 | done | DATA-003, DATA-004 | totals (over/under) odds ingestion |
+| SIM-001 | backlog | SIM-003, ML-009 | walk-forward validate sim P(home_win) vs locked XGBoost |
+| SIM-002 | ready | SIM-000, MARKET-001 | totals / runs-per-game probs + edge from simulation |
+| SIM-003 | ready | SIM-000 | full Gold feature score model |
+| PIPE-007 | ready | SIM-003, PIPE-005 | daily operator simulation.jsonl artifacts |
+| APP-010 | ready | PIPE-007 | Streamlit simulation comparison tab + charts |
+| DOCS-002 | backlog | SIM-001 | ADR-007 V2 policy: XGBoost owns ML, sim owns totals |
+
+Wave 2 parallel: **SIM-003** + **SIM-002**.
+Wave 3 parallel (after SIM-003 merge): **PIPE-007** + **APP-010**.
 
 ## Safe parallel guidance
 
