@@ -242,9 +242,31 @@ to certify cleanly.
   now counts only the latest displayed prediction per game and exposes awaiting
   starters/odds in the top summary cards.
 
+- ML-012 - feature-family ablation study completed (candidate for review/test
+  gates): `src/experiments/ablation.py` reuses the ML-004 walk-forward runner
+  and folds unmodified; `scripts/ml012_feature_ablation.py` runs it against
+  the certified build `a910017bac839af5`. Real Gold taxonomy reused verbatim
+  from `features/completeness.REQUIRED_FAMILY_COLUMNS`: team (84 cols),
+  starter (75), bullpen (45), rest_schedule (36), summing to the build's exact
+  240 columns. ADR-006 locked XGBoost across expanding/rolling_2/rolling_3;
+  logistic/random-forest sanity checks on expanding only. Leave-one-out +
+  incremental ablation both run (cheap given 4 families). Strongest,
+  consistent across all 3 windows: team, then starter. Weakest/most ambiguous:
+  bullpen and rest_schedule (small effect, rank flips between windows,
+  redundant with each other -- both encode recent bullpen usage at different
+  windows). No family verdicts REMOVE. A new per-column univariate leakage
+  scan flagged 0 suspicious columns (strongest 0.5801 AUC, barely above the
+  full model's own 0.584 AUC); no leakage found, not escalated as P0/P1.
+  Report: `reports/experiments/ml-012-feature-ablation.json`. Markdown:
+  `docs/research/ml-012-feature-ablation.md`. Full repo suite: 817 passed, 5
+  xfailed (all pre-existing). 2026 never inspected (asserted in the harness).
+  No ADR-006/production-model change. See
+  `tasks/ML-012-feature-ablation-study.md` Handoff for full detail.
+
 ## In progress
 
-- ML-012 — feature-family ablation study, dispatched to Implementer.
+- None currently dispatched (ML-012 implementation complete; ready for the
+  task's required reviewer/tester gates).
 
 ## Recently shipped (Kalshi integration, wave 1)
 
