@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+implemented (candidate for review/test gates)
 
 ## Dependencies
 
@@ -112,5 +112,67 @@ rather than working around here.
 
 ## Handoff
 
-Record: summary, files changed (ideally minimal/none in `game_detail.py`),
-commands run, test results, known limitations, any new ADR/state changes.
+**Summary.** Verification-only, as the task predicted. Read `_load_odds_books`
+and `_best_price_for_side` in `src/app/game_detail.py`: both are already
+generic over `bookmaker` — they read `home_american`/`away_american`/
+`snapshot_timestamp`/`bookmaker` off any `odds_books.jsonl` row with no
+special-casing, so a Kalshi row (`bookmaker="kalshi"`, confirmed by reading
+`scripts/kalshi_pregame_capture.py`'s `KALSHI_BOOKMAKER = "kalshi"` /
+`_game_capture_record`, which writes `bookmaker`/`source` both as `"kalshi"`
+and prices via `probability_to_american`) flows through unmodified: no-vig
+probability computed, included in the odds-by-book table, and eligible to
+win `_best_price_for_side`'s max-payout comparison for the model's favored
+side exactly like any sportsbook row.
+
+`src/app/game_detail_page.py`'s table already renders `book["bookmaker"]`
+verbatim with no per-bookmaker capitalization/formatting (The Odds API's
+own bookmaker keys — `"draftkings"`, `"fanduel"`, etc. — are already raw
+lowercase strings in that column today). `"kalshi"` displays exactly as
+consistently as every existing row, so the "human-readable label" polish
+the task allowed for turned out to be unnecessary — adding capitalization
+only for Kalshi would have made it inconsistent with the rest of the
+column, not more polished.
+
+**Files changed:**
+
+- `tests/unit/app/test_app_game_detail.py` — two new cases: a Kalshi row
+  mixed in with a sportsbook row where Kalshi offers the better price for
+  the model's favored side (wins `best_price`, implied probability/
+  `snapshot_pacific` computed correctly off its own near-first-pitch
+  timestamp), and the inverse (Kalshi present but a sportsbook has the
+  better price, so Kalshi correctly does not win).
+- `src/app/game_detail.py` — **not modified.** Confirmed correct by
+  inspection and by the new tests; PIPE-006/MARKET-003's schema-reuse
+  design worked exactly as intended.
+- `src/app/game_detail_page.py` — **not modified.** No labeling polish was
+  needed (see above).
+
+This is the "near-zero new code" outcome the task predicted, not a signal
+of PIPE-006/MARKET-003's design falling short.
+
+**Commands run:**
+
+- `python -m pytest tests/unit/app/test_app_game_detail.py -q` → 12 passed.
+- `python -m pytest -q` (full suite) → 895 passed, 6 xfailed (all
+  pre-existing; matches main's pre-task xfail count from the PIPE-006
+  handoff, no new xfails introduced).
+- Ad hoc `streamlit.testing.v1.AppTest` headless smoke run (not committed,
+  same approach APP-005 used) against a synthetic `daily.jsonl`/
+  `odds_books.jsonl` pair with one Kalshi row and one DraftKings row:
+  zero exceptions; the rendered odds-by-book dataframe shows both rows
+  (`kalshi` at `-110`, `draftkings` at `-150`, each with its own correctly
+  formatted Pacific snapshot time — Kalshi's near-first-pitch 22:45 UTC
+  vs. DraftKings' 14:00 UTC daily-batch time, both read sensibly); the
+  verdict banner's success message correctly reads "Best price found for
+  NYY: kalshi -110." confirming Kalshi wins the verdict-banner callout
+  when it genuinely offers the best price. Synthetic fixtures were
+  temp-directory-scoped and not committed.
+
+**Test results:** all green, no regressions.
+
+**Known limitations:** none beyond APP-005's own known limitations (no
+literal browser click-through this session). No new ADR or
+`state/CURRENT.md` policy change required — this is a display-only
+verification task with no methodology impact; `state/CURRENT.md` should
+be updated by the orchestrator once this clears review/test gates, per
+repo convention.
