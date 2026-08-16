@@ -260,6 +260,93 @@ def test_best_price_picks_highest_payout_for_favored_side(tmp_path):
     assert result["best_price"] == {"bookmaker": "fanduel", "price": -120}
 
 
+def test_kalshi_row_mixed_with_sportsbooks_renders_and_can_win_best_price(tmp_path):
+    # PIPE-006 writes Kalshi rows into the same odds_books.jsonl schema every
+    # sportsbook row already uses (bookmaker="kalshi", American-odds-
+    # equivalent prices via MARKET-003's probability_to_american). Nothing in
+    # _load_odds_books/_best_price_for_side special-cases bookmaker identity,
+    # so a Kalshi row should be treated exactly like any other book: eligible
+    # for implied-probability display and for winning "best price".
+    odds_path = tmp_path / "odds_books.jsonl"
+    _write_jsonl(
+        odds_path,
+        [
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "draftkings",
+                "home_american": -150,
+                "away_american": 130,
+                "snapshot_timestamp": "2026-08-12T14:00:00+00:00",
+                "source": "the_odds_api",
+            },
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "kalshi",
+                # better payout for home than draftkings' -150
+                "home_american": -110,
+                "away_american": 105,
+                "snapshot_timestamp": "2026-08-12T22:45:00+00:00",  # near-first-pitch, not the daily batch time
+                "source": "kalshi",
+            },
+        ],
+    )
+
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=0.05)]),  # favors home
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=odds_path,
+    )
+
+    books = {book["bookmaker"]: book for book in result["odds_books"]}
+    assert set(books) == {"draftkings", "kalshi"}
+    assert books["kalshi"]["implied_home_probability"] > 0
+    assert books["kalshi"]["snapshot_pacific"]  # per-row formatting still works for its own timestamp
+
+    # Kalshi offers the better home price here, so it should win best_price.
+    assert result["best_price"] == {"bookmaker": "kalshi", "price": -110}
+
+
+def test_kalshi_row_does_not_win_best_price_when_a_sportsbook_is_better(tmp_path):
+    odds_path = tmp_path / "odds_books.jsonl"
+    _write_jsonl(
+        odds_path,
+        [
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "kalshi",
+                "home_american": -180,
+                "away_american": 160,
+                "snapshot_timestamp": "2026-08-12T22:45:00+00:00",
+                "source": "kalshi",
+            },
+            {
+                "run_date": "2026-08-12",
+                "game_pk": 1,
+                "bookmaker": "fanduel",
+                "home_american": -120,
+                "away_american": 105,
+                "snapshot_timestamp": "2026-08-12T14:00:00+00:00",
+                "source": "the_odds_api",
+            },
+        ],
+    )
+
+    result = load_game_detail(
+        1,
+        "2026-08-12",
+        predictions_store=_FakeStore([_record(1, edge=0.05)]),  # favors home
+        features_path=tmp_path / "game_features.jsonl",
+        odds_books_path=odds_path,
+    )
+
+    assert result["best_price"] == {"bookmaker": "fanduel", "price": -120}
+
+
 def test_odds_books_computes_implied_probability_per_book(tmp_path):
     # odds_books.jsonl is upserted by the writer (append_jsonl_records with
     # on_conflict="overwrite"), so realistic on-disk content has at most one
