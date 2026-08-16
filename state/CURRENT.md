@@ -329,10 +329,23 @@ to certify cleanly.
   value-conflict edge case, same low-severity class as this integration's
   other xfail-pinned P2s). Full suite post-merge: 893 passed, 6 xfailed.
 
-Unblocked next: **APP-012** (renamed from APP-010 to avoid colliding with
-the merged V2 simulation-dashboard APP-010; all deps — PIPE-006, APP-005 —
-now merged). This completes the Kalshi integration wave except for scheduler
-registration (a future OPS-001/OPS-003 task) and the display layer (APP-012).
+- **APP-012** — verification-only task, renamed from APP-010. Confirmed
+  PIPE-006/MARKET-003's schema-reuse design worked exactly as intended: zero
+  changes needed in `src/app/game_detail.py` or `game_detail_page.py` — both
+  are already bookmaker-agnostic, so a Kalshi row renders in the same
+  unified odds-by-book table as every sportsbook and is correctly eligible
+  for the best-price verdict callout. Reviewer APPROVE (1 pre-existing,
+  non-blocking P3: no committed AppTest-level page coverage, predates this
+  task). Tester PASS — adversarial coverage for multiple Kalshi rows per
+  game, missing/null price handling, Kalshi-as-sole-book, bookmaker-string
+  case sensitivity, and confirmed verdict/edge fields are byte-identical
+  regardless of Kalshi's price.
+
+**This completes the Kalshi integration graph**
+(DATA-022 → MARKET-003 → DATA-023 → PIPE-006 → APP-012), all merged to
+`main`. Only remaining follow-up: scheduler registration for
+`scripts/kalshi_pregame_capture.py` (a future OPS-001/OPS-003 task) — the
+script itself works, it just isn't wired to cron/Task Scheduler yet.
 
 ## In progress (V2 simulation)
 
