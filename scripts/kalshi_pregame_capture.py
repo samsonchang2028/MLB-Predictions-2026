@@ -56,6 +56,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import daily_predictions as dp  # noqa: E402
 from ingestion.kalshi import KalshiDataError, ingest_kalshi_market_snapshots  # noqa: E402
+from ingestion.kalshi.snapshots import parse_kalshi_market_snapshots  # noqa: E402
 from ingestion.kalshi.matching import (  # noqa: E402
     MATCHED,
     KalshiGameCandidate,
@@ -235,6 +236,66 @@ def _midpoint_probability(row: Mapping[str, Any]) -> float | None:
     return probability
 
 
+def _valid_kalshi_markets(payload: Any) -> list[dict[str, Any]] | None:
+    """Isolate one malformed market from the rest of the same Kalshi payload.
+
+    ``ingest_kalshi_market_snapshots``/``parse_kalshi_market_snapshots``
+    intentionally fail-fast on the FIRST malformed market anywhere in
+    ``payload["markets"]`` -- a pinned, correct contract for a single ingest
+    call. But this script's own batch spans every due game in the slate, so
+    one bad, unrelated market must not block every other due game sharing
+    the same payload. Validate each market individually (by reusing the real
+    per-field validation via ``parse_kalshi_market_snapshots`` on a
+    single-market sub-payload, not by re-deriving what "malformed" means) and
+    drop only the ones that fail.
+
+    Returns ``None`` when the payload's top-level shape itself is malformed
+    (not a dict, or ``markets`` missing/not a list of objects) -- that is not
+    a per-market problem, so the caller should let
+    ``ingest_kalshi_market_snapshots`` raise its normal top-level error and
+    skip the whole run, same as before this fix.
+    """
+    if not isinstance(payload, dict):
+        return None
+    markets = payload.get("markets")
+    if not isinstance(markets, list) or not all(isinstance(item, dict) for item in markets):
+        return None
+    valid: list[dict[str, Any]] = []
+    for market in markets:
+        try:
+            parse_kalshi_market_snapshots({"markets": [market]})
+        except KalshiDataError:
+            continue
+        valid.append(market)
+    return valid
+
+
+def _build_kalshi_candidates(
+    schedule: Sequence[Mapping[str, Any]]
+) -> list[KalshiGameCandidate]:
+    """Per-game isolated candidate construction from today's schedule.
+
+    ``kalshi_game_candidates_from_schedule`` raises ``KalshiMatchingError``
+    for the WHOLE schedule if any single game's ``source_game_json`` is
+    malformed/missing (its own fail-fast loop). Building one game at a time
+    isolates that failure to just the offending ``game_pk`` -- the same
+    "one bad record must not block every other due game" property as
+    :func:`_valid_kalshi_markets` above, applied at the candidate-building
+    choke point instead of the market-parsing one.
+    """
+    candidates: list[KalshiGameCandidate] = []
+    for game in schedule:
+        try:
+            candidates.extend(kalshi_game_candidates_from_schedule([game]))
+        except KalshiMatchingError as exc:
+            print(
+                f"[kalshi] skipping game_pk={game.get('game_pk')}, "
+                f"malformed schedule data: {exc}",
+                flush=True,
+            )
+    return candidates
+
+
 def build_kalshi_capture_records(
     market_rows: Sequence[Mapping[str, Any]],
     candidates: Sequence[KalshiGameCandidate],
@@ -390,14 +451,29 @@ def _run_capture(args: argparse.Namespace) -> int:
 
     with connect_database(args.database) as connection:
         try:
-            inserted = ingest_kalshi_market_snapshots(connection, payload)
+            valid_markets = _valid_kalshi_markets(payload)
+            if valid_markets is None:
+                # Top-level shape is malformed (not per-market) -- let
+                # ingest_kalshi_market_snapshots raise its own error below.
+                inserted = ingest_kalshi_market_snapshots(connection, payload)
+            else:
+                skipped = len(payload["markets"]) - len(valid_markets)
+                if skipped:
+                    print(
+                        f"[kalshi] skipping {skipped} malformed market(s), "
+                        "other due games in this payload are unaffected",
+                        flush=True,
+                    )
+                inserted = ingest_kalshi_market_snapshots(
+                    connection, {"markets": valid_markets}
+                )
         except KalshiDataError as exc:
             print(f"[kalshi] payload malformed, skipping this run: {exc}", flush=True)
             return 0
         print(f"[kalshi] bronze_inserted={inserted}", flush=True)
         market_rows = _latest_kalshi_markets(connection)
 
-    candidates = kalshi_game_candidates_from_schedule(schedule)
+    candidates = _build_kalshi_candidates(schedule)
     due_game_pks = {game["game_pk"] for game in due}
     records, stats = build_kalshi_capture_records(
         market_rows, candidates, due_game_pks, run_date=run_date, now=now

@@ -803,6 +803,85 @@ def test_main_one_malformed_market_blocks_capture_for_every_other_due_game(
     assert {row["game_pk"] for row in rows} == {776001}
 
 
+def test_main_one_malformed_schedule_game_does_not_block_capture_for_other_games(
+    tmp_path: Path,
+) -> None:
+    """Adversarial: one game's malformed ``source_game_json`` must not crash
+    the whole invocation or block a completely unrelated healthy due game.
+
+    ``kalshi_game_candidates_from_schedule`` raises ``KalshiMatchingError``
+    for the WHOLE schedule (its own fail-fast loop over every game) if any
+    single game's ``source_game_json`` is missing the expected team-name
+    shape. Before this fix, ``_run_capture`` built ``candidates`` outside any
+    try/except, so that exception propagated uncaught through ``main()`` and
+    crashed the entire invocation with zero games captured -- same failure
+    class as the market-level P1, at a different choke point.
+    """
+    database = tmp_path / "mlb.duckdb"
+    odds_books = tmp_path / "odds_books.jsonl"
+    kalshi_json = tmp_path / "kalshi.json"
+
+    now = datetime(2026, 8, 15, 18, 0, tzinfo=timezone.utc)
+    first_pitch = now + timedelta(minutes=40)
+
+    _write_schedule(
+        database,
+        [
+            {
+                "game_pk": 776001,
+                "official_date": date(2026, 8, 15),
+                "game_date": first_pitch,
+                "source_game_json": {
+                    "teams": {
+                        "home": {"team": {"name": "Houston Astros"}},
+                        "away": {"team": {"name": "Seattle Mariners"}},
+                    }
+                },
+            },
+            {
+                # Malformed: missing the expected "teams" shape entirely.
+                "game_pk": 776099,
+                "official_date": date(2026, 8, 15),
+                "game_date": first_pitch,
+                "source_game_json": {},
+            },
+        ],
+    )
+
+    payload = {
+        "markets": [
+            _kalshi_market(
+                "T-SEA", "E-A", "Seattle", "Houston", first_pitch, now - timedelta(minutes=5),
+                yes_bid=0.44, yes_ask=0.46, no_bid=0.54, no_ask=0.56,
+            ),
+            _kalshi_market(
+                "T-HOU", "E-A", "Houston", "Seattle", first_pitch, now - timedelta(minutes=5),
+                yes_bid=0.54, yes_ask=0.56, no_bid=0.44, no_ask=0.46,
+            ),
+        ]
+    }
+    kalshi_json.write_text(json.dumps(payload), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--date", "2026-08-15",
+            "--database", str(database),
+            "--odds-books-output", str(odds_books),
+            "--kalshi-json", str(kalshi_json),
+            "--now", now.isoformat(),
+        ]
+    )
+
+    assert exit_code == 0  # must never raise/crash
+    assert odds_books.exists(), (
+        "one game's malformed source_game_json blocked candidate-building "
+        "for the WHOLE schedule, so the healthy due game 776001 was never "
+        "captured this invocation"
+    )
+    rows = [json.loads(line) for line in odds_books.read_text(encoding="utf-8").splitlines()]
+    assert {row["game_pk"] for row in rows} == {776001}
+
+
 def test_main_missing_kalshi_fetch_never_raises_and_leaves_no_trace(tmp_path: Path, monkeypatch) -> None:
     # A total Kalshi API outage (network error) must never raise/crash --
     # comparison-only data, isolated from everything else this repo does.
