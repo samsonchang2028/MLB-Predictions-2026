@@ -304,17 +304,35 @@ to certify cleanly.
   APPROVE (independently re-derived the exploit, confirmed closed without
   breaking doubleheader disambiguation). Tester: PASS. Full suite post-merge:
   841 passed, 5 xfailed.
-- **Known gap for PIPE-006**: `bronze.kalshi_market_snapshots` (DATA-022)
-  does not persist `occurrence_datetime`, `title`, or `no_sub_title` — only
-  `side` (= `yes_sub_title`). DATA-023's matcher is written against the raw
-  Kalshi market-object shape, not the Bronze row shape, since Bronze alone
-  is insufficient to match. PIPE-006 needs either a Bronze schema addition
-  or to match at fetch time before persisting.
+- **PIPE-006** — `scripts/kalshi_pregame_capture.py` (new standalone script,
+  meant to be invoked frequently — every 10-15 min — by an external
+  scheduler; scheduler registration itself is out of scope, deferred to a
+  future OPS-001/OPS-003 task). Captures each game's Kalshi price once, close
+  to that specific game's own first pitch (60-15 minute window before game
+  start, documented default, CLI-overridable), not on the existing
+  once-daily sportsbook batch timestamp. Extended
+  `bronze.kalshi_market_snapshots` additively with `occurrence_datetime`,
+  `title`, `no_sub_title` (nullable, migrates existing rows safely via
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`) so matching reads from Bronze
+  rather than the raw API response. Reuses `append_jsonl_records`, the
+  existing `(run_date, game_pk, bookmaker)` upsert key, the post-DATA-023-fix
+  matching logic, and MARKET-003's `probability_to_american`.
+  `daily.jsonl`/`market_probability`/`edge` remain untouched. Reviewer
+  initially CHANGES REQUIRED and Tester FAIL — both independently found the
+  same P1: a single malformed Kalshi market anywhere in the shared slate
+  payload aborted capture for every due game, not just the bad one, since the
+  batch ingest call fails fast on the first bad record; a related gap let one
+  game's malformed schedule data crash the whole invocation. Fixed by
+  validating each market/game independently before batch persistence.
+  Re-review: APPROVE (independently verified both fixes by code inspection
+  plus fresh adversarial cases; found one new narrow non-blocking P2 — a
+  value-conflict edge case, same low-severity class as this integration's
+  other xfail-pinned P2s). Full suite post-merge: 893 passed, 6 xfailed.
 
-Unblocked next: **PIPE-006** (all three deps — DATA-022, DATA-023,
-MARKET-003 — merged; see the schema gap above). Still blocked: **APP-012**
-(renamed from APP-010 to avoid colliding with the merged V2
-simulation-dashboard APP-010; needs PIPE-006).
+Unblocked next: **APP-012** (renamed from APP-010 to avoid colliding with
+the merged V2 simulation-dashboard APP-010; all deps — PIPE-006, APP-005 —
+now merged). This completes the Kalshi integration wave except for scheduler
+registration (a future OPS-001/OPS-003 task) and the display layer (APP-012).
 
 ## In progress (V2 simulation)
 
