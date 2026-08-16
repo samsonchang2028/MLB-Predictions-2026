@@ -1,5 +1,6 @@
 import json
 from copy import deepcopy
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -246,6 +247,76 @@ def test_all_fields_round_trip_losslessly_for_both_real_markets(tmp_path: Path) 
             Decimal("0.5600"),
         ),
     ]
+
+
+def test_pipe_006_matching_fields_round_trip(tmp_path: Path) -> None:
+    """occurrence_datetime/title/no_sub_title persist -- PIPE-006's read path."""
+    paths = initialize_storage(tmp_path / "data")
+
+    with connect_database(paths["database"]) as connection:
+        ingest_kalshi_market_snapshots(connection, load_fixture())
+        rows = connection.execute(
+            """
+            SELECT market_ticker, no_sub_title, title, occurrence_datetime
+            FROM bronze.kalshi_market_snapshots
+            ORDER BY market_ticker
+            """
+        ).fetchall()
+
+    assert rows == [
+        (
+            "KXMLBGAME-26AUG161920SEAHOU-HOU",
+            "Seattle",
+            "Seattle vs Houston Winner?",
+            datetime(2026, 8, 17, 2, 20, tzinfo=timezone.utc),
+        ),
+        (
+            "KXMLBGAME-26AUG161920SEAHOU-SEA",
+            "Houston",
+            "Seattle vs Houston Winner?",
+            datetime(2026, 8, 17, 2, 20, tzinfo=timezone.utc),
+        ),
+    ]
+
+
+def test_pre_pipe_006_table_shape_is_migrated_additively(tmp_path: Path) -> None:
+    """A DB created before PIPE-006 (no matching-input columns) still ingests.
+
+    Simulates the pre-existing on-disk table shape DATA-022 originally
+    created, then confirms a fresh ingest call transparently adds the new
+    nullable columns via ``ALTER TABLE ... ADD COLUMN IF NOT EXISTS`` rather
+    than failing or requiring a manual migration.
+    """
+    paths = initialize_storage(tmp_path / "data")
+    with connect_database(paths["database"]) as connection:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
+        connection.execute(
+            """
+            CREATE TABLE bronze.kalshi_market_snapshots (
+                source VARCHAR NOT NULL,
+                market_ticker VARCHAR NOT NULL,
+                event_ticker VARCHAR NOT NULL,
+                side VARCHAR NOT NULL,
+                yes_bid DECIMAL(5,4) NOT NULL CHECK (yes_bid >= 0 AND yes_bid <= 1),
+                yes_ask DECIMAL(5,4) NOT NULL CHECK (yes_ask >= 0 AND yes_ask <= 1),
+                no_bid DECIMAL(5,4) NOT NULL CHECK (no_bid >= 0 AND no_bid <= 1),
+                no_ask DECIMAL(5,4) NOT NULL CHECK (no_ask >= 0 AND no_ask <= 1),
+                snapshot_timestamp TIMESTAMPTZ NOT NULL,
+                source_payload_sha256 VARCHAR NOT NULL,
+                PRIMARY KEY (source, market_ticker, snapshot_timestamp)
+            )
+            """
+        )
+
+        assert ingest_kalshi_market_snapshots(connection, load_fixture()) == 2
+        no_sub_titles = {
+            row[0]
+            for row in connection.execute(
+                "SELECT no_sub_title FROM bronze.kalshi_market_snapshots"
+            ).fetchall()
+        }
+
+    assert no_sub_titles == {"Seattle", "Houston"}
 
 
 @pytest.mark.xfail(

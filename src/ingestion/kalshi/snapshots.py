@@ -80,6 +80,16 @@ def parse_kalshi_market_snapshots(
         # this market" (docs.kalshi.com) — i.e. the team this market's "yes"
         # resolves for. This is the natural `side` for a per-team market.
         side = _required_text(market.get("yes_sub_title"), f"{prefix}.yes_sub_title")
+        # PIPE-006: no_sub_title (the opposing team on this market's no side),
+        # title, and occurrence_datetime (first pitch) are the matching inputs
+        # DATA-023's match_kalshi_market needs but this table did not persist
+        # until now -- additive columns, same required-field treatment as the
+        # other identity fields above.
+        no_sub_title = _required_text(market.get("no_sub_title"), f"{prefix}.no_sub_title")
+        title = _required_text(market.get("title"), f"{prefix}.title")
+        occurrence_datetime = _timestamp(
+            market.get("occurrence_datetime"), f"{prefix}.occurrence_datetime"
+        )
         yes_bid = _price(market.get("yes_bid_dollars"), f"{prefix}.yes_bid_dollars")
         yes_ask = _price(market.get("yes_ask_dollars"), f"{prefix}.yes_ask_dollars")
         no_bid = _price(market.get("no_bid_dollars"), f"{prefix}.no_bid_dollars")
@@ -98,6 +108,9 @@ def parse_kalshi_market_snapshots(
                 "no_ask": no_ask,
                 "snapshot_timestamp": snapshot_timestamp,
                 "source_payload_sha256": payload_sha256,
+                "no_sub_title": no_sub_title,
+                "title": title,
+                "occurrence_datetime": occurrence_datetime,
             }
         )
 
@@ -123,6 +136,9 @@ def ingest_kalshi_market_snapshots(
             or previous["no_ask"] != snapshot["no_ask"]
             or previous["event_ticker"] != snapshot["event_ticker"]
             or previous["side"] != snapshot["side"]
+            or previous["no_sub_title"] != snapshot["no_sub_title"]
+            or previous["title"] != snapshot["title"]
+            or previous["occurrence_datetime"] != snapshot["occurrence_datetime"]
         ):
             raise KalshiDataError(
                 "payload contains conflicting values for the same kalshi market snapshot"
@@ -137,7 +153,8 @@ def ingest_kalshi_market_snapshots(
         for key, snapshot in unique_snapshots.items():
             existing = connection.execute(
                 """
-                SELECT yes_bid, yes_ask, no_bid, no_ask, event_ticker, side
+                SELECT yes_bid, yes_ask, no_bid, no_ask, event_ticker, side,
+                       no_sub_title, title, occurrence_datetime
                 FROM bronze.kalshi_market_snapshots
                 WHERE source = ? AND market_ticker = ? AND snapshot_timestamp = ?
                 """,
@@ -150,6 +167,9 @@ def ingest_kalshi_market_snapshots(
                 or existing[3] != snapshot["no_ask"]
                 or existing[4] != snapshot["event_ticker"]
                 or existing[5] != snapshot["side"]
+                or existing[6] != snapshot["no_sub_title"]
+                or existing[7] != snapshot["title"]
+                or existing[8] != snapshot["occurrence_datetime"]
             ):
                 raise KalshiDataError(
                     "stored snapshot conflicts with the immutable incoming observation"
@@ -160,7 +180,7 @@ def ingest_kalshi_market_snapshots(
             row = connection.execute(
                 """
                 INSERT INTO bronze.kalshi_market_snapshots
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT DO NOTHING
                 RETURNING 1
                 """,
@@ -175,6 +195,9 @@ def ingest_kalshi_market_snapshots(
                     snapshot["no_ask"],
                     snapshot["snapshot_timestamp"],
                     snapshot["source_payload_sha256"],
+                    snapshot["no_sub_title"],
+                    snapshot["title"],
+                    snapshot["occurrence_datetime"],
                 ],
             ).fetchone()
             inserted += row is not None
@@ -203,3 +226,18 @@ def _ensure_kalshi_market_snapshots_table(connection: duckdb.DuckDBPyConnection)
         )
         """
     )
+    # PIPE-006: additive nullable columns for DATA-023's matching inputs
+    # (occurrence_datetime/title/no_sub_title), not present when DATA-022
+    # first created this table. ADD COLUMN IF NOT EXISTS keeps a pre-existing
+    # database file (already-created table, older rows) working without a
+    # destructive migration; new ingests always populate all three (required
+    # fields in parse_kalshi_market_snapshots above), so NULL only appears for
+    # rows written before this change.
+    for column, column_type in (
+        ("no_sub_title", "VARCHAR"),
+        ("title", "VARCHAR"),
+        ("occurrence_datetime", "TIMESTAMPTZ"),
+    ):
+        connection.execute(
+            f"ALTER TABLE bronze.kalshi_market_snapshots ADD COLUMN IF NOT EXISTS {column} {column_type}"
+        )

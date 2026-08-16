@@ -33,10 +33,17 @@ def test_maps_real_market_pair_to_canonical_snapshots() -> None:
         2026, 8, 13, 23, 40, 0, 213197, tzinfo=timezone.utc
     )
     assert len(first["source_payload_sha256"]) == 64
+    # PIPE-006: matching inputs DATA-023's match_kalshi_market needs.
+    assert first["no_sub_title"] == "Houston"
+    assert first["title"] == "Seattle vs Houston Winner?"
+    assert first["occurrence_datetime"] == datetime(
+        2026, 8, 17, 2, 20, 0, tzinfo=timezone.utc
+    )
 
     # Both markets come from one fetch -> same immutable payload hash.
     assert snapshots[0]["source_payload_sha256"] == snapshots[1]["source_payload_sha256"]
     assert snapshots[1]["side"] == "Houston"
+    assert snapshots[1]["no_sub_title"] == "Seattle"
 
 
 def test_custom_source_is_preserved() -> None:
@@ -68,6 +75,12 @@ def test_no_markets_for_the_day_is_a_normal_empty_result() -> None:
         ("updated_time", None, "updated_time is required"),
         ("updated_time", "not-a-time", "valid ISO-8601 timestamp"),
         ("updated_time", "2026-08-13T23:40:00", "timezone offset"),
+        ("no_sub_title", None, "no_sub_title is required"),
+        ("no_sub_title", "", "no_sub_title is required"),
+        ("title", None, "title is required"),
+        ("occurrence_datetime", None, "occurrence_datetime is required"),
+        ("occurrence_datetime", "not-a-time", "valid ISO-8601 timestamp"),
+        ("occurrence_datetime", "2026-08-17T02:20:00", "timezone offset"),
     ],
 )
 def test_missing_or_malformed_identity_fields_fail_clearly(
