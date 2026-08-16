@@ -26,6 +26,7 @@ from experiments.ablation import (
     leave_one_out_variants,
     run_ablation,
 )
+from features.completeness import REQUIRED_FAMILY_COLUMNS
 
 
 def _dt(year: int, day: int = 1) -> datetime:
@@ -312,3 +313,242 @@ def test_variant_aggregate_pooled_log_loss_is_the_n_weighted_fold_mean() -> None
     expected_log_loss = sum(r["log_loss"] * r["n_test"] for r in fold_rows) / n
     assert aggregate_row["log_loss"] == pytest.approx(expected_log_loss, abs=1e-9)
     assert aggregate_row["n_test"] == n
+
+
+# ---------------------------------------------------------------------------
+# Tester (ML-012): additional adversarial coverage
+# ---------------------------------------------------------------------------
+#
+# Everything below was added by the tester pass, on top of the implementer's
+# 14 tests above. It targets six angles the tester role treats as high-risk
+# for this task: (1) family assembly against the REAL 240-column production
+# taxonomy, not just the 12-column fixture; (2) the FULL/zero-column boundary
+# cases, not just a middle case; (3) determinism under adversarial column
+# ordering; (4) that the harness reuses evaluation.splits's real fold
+# boundaries rather than reinventing them; (5) a broader mutation-based
+# leakage test spanning every variant and window, not just one; (6) an
+# end-to-end (not just unit-level) 2026-holdout rejection test, plus one
+# xfail-pinned finding.
+
+
+def test_family_columns_matches_real_completeness_taxonomy_on_full_column_set() -> None:
+    """Column-membership assertion against the actual production taxonomy
+    (``features.completeness.REQUIRED_FAMILY_COLUMNS``), not the small
+    12-column synthetic fixture -- proves ``family_columns`` partitions the
+    real 240-column certified-build taxonomy with the documented exact counts
+    and zero leftovers."""
+    all_real_columns = [col for cols in REQUIRED_FAMILY_COLUMNS.values() for col in cols]
+    assert len(all_real_columns) == 240
+
+    families = family_columns(all_real_columns)
+
+    assert "unclassified" not in families
+    assert len(families["team"]) == 84
+    assert len(families["starter"]) == 75
+    assert len(families["bullpen"]) == 45
+    assert len(families["rest_schedule"]) == 36
+    for family, expected_columns in REQUIRED_FAMILY_COLUMNS.items():
+        assert set(families[family]) == set(expected_columns)
+
+
+def test_leave_one_out_full_variant_excludes_unclassified_columns_directly() -> None:
+    """Boundary case for the FULL model, called directly (bypassing
+    ``run_ablation``'s own unclassified-column guard): ``leave_one_out_variants``
+    must restrict ``"full"`` to only the four known families' columns, not
+    every column physically present in the matrix."""
+    matrix = _synthetic_matrix()
+    for row in matrix["rows"]:
+        row["features"]["home_weather_temperature"] = 1.0
+    stray_columns = [*_ALL_COLUMNS, "home_weather_temperature"]
+    matrix["feature_columns"] = sorted(stray_columns)
+
+    families = family_columns(stray_columns)
+    assert families["unclassified"] == ["home_weather_temperature"]
+
+    variants = leave_one_out_variants(matrix, families)
+    full_columns = {c for row in variants["full"]["rows"] for c in row["features"]}
+    assert full_columns == set(_ALL_COLUMNS)
+    assert "home_weather_temperature" not in full_columns
+
+
+def test_incremental_final_variant_matches_leave_one_out_full_exactly() -> None:
+    """Cross-invariant documented in the module: the incremental scheme's
+    final cumulative step must cover exactly the same columns as
+    ``leave_one_out_variants(...)["full"]`` -- both represent the same
+    'every known family present' model."""
+    families = family_columns(_ALL_COLUMNS)
+    matrix = _synthetic_matrix()
+
+    loo = leave_one_out_variants(matrix, families)
+    inc = incremental_variants(matrix, families)
+
+    full_cols = {c for row in loo["full"]["rows"] for c in row["features"]}
+    final_key = "+".join(FAMILIES)
+    final_cols = {c for row in inc[final_key]["rows"] for c in row["features"]}
+    assert final_cols == full_cols
+
+
+def test_subset_matrix_handles_the_zero_column_baseline_without_crashing() -> None:
+    """Baseline boundary: carving a variant down to zero feature columns (as
+    if every known family were removed) must not crash or silently retain
+    any column -- exercises the assembly logic at its emptiest edge, not
+    just a middle case."""
+    from experiments.ablation import _subset_matrix
+
+    matrix = _synthetic_matrix(per_season=5)
+    subset = _subset_matrix(matrix, set())
+
+    assert subset["feature_columns"] == []
+    assert subset["rows"]
+    assert all(row["features"] == {} for row in subset["rows"])
+
+
+def test_run_ablation_is_order_independent_of_feature_column_ordering() -> None:
+    """Determinism under adversarial column ordering: reversing
+    ``feature_columns`` and each row's ``features`` dict insertion order must
+    not change the ablation result. Catches iteration-order non-determinism
+    that dict-based family/variant assembly could otherwise be sensitive to
+    (this harness sorts column sets and iterates the fixed ``FAMILIES``
+    tuple, so it should be immune -- this test proves that, rather than
+    assuming it)."""
+    matrix = _synthetic_matrix(seed=3)
+    baseline = run_ablation(matrix, windows=("expanding",))
+
+    shuffled_columns = list(reversed(_ALL_COLUMNS))
+    shuffled_rows = []
+    for row in matrix["rows"]:
+        shuffled_row = dict(row)
+        shuffled_row["features"] = {col: row["features"][col] for col in shuffled_columns}
+        shuffled_rows.append(shuffled_row)
+    shuffled_matrix = {"feature_columns": shuffled_columns, "rows": shuffled_rows}
+
+    shuffled_result = run_ablation(shuffled_matrix, windows=("expanding",))
+
+    assert shuffled_result["fold_metrics"] == baseline["fold_metrics"]
+    assert shuffled_result["variant_aggregates"] == baseline["variant_aggregates"]
+    assert shuffled_result["families"] == baseline["families"]
+
+
+def test_ablation_reuses_evaluation_splits_fold_boundaries_exactly() -> None:
+    """Chronology/window integrity: the harness must resolve folds via the
+    real ``evaluation.splits`` functions for ALL three window schemes, not
+    silently construct its own boundaries (which could reintroduce
+    train/test overlap bugs already solved elsewhere in this repo)."""
+    matrix = _synthetic_matrix()
+    result = run_ablation(
+        matrix, windows=("expanding", "rolling_2", "rolling_3"), sanity_models=()
+    )
+
+    expected = {
+        "expanding": expanding_folds(),
+        "rolling_2": rolling_folds(2),
+        "rolling_3": rolling_folds(3),
+    }
+    for window, folds in expected.items():
+        expected_pairs = {(f.train_seasons, f.test_season) for f in folds}
+        actual_pairs = {
+            (tuple(row["train_seasons"]), row["test_season"])
+            for row in result["fold_metrics"]
+            if row["window"] == window and row["variant"] == "leave_one_out:full"
+        }
+        assert actual_pairs == expected_pairs
+
+
+def test_mutating_future_fold_data_never_changes_earlier_folds_across_variants_and_windows() -> None:
+    """Broader mutation-based leakage test than the implementer's single
+    leave_one_out:full/expanding case: proves the invariant holds across
+    every variant (leave-one-out AND incremental) and every window
+    (expanding, rolling_2, rolling_3) at once, using the real fold set the
+    harness actually drives."""
+    matrix = _synthetic_matrix(per_season=40, seed=2)
+    windows = ("expanding", "rolling_2", "rolling_3")
+
+    def _run() -> dict:
+        return run_ablation(matrix, windows=windows, sanity_models=())
+
+    def _unaffected_rows(result: dict) -> dict:
+        # Folds whose train AND test seasons never touch 2024/2025 cannot be
+        # affected by mutating 2024/2025 feature values under any correct
+        # walk-forward implementation.
+        return {
+            (row["window"], row["variant"], row["test_season"]): row
+            for row in result["fold_metrics"]
+            if row["test_season"] not in (2024, 2025)
+            and all(s not in (2024, 2025) for s in row["train_seasons"])
+        }
+
+    baseline = _run()
+    baseline_unaffected = _unaffected_rows(baseline)
+    assert baseline_unaffected  # sanity: such folds actually exist (2022/2023)
+
+    mutated_rows = 0
+    for row in matrix["rows"]:
+        if row["game_date"].year in (2024, 2025):
+            for col in row["features"]:
+                row["features"][col] = -999.0
+            mutated_rows += 1
+    assert mutated_rows > 0
+
+    mutated = _run()
+    mutated_unaffected = _unaffected_rows(mutated)
+
+    assert mutated_unaffected == baseline_unaffected
+
+
+def test_run_ablation_raises_end_to_end_when_2026_rows_are_present() -> None:
+    """Adversarial 2026-exclusion check driven through the full
+    ``run_ablation`` entry point (not just the internal
+    ``_univariate_leakage_scan`` helper in isolation, which the implementer's
+    existing test already covers): proves the harness as actually invoked by
+    ``scripts/ml012_feature_ablation.py`` refuses contaminated input rather
+    than silently completing."""
+    matrix = _synthetic_matrix(include_holdout=True)
+    with pytest.raises(ValueError, match="2026"):
+        run_ablation(matrix, windows=("expanding",))
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "P2 known gap (unreachable via the real ML-012 production path: "
+        "scripts/ml012_feature_ablation.py always builds its matrix through "
+        "build_feature_matrix, which carries build_id/feature_completeness, "
+        "and FEAT-006 already FAILs Gold completeness when a required family "
+        "is entirely absent -- 'family entirely absent' is one of its "
+        "blocking_issues -- so a certified-PASS build can never reach "
+        "run_ablation with a genuinely empty family). But run_ablation and "
+        "leave_one_out_variants have no independent guard of their own: if a "
+        "family's REQUIRED_FAMILY_COLUMNS set has zero columns actually "
+        "present in feature_columns (e.g. a hand-built matrix bypassing "
+        "FEAT-006, or a future matrix shape that skips the completeness "
+        "gate), leave_one_out_variants[<family>] silently equals "
+        "leave_one_out_variants['full'] (removing an empty set is a no-op). "
+        "The ablation report would then read as 'removing bullpen has zero "
+        "effect on log loss' when in truth bullpen was never in the input "
+        "at all -- a materially different, misleading conclusion for a "
+        "research report whose whole purpose is family-level KEEP/REMOVE "
+        "verdicts. Fix: family_columns/run_ablation should raise (or the "
+        "family report should flag) any FAMILIES entry with zero present "
+        "columns, mirroring the existing unclassified-column guard."
+    ),
+)
+def test_leave_one_out_family_removal_is_not_a_silent_no_op_when_family_is_entirely_absent() -> None:
+    columns = tuple(c for c in _ALL_COLUMNS if "_bullpen_" not in c)
+    matrix = _synthetic_matrix()
+    for row in matrix["rows"]:
+        row["features"] = {c: v for c, v in row["features"].items() if c in columns}
+    matrix["feature_columns"] = sorted(columns)
+
+    families = family_columns(columns)
+    assert families["bullpen"] == []  # sanity: the family is genuinely absent
+
+    variants = leave_one_out_variants(matrix, families)
+    full_cols = {c for row in variants["full"]["rows"] for c in row["features"]}
+    bullpen_removed_cols = {c for row in variants["bullpen"]["rows"] for c in row["features"]}
+
+    assert bullpen_removed_cols != full_cols, (
+        "family 'bullpen' has zero present columns but its leave-one-out "
+        "variant is byte-identical to 'full' -- the report would misreport "
+        "this as 'removing bullpen has zero effect' instead of flagging "
+        "that bullpen was never in the input"
+    )
