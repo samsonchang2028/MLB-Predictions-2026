@@ -349,3 +349,88 @@ independent comparison-only script; no accepted decision changed).
 scheduler registration still pending OPS-001/OPS-003 — left to the
 orchestrator/reviewer per this repo's normal flow, consistent with how
 DATA-022/DATA-023 handoffs treated that update.
+
+### Re-review fix (2026-08-15)
+
+A Reviewer and a Tester independently converged on the same real P1 defect
+(commit `e5dc545`, plus Tester commit `11de103` adding the failing
+regression test): cross-game failure isolation was broken at two choke
+points in `_run_capture`, both the same "one bad record blocks the whole
+batch" pattern the task's own acceptance criteria explicitly forbid.
+
+**Fix 1 (Reviewer/Tester P1) — batch Kalshi ingest.**
+`ingest_kalshi_market_snapshots` (`src/ingestion/kalshi/snapshots.py`,
+DATA-022's code, contract intentionally left unchanged) parses the ENTIRE
+payload before any DB write and raises `KalshiDataError` on the FIRST
+malformed market anywhere in `payload["markets"]`. `_run_capture`'s blanket
+`except KalshiDataError: return 0` therefore aborted Kalshi capture for
+every due game in the slate, not just the game whose market was bad — if a
+bad record persisted across polls it would silently block the whole day's
+Kalshi capture. Fixed in `scripts/kalshi_pregame_capture.py` by adding
+`_valid_kalshi_markets(payload)`, which validates each market individually
+by reusing `parse_kalshi_market_snapshots` on a single-market sub-payload
+(so validity agrees exactly with what would fail at real ingest — no
+re-derived validation logic) and returns only the well-formed markets.
+`_run_capture` now passes `{"markets": valid_markets}` to
+`ingest_kalshi_market_snapshots` instead of the raw payload; a genuinely
+malformed top-level shape (not a dict, or `markets` not a list) still falls
+through to `ingest_kalshi_market_snapshots`'s own top-level error and the
+existing "payload malformed, skipping this run" behavior, unchanged.
+
+**Fix 2 (Reviewer P2->confirmed real, same class) — candidate building.**
+`candidates = kalshi_game_candidates_from_schedule(schedule)` was not
+wrapped in a try/except. `kalshi_game_candidates_from_schedule` raises
+`KalshiMatchingError` for the WHOLE schedule (its own fail-fast loop) if any
+single game's `source_game_json` is missing the expected team-name shape,
+which propagated uncaught through `main()` and crashed the entire
+invocation with zero games captured. Fixed by adding
+`_build_kalshi_candidates(schedule)`, which builds candidates one game at a
+time (calling `kalshi_game_candidates_from_schedule([game])` per game) and
+skips/logs just the offending `game_pk` on `KalshiMatchingError`, mirroring
+the per-market isolation already used in `build_kalshi_capture_records`.
+
+**Why this actually fixes the isolation property, not just the named
+tests:** both fixes move the failure boundary from "whole schedule/payload"
+to "one record" by validating/building per-item instead of per-batch, using
+the SAME underlying validation code (`parse_kalshi_market_snapshots`,
+`kalshi_game_candidates_from_schedule`) just invoked on singleton inputs —
+so a single call's success/failure is provably identical to what the
+batched call would have decided for that one item, and one item's failure
+can no longer raise before any other item is processed. This holds for any
+number of concurrently-malformed markets/games, not just the one-bad-record
+cases the tests exercise (each bad item is independently caught and
+skipped in its own loop iteration; nothing upstream of the loop can abort
+it).
+
+**Test evidence.**
+- `tests/unit/scripts/test_kalshi_pregame_capture.py::test_main_one_malformed_market_blocks_capture_for_every_other_due_game`
+  — before: FAILED (`AssertionError: one malformed, unrelated Kalshi market
+  blocked Bronze ingestion for the whole batch...`); after: **PASSED**.
+- Added
+  `test_main_one_malformed_schedule_game_does_not_block_capture_for_other_games`
+  (analogous regression test for fix 2, one game with `source_game_json={}`
+  alongside a healthy due game) — **PASSED** from first write (confirms the
+  fix, no separate before/after needed since this is a new test written
+  against the fixed code).
+- `python -m pytest tests/unit/scripts/test_kalshi_pregame_capture.py -q` →
+  **23 passed** (was 22 passed, 1 failed before this fix).
+- `python -m pytest tests/unit/ingestion/kalshi/ tests/integration/ingestion/kalshi/ tests/unit/scripts/test_kalshi_pregame_capture.py -q`
+  → **102 passed, 1 xfailed** (the 1 xfail is DATA-022's pre-existing
+  price-precision P2, unrelated to this fix; no new xfails needed for
+  either fix, as required).
+- `python -m pytest -q` (full repo suite) → **893 passed, 6 xfailed**, no
+  failures, no regressions.
+
+**Files changed:** `scripts/kalshi_pregame_capture.py` (added
+`_valid_kalshi_markets`, `_build_kalshi_candidates`; `_run_capture` now
+calls both instead of the raw batch functions),
+`tests/unit/scripts/test_kalshi_pregame_capture.py` (new regression test
+for fix 2). `src/ingestion/kalshi/snapshots.py` was intentionally NOT
+modified — its own fail-fast-on-malformed-market contract for a single
+ingest call is a pinned, correct design choice; the isolation fix lives
+entirely at this script's own batch-orchestration boundary, which is where
+the task said it belonged.
+
+Out of scope for this round, untouched per instruction: the Reviewer's P2
+(heavy `daily_predictions` module import for reuse) and P3s (private-
+function cross-module import naming, tolerance-window default).
