@@ -319,6 +319,100 @@ def test_pre_pipe_006_table_shape_is_migrated_additively(tmp_path: Path) -> None
     assert no_sub_titles == {"Seattle", "Houston"}
 
 
+def test_pre_pipe_006_existing_row_survives_migration_without_data_loss(
+    tmp_path: Path,
+) -> None:
+    """The real-world scenario: an on-disk `mlb.duckdb` from BEFORE PIPE-006,
+    already holding rows in the old (pre-migration) column shape.
+
+    `test_pre_pipe_006_table_shape_is_migrated_additively` above only proves
+    the OLD table shape can be created and a fresh ingest succeeds against an
+    empty table -- it never puts a row in the table before migrating, so it
+    cannot detect data loss. This test inserts a genuine old-shape row FIRST,
+    then migrates, and asserts that row's original columns are unchanged and
+    its new columns are NULL (not dropped, not backfilled with wrong data),
+    while a fresh ingest of new-shape data lands correctly alongside it.
+    """
+    paths = initialize_storage(tmp_path / "data")
+    with connect_database(paths["database"]) as connection:
+        connection.execute("CREATE SCHEMA IF NOT EXISTS bronze")
+        connection.execute(
+            """
+            CREATE TABLE bronze.kalshi_market_snapshots (
+                source VARCHAR NOT NULL,
+                market_ticker VARCHAR NOT NULL,
+                event_ticker VARCHAR NOT NULL,
+                side VARCHAR NOT NULL,
+                yes_bid DECIMAL(5,4) NOT NULL CHECK (yes_bid >= 0 AND yes_bid <= 1),
+                yes_ask DECIMAL(5,4) NOT NULL CHECK (yes_ask >= 0 AND yes_ask <= 1),
+                no_bid DECIMAL(5,4) NOT NULL CHECK (no_bid >= 0 AND no_bid <= 1),
+                no_ask DECIMAL(5,4) NOT NULL CHECK (no_ask >= 0 AND no_ask <= 1),
+                snapshot_timestamp TIMESTAMPTZ NOT NULL,
+                source_payload_sha256 VARCHAR NOT NULL,
+                PRIMARY KEY (source, market_ticker, snapshot_timestamp)
+            )
+            """
+        )
+        old_snapshot_timestamp = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+        connection.execute(
+            """
+            INSERT INTO bronze.kalshi_market_snapshots
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                "kalshi",
+                "OLD-TICKER-PRE-MIGRATION",
+                "OLD-EVENT-PRE-MIGRATION",
+                "OldSide",
+                Decimal("0.5000"),
+                Decimal("0.5500"),
+                Decimal("0.4500"),
+                Decimal("0.5000"),
+                old_snapshot_timestamp,
+                "old-payload-hash",
+            ],
+        )
+
+        # A fresh, real ingest call is what actually triggers the additive
+        # migration (ALTER TABLE ... ADD COLUMN IF NOT EXISTS).
+        assert ingest_kalshi_market_snapshots(connection, load_fixture()) == 2
+
+        old_row = connection.execute(
+            """
+            SELECT source, market_ticker, event_ticker, side, yes_bid, yes_ask,
+                   no_bid, no_ask, snapshot_timestamp, source_payload_sha256,
+                   no_sub_title, title, occurrence_datetime
+            FROM bronze.kalshi_market_snapshots
+            WHERE market_ticker = 'OLD-TICKER-PRE-MIGRATION'
+            """
+        ).fetchone()
+        total_count = connection.execute(
+            "SELECT count(*) FROM bronze.kalshi_market_snapshots"
+        ).fetchone()[0]
+
+    # Original pre-migration data is intact, byte-for-byte, not touched by
+    # the migration.
+    assert old_row[0:10] == (
+        "kalshi",
+        "OLD-TICKER-PRE-MIGRATION",
+        "OLD-EVENT-PRE-MIGRATION",
+        "OldSide",
+        Decimal("0.5000"),
+        Decimal("0.5500"),
+        Decimal("0.4500"),
+        Decimal("0.5000"),
+        old_snapshot_timestamp,
+        "old-payload-hash",
+    )
+    # The new columns exist but are NULL for the pre-migration row -- not
+    # dropped, not silently defaulted to some invented value.
+    assert old_row[10] is None
+    assert old_row[11] is None
+    assert old_row[12] is None
+    # The old row plus the 2 freshly-ingested rows all coexist.
+    assert total_count == 3
+
+
 @pytest.mark.xfail(
     strict=True,
     reason=(
