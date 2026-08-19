@@ -471,6 +471,42 @@ on `game_pk=823588` (`2026-08-15`, Scheduled). `scripts/holdout_2026.py` now
 uses the existing completed regular-game predicate before Gold build. Regression
 test: `tests/unit/evaluation/test_holdout_runner_inputs.py`.
 
+## ML-014 calibration re-evaluation candidate
+
+ML-014 re-evaluated raw, Platt/sigmoid, and isotonic calibration for the
+ADR-006 tuned XGBoost using only the established 2021-2025 expanding folds.
+Unlike the earlier comparison, all methods scored the same refit full-training-
+fold base probabilities; calibrators were fitted only on chronological inner-
+training predictions. Over 9,694 development predictions, raw scored 0.681237
+log loss / 0.244084 Brier / 0.015782 ECE; sigmoid scored 0.680960 / 0.243985 /
+0.006296; isotonic scored 0.697098 / 0.245104 / 0.018274. Sigmoid improved log
+loss in only 2/4 folds and worsened log loss and Brier in both 2023 and 2024.
+Candidate recommendation: **KEEP RAW**. 2026 was not loaded or used, and no
+production promotion is authorized. Artifact:
+`reports/experiments/v1-locked-calibration-pre2026-a910017bac839af5.json`.
+Implementer gate: 96 relevant evaluation/leakage tests passed; independent
+reviewer/tester gates remain.
+
+## PIPE-006 immutability-conflict fix
+
+`scripts/kalshi_pregame_capture.py` failed on repeated invocations: it
+ingested ALL Kalshi markets into `bronze.kalshi_market_snapshots` regardless
+of due status, so a previously-captured game whose price moved in a freshly-
+fetched payload triggered an immutability conflict that aborted the *entire*
+run via `except KalshiDataError: return 0` — silently dropping capture of
+every other due game in that same invocation too. Fixed by filtering markets
+to only due `game_pk`s before Bronze ingestion (`524a277`), then a follow-up
+(`01d8bf6`) added a real regression test (`test_main_already_captured_game_with_changed_price_does_not_block_a_due_game`,
+independently verified by the Reviewer to fail on pre-fix code and pass on
+fixed code) and corrected a misleading log/comment that had conflated
+"market not due yet" with "market failed to match" skips. Reviewer: APPROVE
+(2 rounds). Tester: PASS, 5 adversarial cases including multi-game scale,
+AMBIGUOUS/UNMATCHED due-game handling, fetch-failure isolation, and a live
+smoke test against the real `data/mlb.duckdb` — no defects found. Note: both
+commits landed directly on `main` rather than through the normal worktree
+flow (an Implementer process deviation), but both received full independent
+Reviewer + Tester gates before being accepted as done.
+
 ## Ready
 
 - Optional: investigate the 39 all-zero-pitcher-line games found by the real
