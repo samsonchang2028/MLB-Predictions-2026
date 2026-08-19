@@ -265,8 +265,33 @@ to certify cleanly.
 
 ## In progress
 
-- None currently dispatched (ML-012 implementation complete; ready for the
-  task's required reviewer/tester gates).
+- ML-013 - failure-regime and redundancy research (extends ML-012) completed
+  (candidate for review/test gates): `src/experiments/failure_regimes.py` and
+  `src/experiments/redundancy.py` reuse the ML-004 runner, ML-012's family
+  taxonomy, and ADR-006 locked XGBoost/expanding window unmodified.
+  `scripts/ml013_failure_regime_and_redundancy.py` runs both against the
+  certified build `a910017bac839af5`. Failure-regime slices (favorite/
+  underdog, home/away outcome, probability bucket, market-edge bucket,
+  starter-quality/bullpen-workload regime, season/fold) cover all 9,694
+  expanding-fold predictions; sharpest finding is the edge-bucket dimension
+  (calibration gap 5-7x larger where the model diverges most from the no-vig
+  opening market, both times moving toward the market's view). Redundancy
+  scan found 39 near-duplicate feature-column groups (expected engineering
+  overlap, not leakage), 0 unstable per-season-coverage columns, and that
+  `rest_schedule` is the one family (of team/starter/bullpen/rest_schedule)
+  whose ML-012 expanding-window ablation benefit is fold-concentrated rather
+  than spread. No leakage found; not escalated as P0/P1. Report:
+  `reports/experiments/ml-013-failure-regimes.json` and
+  `ml-013-redundancy.json`. Markdown:
+  `docs/research/ml-013-failure-regime-and-redundancy.md`. Full repo suite:
+  930 passed, 6 xfailed (all pre-existing). 2026 never inspected (asserted in
+  the harness, and structurally unreachable for the market-edge join). No
+  ADR-006/production-model change; `src/experiments/ablation.py` not
+  modified. See
+  `tasks/ML-013-failure-regime-and-redundancy-research.md` Handoff for full
+  detail.
+- ML-012 - implementation complete; ready for the task's required
+  reviewer/tester gates.
 
 ## Recently shipped (Kalshi integration, wave 1)
 

@@ -1,0 +1,331 @@
+{
+  "adr": "ADR-006",
+  "build_id": "a910017bac839af5",
+  "certification_artifact": "state\\data-certifications\\certification-PASS-a910017bac839af5.json",
+  "dimensions": {
+    "bullpen_workload_regime": {
+      "buckets": {
+        "high_tercile": {
+          "actual_win_rate": 0.5079795242396868,
+          "avg_predicted_probability": 0.5093602714535702,
+          "brier": 0.24555463998750776,
+          "calibration_gap": 0.001380747213883371,
+          "log_loss": 0.6843521549584853,
+          "low_confidence": false,
+          "n": 3321,
+          "roc_auc": 0.5812660208854666
+        },
+        "low_tercile": {
+          "actual_win_rate": 0.5543202033036849,
+          "avg_predicted_probability": 0.5523177966513355,
+          "brier": 0.24174093958333454,
+          "calibration_gap": 0.002002406652349409,
+          "log_loss": 0.6763942278756359,
+          "low_confidence": false,
+          "n": 3148,
+          "roc_auc": 0.5865599094858133
+        },
+        "mid_tercile": {
+          "actual_win_rate": 0.528062015503876,
+          "avg_predicted_probability": 0.5279057106999464,
+          "brier": 0.24485567325404828,
+          "calibration_gap": 0.00015630480392958557,
+          "log_loss": 0.6827559770439663,
+          "low_confidence": false,
+          "n": 3225,
+          "roc_auc": 0.5795461823187495
+        }
+      },
+      "n_excluded": 0
+    },
+    "edge_bucket": {
+      "buckets": {
+        "model_much_higher_than_market": {
+          "actual_win_rate": 0.5089588377723971,
+          "avg_predicted_probability": 0.578476231063538,
+          "brier": 0.24839319489198305,
+          "calibration_gap": 0.06951739329114082,
+          "log_loss": 0.6901866045500237,
+          "low_confidence": false,
+          "n": 2065,
+          "roc_auc": 0.5906594076834873
+        },
+        "model_much_lower_than_market": {
+          "actual_win_rate": 0.578416540595058,
+          "avg_predicted_probability": 0.479275523481559,
+          "brier": 0.24828841278534267,
+          "calibration_gap": 0.09914101711349899,
+          "log_loss": 0.6899171371513221,
+          "low_confidence": false,
+          "n": 1983,
+          "roc_auc": 0.5875281053549305
+        },
+        "model_slightly_higher_than_market": {
+          "actual_win_rate": 0.5147804054054054,
+          "avg_predicted_probability": 0.5460750020385997,
+          "brier": 0.24133422502843008,
+          "calibration_gap": 0.03129459663319434,
+          "log_loss": 0.6756025114717974,
+          "low_confidence": false,
+          "n": 2368,
+          "roc_auc": 0.6107011768267303
+        },
+        "model_slightly_lower_than_market": {
+          "actual_win_rate": 0.5295608108108109,
+          "avg_predicted_probability": 0.516188552502442,
+          "brier": 0.24010831990238599,
+          "calibration_gap": 0.013372258308368856,
+          "log_loss": 0.67298518196268,
+          "low_confidence": false,
+          "n": 2368,
+          "roc_auc": 0.6091032931602713
+        }
+      },
+      "n_excluded": 910
+    },
+    "favorite_underdog": {
+      "buckets": {
+        "model_favors_away": {
+          "actual_win_rate": 0.4572164948453608,
+          "avg_predicted_probability": 0.4373009600321349,
+          "brier": 0.24751398188773632,
+          "calibration_gap": 0.019915534813225888,
+          "log_loss": 0.6882292392047974,
+          "low_confidence": false,
+          "n": 3880,
+          "roc_auc": 0.539986279604844
+        },
+        "model_favors_home": {
+          "actual_win_rate": 0.5780873753009976,
+          "avg_predicted_probability": 0.5909958853523142,
+          "brier": 0.24179441584567238,
+          "calibration_gap": 0.012908510051316546,
+          "log_loss": 0.6765705390130391,
+          "low_confidence": false,
+          "n": 5814,
+          "roc_auc": 0.5563391522600492
+        }
+      },
+      "n_excluded": 0
+    },
+    "home_away_outcome": {
+      "buckets": {
+        "away_win": {
+          "actual_win_rate": 0.0,
+          "avg_predicted_probability": 0.5145213284933612,
+          "brier": 0.27331017942319463,
+          "calibration_gap": 0.5145213284933612,
+          "log_loss": 0.7423218870813303,
+          "low_confidence": false,
+          "n": 4559,
+          "roc_auc": null
+        },
+        "home_win": {
+          "actual_win_rate": 1.0,
+          "avg_predicted_probability": 0.5427604801873037,
+          "brier": 0.21813551615595175,
+          "calibration_gap": 0.4572395198126963,
+          "log_loss": 0.6270039101718867,
+          "low_confidence": false,
+          "n": 5135,
+          "roc_auc": null
+        }
+      },
+      "n_excluded": 0
+    },
+    "probability_bucket": {
+      "buckets": {
+        "0.20-0.30": {
+          "actual_win_rate": 0.45454545454545453,
+          "avg_predicted_probability": 0.2872561410521016,
+          "brier": 0.27285748327285714,
+          "calibration_gap": 0.1672893134933529,
+          "log_loss": 0.7441317466154713,
+          "low_confidence": false,
+          "n": 33,
+          "roc_auc": 0.5925925925925926
+        },
+        "0.30-0.40": {
+          "actual_win_rate": 0.38811630847029077,
+          "avg_predicted_probability": 0.36833264771966656,
+          "brier": 0.23876537681967694,
+          "calibration_gap": 0.01978366075062421,
+          "log_loss": 0.6706933315478373,
+          "low_confidence": false,
+          "n": 791,
+          "roc_auc": 0.48989151210057336
+        },
+        "0.40-0.50": {
+          "actual_win_rate": 0.47513089005235604,
+          "avg_predicted_probability": 0.4567726269383861,
+          "brier": 0.24950475775917808,
+          "calibration_gap": 0.01835826311396993,
+          "log_loss": 0.6921644879653024,
+          "low_confidence": false,
+          "n": 3056,
+          "roc_auc": 0.5195475927948723
+        },
+        "0.50-0.60": {
+          "actual_win_rate": 0.5469550369948777,
+          "avg_predicted_probability": 0.5468605324736222,
+          "brier": 0.24741726059679214,
+          "calibration_gap": 9.450452125547848e-05,
+          "log_loss": 0.6879675048671854,
+          "low_confidence": false,
+          "n": 3514,
+          "roc_auc": 0.5241786782507751
+        },
+        "0.60-0.70": {
+          "actual_win_rate": 0.6077908217716115,
+          "avg_predicted_probability": 0.6429728162072385,
+          "brier": 0.23863216085638778,
+          "calibration_gap": 0.03518199443562697,
+          "log_loss": 0.6703402744115533,
+          "low_confidence": false,
+          "n": 1874,
+          "roc_auc": 0.5406592487741365
+        },
+        "0.70-0.80": {
+          "actual_win_rate": 0.7058823529411765,
+          "avg_predicted_probability": 0.7262293488839093,
+          "brier": 0.20829642485460925,
+          "calibration_gap": 0.020346995942732815,
+          "log_loss": 0.607571399835861,
+          "low_confidence": false,
+          "n": 425,
+          "roc_auc": 0.5027466666666667
+        },
+        "0.80-0.90": {
+          "actual_win_rate": 0.0,
+          "avg_predicted_probability": 0.8036354780197144,
+          "brier": 0.6458299815319748,
+          "calibration_gap": 0.8036354780197144,
+          "log_loss": 1.6277825410276794,
+          "low_confidence": true,
+          "n": 1,
+          "roc_auc": null
+        }
+      },
+      "n_excluded": 0
+    },
+    "season_fold": {
+      "buckets": {
+        "2022": {
+          "actual_win_rate": 0.533003300330033,
+          "avg_predicted_probability": 0.5461620300848393,
+          "brier": 0.24249750798505249,
+          "calibration_gap": 0.013158729754806364,
+          "log_loss": 0.6782277745189268,
+          "low_confidence": false,
+          "n": 2424,
+          "roc_auc": 0.5975365527464472
+        },
+        "2023": {
+          "actual_win_rate": 0.520016508460586,
+          "avg_predicted_probability": 0.52872992782026,
+          "brier": 0.24441444472365,
+          "calibration_gap": 0.008713419359673957,
+          "log_loss": 0.6818879380930433,
+          "low_confidence": false,
+          "n": 2423,
+          "roc_auc": 0.5870327150636695
+        },
+        "2024": {
+          "actual_win_rate": 0.5222956234516928,
+          "avg_predicted_probability": 0.521226988830023,
+          "brier": 0.24331648556451013,
+          "calibration_gap": 0.0010686346216697284,
+          "log_loss": 0.6795587050594826,
+          "low_confidence": false,
+          "n": 2422,
+          "roc_auc": 0.5884842563396544
+        },
+        "2025": {
+          "actual_win_rate": 0.5435051546391753,
+          "avg_predicted_probability": 0.5217965605701368,
+          "brier": 0.24610486453308927,
+          "calibration_gap": 0.021708594069038467,
+          "log_loss": 0.6852704242676428,
+          "low_confidence": false,
+          "n": 2425,
+          "roc_auc": 0.5645327773459828
+        }
+      },
+      "n_excluded": 0
+    },
+    "starter_quality_regime": {
+      "buckets": {
+        "high_tercile": {
+          "actual_win_rate": 0.4913944502985599,
+          "avg_predicted_probability": 0.4952212404662532,
+          "brier": 0.24787065655014232,
+          "calibration_gap": 0.003826790167693328,
+          "log_loss": 0.6889746239868391,
+          "low_confidence": false,
+          "n": 2847,
+          "roc_auc": 0.5625621991240783
+        },
+        "low_tercile": {
+          "actual_win_rate": 0.5623219373219374,
+          "avg_predicted_probability": 0.5685247802454182,
+          "brier": 0.23942699605362472,
+          "calibration_gap": 0.0062028429234808335,
+          "log_loss": 0.6716284391042686,
+          "low_confidence": false,
+          "n": 2808,
+          "roc_auc": 0.5963167921524938
+        },
+        "mid_tercile": {
+          "actual_win_rate": 0.5406064830951551,
+          "avg_predicted_probability": 0.5276066116357606,
+          "brier": 0.24422360094335685,
+          "calibration_gap": 0.012999871459394519,
+          "log_loss": 0.6815269828106563,
+          "low_confidence": false,
+          "n": 2869,
+          "roc_auc": 0.5782277134826129
+        },
+        "missing": {
+          "actual_win_rate": 0.517948717948718,
+          "avg_predicted_probability": 0.5237281872166528,
+          "brier": 0.24570146002378798,
+          "calibration_gap": 0.0057794692679348225,
+          "log_loss": 0.6847574673139599,
+          "low_confidence": false,
+          "n": 1170,
+          "roc_auc": 0.580897584439295
+        }
+      },
+      "n_excluded": 0
+    }
+  },
+  "generated_at": "2026-08-19T17:34:06.905702+00:00",
+  "holdout_2026": "not inspected",
+  "input_counts": {
+    "bullpen_features": 24236,
+    "games": 14520,
+    "pitcher_appearances": 132448,
+    "pitcher_starters": 28941,
+    "starter_features": 24240,
+    "team_features": 24300,
+    "team_game_statistics_regular": 24300
+  },
+  "low_n_threshold": 30,
+  "model": "xgboost",
+  "n_market_matched_games": 10969,
+  "n_predictions": 9694,
+  "n_rows": 12118,
+  "random_state": 0,
+  "runtime_seconds": 38.644,
+  "slice_definitions": {
+    "bullpen_workload_regime": "empirical tercile of diff_bullpen_bullpen_ip_L7 (home recent bullpen IP - away recent bullpen IP)",
+    "edge_bucket": "model_p_home - no_vig_opening_market_p_home, MATCHED archive games only; games without a resolved price are excluded (see n_excluded)",
+    "favorite_underdog": "model_favors_home if p_home_win>=0.5 else model_favors_away; metrics use raw (p_home_win, y_true), not a favorite-perspective reframing (see module docstring for why that reframing is mathematically degenerate)",
+    "home_away_outcome": "actual result: home_win (y_true==1) vs away_win (y_true==0)",
+    "probability_bucket": "10 equal-width bins over [0,1], same convention as evaluation.runner ECE",
+    "season_fold": "expanding-fold test_season (2022-2025)",
+    "starter_quality_regime": "empirical tercile of diff_starter_season_era_before (home ERA - away ERA; negative = home starter has the lower/better ERA)"
+  },
+  "status": "ML013_FAILURE_REGIME_EVIDENCE",
+  "window": "expanding"
+}
