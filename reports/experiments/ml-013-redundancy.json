@@ -1,0 +1,1711 @@
+{
+  "ablation_fold_concentration": {
+    "concentration_threshold": 0.5,
+    "families": {
+      "bullpen": {
+        "expanding": {
+          "concentrated_in_one_fold": false,
+          "max_abs_delta": 0.0019755983413966005,
+          "max_fold_share_of_total_abs_delta": 0.47067837971931237,
+          "mean_delta": 0.0010493356113864538,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0016422785972056708,
+              "n_test": 2424,
+              "test_season": 2022
+            },
+            {
+              "log_loss_delta": 0.00011690642024209108,
+              "n_test": 2423,
+              "test_season": 2023
+            },
+            {
+              "log_loss_delta": 0.0019755983413966005,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.00046255908670145285,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_2": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.001226535231032444,
+          "max_fold_share_of_total_abs_delta": 0.6091729688020927,
+          "mean_delta": 0.001006721648733333,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0007869080664342221,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.001226535231032444,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_3": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.0019755983413966005,
+          "max_fold_share_of_total_abs_delta": 0.7752539240911578,
+          "mean_delta": 0.0012741621035408657,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0019755983413966005,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.0005727258656851308,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        }
+      },
+      "rest_schedule": {
+        "expanding": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.004075052352378483,
+          "max_fold_share_of_total_abs_delta": 0.5662709936760825,
+          "mean_delta": 0.0017879644316581844,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.004075052352378483,
+              "n_test": 2424,
+              "test_season": 2022
+            },
+            {
+              "log_loss_delta": 0.0018850422220927365,
+              "n_test": 2423,
+              "test_season": 2023
+            },
+            {
+              "log_loss_delta": -2.221795851209407e-05,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.001213981110673612,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_2": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.00174894152186289,
+          "max_fold_share_of_total_abs_delta": 0.9985745370196419,
+          "mean_delta": 0.0008732224558216095,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": -2.4966102196710693e-06,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.00174894152186289,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_3": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.0015618210802531562,
+          "max_fold_share_of_total_abs_delta": 0.9859738567242554,
+          "mean_delta": 0.0007698015608705311,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": -2.221795851209407e-05,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.0015618210802531562,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        }
+      },
+      "starter": {
+        "expanding": {
+          "concentrated_in_one_fold": false,
+          "max_abs_delta": 0.004050827331120832,
+          "max_fold_share_of_total_abs_delta": 0.4121068646694988,
+          "mean_delta": 0.0024573888949711575,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.002556724023083934,
+              "n_test": 2424,
+              "test_season": 2022
+            },
+            {
+              "log_loss_delta": 0.0017907188713973676,
+              "n_test": 2423,
+              "test_season": 2023
+            },
+            {
+              "log_loss_delta": 0.004050827331120832,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.0014312853542824966,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_2": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.0032341056313810457,
+          "max_fold_share_of_total_abs_delta": 0.9596066393123627,
+          "mean_delta": 0.0016851204956744303,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0032341056313810457,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.000136135359967815,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_3": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.004050827331120832,
+          "max_fold_share_of_total_abs_delta": 0.9816291442450417,
+          "mean_delta": 0.0019875087372967504,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.004050827331120832,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": -7.58098565273313e-05,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        }
+      },
+      "team": {
+        "expanding": {
+          "concentrated_in_one_fold": false,
+          "max_abs_delta": 0.006350951234435409,
+          "max_fold_share_of_total_abs_delta": 0.4968909336100293,
+          "mean_delta": 0.0031953446948077002,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0021575716105876053,
+              "n_test": 2424,
+              "test_season": 2022
+            },
+            {
+              "log_loss_delta": 0.006350951234435409,
+              "n_test": 2423,
+              "test_season": 2023
+            },
+            {
+              "log_loss_delta": 0.003683053746614151,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.0005898021875936355,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_2": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.0036216924410594764,
+          "max_fold_share_of_total_abs_delta": 0.7979823629837756,
+          "mean_delta": 0.002269281007363011,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.0036216924410594764,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.0009168695736665455,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        },
+        "rolling_3": {
+          "concentrated_in_one_fold": true,
+          "max_abs_delta": 0.003683053746614151,
+          "max_fold_share_of_total_abs_delta": 0.7021721954820355,
+          "mean_delta": 0.002622614346104779,
+          "per_fold_deltas": [
+            {
+              "log_loss_delta": 0.003683053746614151,
+              "n_test": 2422,
+              "test_season": 2024
+            },
+            {
+              "log_loss_delta": 0.001562174945595407,
+              "n_test": 2425,
+              "test_season": 2025
+            }
+          ]
+        }
+      }
+    },
+    "source_report": "reports\\experiments\\ml-012-feature-ablation.json"
+  },
+  "build_id": "a910017bac839af5",
+  "certification_artifact": "state\\data-certifications\\certification-PASS-a910017bac839af5.json",
+  "correlation_scan": {
+    "constant_columns_excluded": [
+      "away_starter_starter_is_probable",
+      "away_starter_starter_known",
+      "home_starter_starter_is_probable",
+      "home_starter_starter_known"
+    ],
+    "flagged_pairs": [
+      {
+        "column_a": "away_bullpen_bullpen_games_L14",
+        "column_b": "away_team_games_L14",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L7",
+        "column_b": "away_team_games_L7",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "away_bullpen_bullpen_ip_prior_1d",
+        "column_b": "away_bullpen_bullpen_outs_prior_1d",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "away_bullpen_bullpen_ip_prior_3d",
+        "column_b": "away_bullpen_bullpen_outs_prior_3d",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_games_L14",
+        "column_b": "diff_team_games_L14",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_games_L7",
+        "column_b": "diff_team_games_L7",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_ip_prior_1d",
+        "column_b": "diff_bullpen_bullpen_outs_prior_1d",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_ip_prior_3d",
+        "column_b": "diff_bullpen_bullpen_outs_prior_3d",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "home_bullpen_bullpen_games_L14",
+        "column_b": "home_team_games_L14",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "home_bullpen_bullpen_games_L30",
+        "column_b": "home_team_games_L30",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "home_bullpen_bullpen_games_L7",
+        "column_b": "home_team_games_L7",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "home_bullpen_bullpen_ip_prior_3d",
+        "column_b": "home_bullpen_bullpen_outs_prior_3d",
+        "correlation": 1.0
+      },
+      {
+        "column_a": "home_bullpen_bullpen_ip_prior_1d",
+        "column_b": "home_bullpen_bullpen_outs_prior_1d",
+        "correlation": 0.9999999999999991
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L30",
+        "column_b": "away_team_games_L30",
+        "correlation": 0.9999927275884107
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "home_team_games_played_before",
+        "correlation": 0.9994692275304118
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_games_L30",
+        "column_b": "diff_team_games_L30",
+        "correlation": 0.9991988324908878
+      },
+      {
+        "column_a": "home_team_run_diff_avg_L7",
+        "column_b": "home_team_run_diff_total_L7",
+        "correlation": 0.9977158498973321
+      },
+      {
+        "column_a": "away_team_run_diff_avg_L7",
+        "column_b": "away_team_run_diff_total_L7",
+        "correlation": 0.9977007483490549
+      },
+      {
+        "column_a": "diff_team_run_diff_avg_L7",
+        "column_b": "diff_team_run_diff_total_L7",
+        "correlation": 0.9965309129017055
+      },
+      {
+        "column_a": "away_team_games_L30",
+        "column_b": "home_bullpen_bullpen_games_L30",
+        "correlation": 0.9954894730285024
+      },
+      {
+        "column_a": "away_team_games_L30",
+        "column_b": "home_team_games_L30",
+        "correlation": 0.9954894730285024
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L30",
+        "column_b": "home_bullpen_bullpen_games_L30",
+        "correlation": 0.9954749483768514
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L30",
+        "column_b": "home_team_games_L30",
+        "correlation": 0.9954749483768514
+      },
+      {
+        "column_a": "away_team_run_diff_avg_L14",
+        "column_b": "away_team_run_diff_total_L14",
+        "correlation": 0.9926377271981726
+      },
+      {
+        "column_a": "home_team_run_diff_avg_L14",
+        "column_b": "home_team_run_diff_total_L14",
+        "correlation": 0.9925422816316789
+      },
+      {
+        "column_a": "diff_team_losses_before",
+        "column_b": "diff_team_wins_before",
+        "correlation": -0.9912705899053424
+      },
+      {
+        "column_a": "diff_team_run_diff_avg_L14",
+        "column_b": "diff_team_run_diff_total_L14",
+        "correlation": 0.9887981604533103
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L14",
+        "column_b": "home_bullpen_bullpen_games_L14",
+        "correlation": 0.9872182555228362
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L14",
+        "column_b": "home_team_games_L14",
+        "correlation": 0.9872182555228362
+      },
+      {
+        "column_a": "away_team_games_L14",
+        "column_b": "home_bullpen_bullpen_games_L14",
+        "correlation": 0.9872182555228362
+      },
+      {
+        "column_a": "away_team_games_L14",
+        "column_b": "home_team_games_L14",
+        "correlation": 0.9872182555228362
+      },
+      {
+        "column_a": "away_team_run_diff_avg_L30",
+        "column_b": "away_team_run_diff_total_L30",
+        "correlation": 0.9815369340413262
+      },
+      {
+        "column_a": "home_team_run_diff_avg_L30",
+        "column_b": "home_team_run_diff_total_L30",
+        "correlation": 0.9814703317113507
+      },
+      {
+        "column_a": "home_team_losses_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9799081015318231
+      },
+      {
+        "column_a": "away_team_losses_before",
+        "column_b": "away_team_runs_allowed_total_before",
+        "correlation": 0.9796890796760002
+      },
+      {
+        "column_a": "home_team_games_played_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9768889761533033
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "away_team_runs_scored_total_before",
+        "correlation": 0.9764842440002616
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9764741556824098
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "away_team_wins_before",
+        "correlation": 0.9764282960926888
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "home_team_games_played_before",
+        "correlation": 0.9761004864355847
+      },
+      {
+        "column_a": "home_team_runs_scored_total_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9756758278882374
+      },
+      {
+        "column_a": "diff_team_run_diff_avg_L30",
+        "column_b": "diff_team_run_diff_total_L30",
+        "correlation": 0.9732524014101078
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "away_team_runs_allowed_total_before",
+        "correlation": 0.9712762971767216
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "home_team_games_played_before",
+        "correlation": 0.9706936917990159
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L7",
+        "column_b": "home_bullpen_bullpen_games_L7",
+        "correlation": 0.9702701077107052
+      },
+      {
+        "column_a": "away_bullpen_bullpen_games_L7",
+        "column_b": "home_team_games_L7",
+        "correlation": 0.9702701077107052
+      },
+      {
+        "column_a": "away_team_games_L7",
+        "column_b": "home_bullpen_bullpen_games_L7",
+        "correlation": 0.9702701077107052
+      },
+      {
+        "column_a": "away_team_games_L7",
+        "column_b": "home_team_games_L7",
+        "correlation": 0.9702701077107052
+      },
+      {
+        "column_a": "home_team_games_played_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9702277116001949
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9697428121535748
+      },
+      {
+        "column_a": "home_bullpen_bullpen_outs_prior_1d",
+        "column_b": "home_bullpen_bullpen_pitches_prior_1d",
+        "correlation": 0.9581602745677951
+      },
+      {
+        "column_a": "home_bullpen_bullpen_ip_prior_1d",
+        "column_b": "home_bullpen_bullpen_pitches_prior_1d",
+        "correlation": 0.9581602745677947
+      },
+      {
+        "column_a": "away_bullpen_bullpen_ip_prior_1d",
+        "column_b": "away_bullpen_bullpen_pitches_prior_1d",
+        "correlation": 0.956598721118353
+      },
+      {
+        "column_a": "away_bullpen_bullpen_outs_prior_1d",
+        "column_b": "away_bullpen_bullpen_pitches_prior_1d",
+        "correlation": 0.9565987211183515
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9545021333981569
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9530171570496723
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9507455818013086
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "away_team_losses_before",
+        "correlation": 0.9478719864230339
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "away_team_wins_before",
+        "correlation": 0.9477327618435173
+      },
+      {
+        "column_a": "home_starter_roll_starts_L3",
+        "column_b": "home_starter_roll_starts_L5",
+        "correlation": 0.9474831276858534
+      },
+      {
+        "column_a": "away_team_wins_before",
+        "column_b": "home_team_games_played_before",
+        "correlation": 0.9473340043884817
+      },
+      {
+        "column_a": "home_team_games_played_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9473255042180827
+      },
+      {
+        "column_a": "away_team_losses_before",
+        "column_b": "home_team_games_played_before",
+        "correlation": 0.9472647443117087
+      },
+      {
+        "column_a": "home_team_games_played_before",
+        "column_b": "home_team_losses_before",
+        "correlation": 0.9470157181224825
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9468592935487842
+      },
+      {
+        "column_a": "away_team_games_played_before",
+        "column_b": "home_team_losses_before",
+        "correlation": 0.9464763600653833
+      },
+      {
+        "column_a": "home_bullpen_bullpen_ip_prior_3d",
+        "column_b": "home_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.9456881426759617
+      },
+      {
+        "column_a": "home_bullpen_bullpen_outs_prior_3d",
+        "column_b": "home_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.9456881426759617
+      },
+      {
+        "column_a": "away_starter_roll_starts_L3",
+        "column_b": "away_starter_roll_starts_L5",
+        "correlation": 0.9449675723234278
+      },
+      {
+        "column_a": "away_bullpen_bullpen_outs_prior_3d",
+        "column_b": "away_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.9434871032242361
+      },
+      {
+        "column_a": "away_bullpen_bullpen_ip_prior_3d",
+        "column_b": "away_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.9434871032242357
+      },
+      {
+        "column_a": "diff_starter_roll_starts_L3",
+        "column_b": "diff_starter_roll_starts_L5",
+        "correlation": 0.9420645771810595
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9401564455041238
+      },
+      {
+        "column_a": "diff_team_losses_before",
+        "column_b": "diff_team_run_diff_total_before",
+        "correlation": -0.9347071916460881
+      },
+      {
+        "column_a": "diff_team_run_diff_total_before",
+        "column_b": "diff_team_wins_before",
+        "correlation": 0.9337892653741929
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "away_team_runs_scored_total_before",
+        "correlation": 0.931776443028449
+      },
+      {
+        "column_a": "home_team_runs_allowed_total_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.931084001951079
+      },
+      {
+        "column_a": "away_team_losses_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9281386225214282
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "home_team_losses_before",
+        "correlation": 0.9264935969376119
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9250042299339692
+      },
+      {
+        "column_a": "away_team_wins_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9236637165380761
+      },
+      {
+        "column_a": "away_team_wins_before",
+        "column_b": "home_team_runs_scored_total_before",
+        "correlation": 0.9228670908362033
+      },
+      {
+        "column_a": "away_team_runs_scored_total_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9225798047873038
+      },
+      {
+        "column_a": "away_starter_season_ip_before",
+        "column_b": "away_starter_season_starts_before",
+        "correlation": 0.9185309636369552
+      },
+      {
+        "column_a": "home_starter_season_ip_before",
+        "column_b": "home_starter_season_starts_before",
+        "correlation": 0.9179942678958095
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_outs_prior_3d",
+        "column_b": "diff_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.9155732721101825
+      },
+      {
+        "column_a": "diff_bullpen_bullpen_ip_prior_3d",
+        "column_b": "diff_bullpen_bullpen_pitches_prior_3d",
+        "correlation": 0.915573272110182
+      },
+      {
+        "column_a": "away_team_losses_before",
+        "column_b": "home_team_runs_allowed_total_before",
+        "correlation": 0.9145913378730302
+      },
+      {
+        "column_a": "away_team_runs_allowed_total_before",
+        "column_b": "home_team_losses_before",
+        "correlation": 0.9138053016248492
+      },
+      {
+        "column_a": "away_starter_roll_starts_L10",
+        "column_b": "away_starter_roll_starts_L5",
+        "correlation": 0.9107034225270147
+      },
+      {
+        "column_a": "away_starter_roll_ip_per_start_L10",
+        "column_b": "away_starter_roll_ip_per_start_L5",
+        "correlation": 0.9106839000401404
+      },
+      {
+        "column_a": "home_starter_roll_starts_L10",
+        "column_b": "home_starter_roll_starts_L5",
+        "correlation": 0.909730420191678
+      },
+      {
+        "column_a": "diff_starter_roll_ip_per_start_L10",
+        "column_b": "diff_starter_roll_ip_per_start_L5",
+        "correlation": 0.9091602351302458
+      },
+      {
+        "column_a": "away_starter_roll_ip_per_start_L3",
+        "column_b": "away_starter_roll_ip_per_start_L5",
+        "correlation": 0.9088907918808236
+      },
+      {
+        "column_a": "home_starter_roll_ip_per_start_L10",
+        "column_b": "home_starter_roll_ip_per_start_L5",
+        "correlation": 0.908677784888888
+      },
+      {
+        "column_a": "home_starter_roll_ip_per_start_L3",
+        "column_b": "home_starter_roll_ip_per_start_L5",
+        "correlation": 0.90725762461937
+      },
+      {
+        "column_a": "home_starter_roll_era_L10",
+        "column_b": "home_starter_roll_era_L5",
+        "correlation": 0.9071155305615286
+      },
+      {
+        "column_a": "diff_starter_roll_ip_per_start_L3",
+        "column_b": "diff_starter_roll_ip_per_start_L5",
+        "correlation": 0.9067329095219181
+      },
+      {
+        "column_a": "diff_starter_roll_era_L10",
+        "column_b": "diff_starter_roll_era_L5",
+        "correlation": 0.905208006834081
+      },
+      {
+        "column_a": "away_starter_roll_k_rate_L10",
+        "column_b": "away_starter_roll_k_rate_L5",
+        "correlation": 0.9049276638525732
+      },
+      {
+        "column_a": "away_starter_roll_era_L10",
+        "column_b": "away_starter_roll_era_L5",
+        "correlation": 0.9046790419478679
+      },
+      {
+        "column_a": "away_starter_roll_whip_L10",
+        "column_b": "away_starter_roll_whip_L5",
+        "correlation": 0.9044888729067342
+      },
+      {
+        "column_a": "diff_starter_roll_whip_L10",
+        "column_b": "diff_starter_roll_whip_L5",
+        "correlation": 0.9043741156214848
+      },
+      {
+        "column_a": "diff_starter_roll_starts_L10",
+        "column_b": "diff_starter_roll_starts_L5",
+        "correlation": 0.9042040767749858
+      },
+      {
+        "column_a": "home_starter_roll_whip_L10",
+        "column_b": "home_starter_roll_whip_L5",
+        "correlation": 0.9038264787332507
+      },
+      {
+        "column_a": "away_team_losses_before",
+        "column_b": "home_team_wins_before",
+        "correlation": 0.9038013437714868
+      },
+      {
+        "column_a": "away_team_wins_before",
+        "column_b": "home_team_losses_before",
+        "correlation": 0.9035306108854932
+      },
+      {
+        "column_a": "home_starter_roll_k_rate_L10",
+        "column_b": "home_starter_roll_k_rate_L5",
+        "correlation": 0.9026574235964507
+      }
+    ],
+    "n_columns_scanned": 236,
+    "n_constant_columns_excluded": 4,
+    "n_flagged_pairs": 108,
+    "n_pairs_scanned": 27730,
+    "near_duplicate_groups": [
+      [
+        "away_team_games_played_before",
+        "away_team_losses_before",
+        "away_team_runs_allowed_total_before",
+        "away_team_runs_scored_total_before",
+        "away_team_wins_before",
+        "home_team_games_played_before",
+        "home_team_losses_before",
+        "home_team_runs_allowed_total_before",
+        "home_team_runs_scored_total_before",
+        "home_team_wins_before"
+      ],
+      [
+        "away_bullpen_bullpen_games_L14",
+        "away_team_games_L14",
+        "home_bullpen_bullpen_games_L14",
+        "home_team_games_L14"
+      ],
+      [
+        "away_bullpen_bullpen_games_L30",
+        "away_team_games_L30",
+        "home_bullpen_bullpen_games_L30",
+        "home_team_games_L30"
+      ],
+      [
+        "away_bullpen_bullpen_games_L7",
+        "away_team_games_L7",
+        "home_bullpen_bullpen_games_L7",
+        "home_team_games_L7"
+      ],
+      [
+        "away_bullpen_bullpen_ip_prior_1d",
+        "away_bullpen_bullpen_outs_prior_1d",
+        "away_bullpen_bullpen_pitches_prior_1d"
+      ],
+      [
+        "away_bullpen_bullpen_ip_prior_3d",
+        "away_bullpen_bullpen_outs_prior_3d",
+        "away_bullpen_bullpen_pitches_prior_3d"
+      ],
+      [
+        "away_starter_roll_ip_per_start_L10",
+        "away_starter_roll_ip_per_start_L3",
+        "away_starter_roll_ip_per_start_L5"
+      ],
+      [
+        "away_starter_roll_starts_L10",
+        "away_starter_roll_starts_L3",
+        "away_starter_roll_starts_L5"
+      ],
+      [
+        "diff_bullpen_bullpen_ip_prior_3d",
+        "diff_bullpen_bullpen_outs_prior_3d",
+        "diff_bullpen_bullpen_pitches_prior_3d"
+      ],
+      [
+        "diff_starter_roll_ip_per_start_L10",
+        "diff_starter_roll_ip_per_start_L3",
+        "diff_starter_roll_ip_per_start_L5"
+      ],
+      [
+        "diff_starter_roll_starts_L10",
+        "diff_starter_roll_starts_L3",
+        "diff_starter_roll_starts_L5"
+      ],
+      [
+        "diff_team_losses_before",
+        "diff_team_run_diff_total_before",
+        "diff_team_wins_before"
+      ],
+      [
+        "home_bullpen_bullpen_ip_prior_1d",
+        "home_bullpen_bullpen_outs_prior_1d",
+        "home_bullpen_bullpen_pitches_prior_1d"
+      ],
+      [
+        "home_bullpen_bullpen_ip_prior_3d",
+        "home_bullpen_bullpen_outs_prior_3d",
+        "home_bullpen_bullpen_pitches_prior_3d"
+      ],
+      [
+        "home_starter_roll_ip_per_start_L10",
+        "home_starter_roll_ip_per_start_L3",
+        "home_starter_roll_ip_per_start_L5"
+      ],
+      [
+        "home_starter_roll_starts_L10",
+        "home_starter_roll_starts_L3",
+        "home_starter_roll_starts_L5"
+      ],
+      [
+        "away_starter_roll_era_L10",
+        "away_starter_roll_era_L5"
+      ],
+      [
+        "away_starter_roll_k_rate_L10",
+        "away_starter_roll_k_rate_L5"
+      ],
+      [
+        "away_starter_roll_whip_L10",
+        "away_starter_roll_whip_L5"
+      ],
+      [
+        "away_starter_season_ip_before",
+        "away_starter_season_starts_before"
+      ],
+      [
+        "away_team_run_diff_avg_L14",
+        "away_team_run_diff_total_L14"
+      ],
+      [
+        "away_team_run_diff_avg_L30",
+        "away_team_run_diff_total_L30"
+      ],
+      [
+        "away_team_run_diff_avg_L7",
+        "away_team_run_diff_total_L7"
+      ],
+      [
+        "diff_bullpen_bullpen_games_L14",
+        "diff_team_games_L14"
+      ],
+      [
+        "diff_bullpen_bullpen_games_L30",
+        "diff_team_games_L30"
+      ],
+      [
+        "diff_bullpen_bullpen_games_L7",
+        "diff_team_games_L7"
+      ],
+      [
+        "diff_bullpen_bullpen_ip_prior_1d",
+        "diff_bullpen_bullpen_outs_prior_1d"
+      ],
+      [
+        "diff_starter_roll_era_L10",
+        "diff_starter_roll_era_L5"
+      ],
+      [
+        "diff_starter_roll_whip_L10",
+        "diff_starter_roll_whip_L5"
+      ],
+      [
+        "diff_team_run_diff_avg_L14",
+        "diff_team_run_diff_total_L14"
+      ],
+      [
+        "diff_team_run_diff_avg_L30",
+        "diff_team_run_diff_total_L30"
+      ],
+      [
+        "diff_team_run_diff_avg_L7",
+        "diff_team_run_diff_total_L7"
+      ],
+      [
+        "home_starter_roll_era_L10",
+        "home_starter_roll_era_L5"
+      ],
+      [
+        "home_starter_roll_k_rate_L10",
+        "home_starter_roll_k_rate_L5"
+      ],
+      [
+        "home_starter_roll_whip_L10",
+        "home_starter_roll_whip_L5"
+      ],
+      [
+        "home_starter_season_ip_before",
+        "home_starter_season_starts_before"
+      ],
+      [
+        "home_team_run_diff_avg_L14",
+        "home_team_run_diff_total_L14"
+      ],
+      [
+        "home_team_run_diff_avg_L30",
+        "home_team_run_diff_total_L30"
+      ],
+      [
+        "home_team_run_diff_avg_L7",
+        "home_team_run_diff_total_L7"
+      ]
+    ],
+    "threshold": 0.9
+  },
+  "generated_at": "2026-08-19T17:34:06.905723+00:00",
+  "holdout_2026": "not inspected",
+  "missingness": {
+    "columns_with_any_missing": [
+      {
+        "column": "diff_starter_season_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_era_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_ip_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_ip_per_start_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_k_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_k_rate_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "diff_starter_season_whip_before",
+        "family": "starter",
+        "null_rate": 0.12287506189140118
+      },
+      {
+        "column": "home_starter_season_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_era_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_ip_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_ip_per_start_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_k_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_k_rate_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "home_starter_season_whip_before",
+        "family": "starter",
+        "null_rate": 0.07814820927545796
+      },
+      {
+        "column": "away_starter_season_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_era_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_ip_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_ip_per_start_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_k_bb_rate_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_k_rate_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "away_starter_season_whip_before",
+        "family": "starter",
+        "null_rate": 0.0769929031193266
+      },
+      {
+        "column": "diff_starter_days_rest",
+        "family": "rest_schedule",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_prev_start_batters_faced",
+        "family": "rest_schedule",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_prev_start_ip",
+        "family": "rest_schedule",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_prev_start_pitches",
+        "family": "rest_schedule",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_era_L10",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_era_L3",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_era_L5",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_ip_per_start_L10",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_ip_per_start_L3",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_ip_per_start_L5",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_k_rate_L10",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_k_rate_L3",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_k_rate_L5",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_whip_L10",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_whip_L3",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "diff_starter_roll_whip_L5",
+        "family": "starter",
+        "null_rate": 0.06279914177256973
+      },
+      {
+        "column": "home_starter_days_rest",
+        "family": "rest_schedule",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_prev_start_batters_faced",
+        "family": "rest_schedule",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_prev_start_ip",
+        "family": "rest_schedule",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_prev_start_pitches",
+        "family": "rest_schedule",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_era_L10",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_era_L3",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_era_L5",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_ip_per_start_L10",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_ip_per_start_L3",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_ip_per_start_L5",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_k_rate_L10",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_k_rate_L3",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_k_rate_L5",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_whip_L10",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_whip_L3",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "home_starter_roll_whip_L5",
+        "family": "starter",
+        "null_rate": 0.03606205644495797
+      },
+      {
+        "column": "away_starter_days_rest",
+        "family": "rest_schedule",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_prev_start_batters_faced",
+        "family": "rest_schedule",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_prev_start_ip",
+        "family": "rest_schedule",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_prev_start_pitches",
+        "family": "rest_schedule",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_era_L10",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_era_L3",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_era_L5",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_ip_per_start_L10",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_ip_per_start_L3",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_ip_per_start_L5",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_k_rate_L10",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_k_rate_L3",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_k_rate_L5",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_whip_L10",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_whip_L3",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "away_starter_roll_whip_L5",
+        "family": "starter",
+        "null_rate": 0.03399900973758041
+      },
+      {
+        "column": "diff_team_run_diff_avg_before",
+        "family": "team",
+        "null_rate": 0.006436705727017711
+      },
+      {
+        "column": "diff_team_runs_allowed_avg_before",
+        "family": "team",
+        "null_rate": 0.006436705727017711
+      },
+      {
+        "column": "diff_team_runs_scored_avg_before",
+        "family": "team",
+        "null_rate": 0.006436705727017711
+      },
+      {
+        "column": "diff_team_win_pct_before",
+        "family": "team",
+        "null_rate": 0.006436705727017711
+      },
+      {
+        "column": "away_team_run_diff_avg_before",
+        "family": "team",
+        "null_rate": 0.006271661990427502
+      },
+      {
+        "column": "away_team_runs_allowed_avg_before",
+        "family": "team",
+        "null_rate": 0.006271661990427502
+      },
+      {
+        "column": "away_team_runs_scored_avg_before",
+        "family": "team",
+        "null_rate": 0.006271661990427502
+      },
+      {
+        "column": "away_team_win_pct_before",
+        "family": "team",
+        "null_rate": 0.006271661990427502
+      },
+      {
+        "column": "home_team_run_diff_avg_before",
+        "family": "team",
+        "null_rate": 0.006106618253837293
+      },
+      {
+        "column": "home_team_runs_allowed_avg_before",
+        "family": "team",
+        "null_rate": 0.006106618253837293
+      },
+      {
+        "column": "home_team_runs_scored_avg_before",
+        "family": "team",
+        "null_rate": 0.006106618253837293
+      },
+      {
+        "column": "home_team_win_pct_before",
+        "family": "team",
+        "null_rate": 0.006106618253837293
+      },
+      {
+        "column": "diff_bullpen_bullpen_era_L14",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_bullpen_bullpen_era_L30",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_bullpen_bullpen_era_L7",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_bullpen_bullpen_whip_L14",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_bullpen_bullpen_whip_L30",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_bullpen_bullpen_whip_L7",
+        "family": "bullpen",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_run_diff_avg_L14",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_run_diff_avg_L30",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_run_diff_avg_L7",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_allowed_avg_L14",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_allowed_avg_L30",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_allowed_avg_L7",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_scored_avg_L14",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_scored_avg_L30",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_runs_scored_avg_L7",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_win_pct_L14",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_win_pct_L30",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "diff_team_win_pct_L7",
+        "family": "team",
+        "null_rate": 0.0013203498927215618
+      },
+      {
+        "column": "away_bullpen_bullpen_era_L14",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_bullpen_bullpen_era_L30",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_bullpen_bullpen_era_L7",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_bullpen_bullpen_whip_L14",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_bullpen_bullpen_whip_L30",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_bullpen_bullpen_whip_L7",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_run_diff_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_run_diff_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_run_diff_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_allowed_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_allowed_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_allowed_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_scored_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_scored_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_runs_scored_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_win_pct_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_win_pct_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "away_team_win_pct_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_era_L14",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_era_L30",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_era_L7",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_whip_L14",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_whip_L30",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_bullpen_bullpen_whip_L7",
+        "family": "bullpen",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_run_diff_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_run_diff_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_run_diff_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_allowed_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_allowed_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_allowed_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_scored_avg_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_scored_avg_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_runs_scored_avg_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_win_pct_L14",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_win_pct_L30",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      },
+      {
+        "column": "home_team_win_pct_L7",
+        "family": "team",
+        "null_rate": 0.0012378280244265127
+      }
+    ],
+    "n_columns": 240,
+    "n_columns_with_any_missing": 135
+  },
+  "n_rows": 12118,
+  "per_season_coverage_stability": {
+    "n_unstable_columns": 0,
+    "seasons": [
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "unstable_columns": [],
+    "unstable_spread_threshold": 0.2
+  },
+  "runtime_seconds": 38.644,
+  "status": "ML013_REDUNDANCY_EVIDENCE"
+}
