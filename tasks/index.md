@@ -83,7 +83,7 @@ state source of truth.
 | PIPE-006 | done | DATA-022, DATA-023, MARKET-003, PIPE-004 | capture each game's Kalshi price near that game's own first pitch (60-15 min window, CLI-overridable) via a new standalone script for external-scheduler invocation; merged after fixing a P1 cross-game failure-isolation defect found independently by both Reviewer and Tester |
 | APP-012 | done | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table — merged; confirmed zero production-code changes needed, schema-reuse design validated |
 | ML-012 | done | ML-009, FEAT-006 | feature-family ablation study — merged; team/starter strongest, bullpen/rest_schedule INVESTIGATE (redundancy interaction), zero leakage found, no production model change; see `docs/research/ml-012-feature-ablation.md` |
-| ML-013 | ready | ML-012, ML-009, FEAT-006 | failure-regime + redundancy research, extends ML-012 (favorite/underdog, home/away, probability/edge buckets, correlation/missingness analysis); see `tasks/ML-013-failure-regime-and-redundancy-research.md` |
+| ML-013 | done | ML-012, ML-009, FEAT-006 | failure-regime + redundancy research — merged; sharpest gap is edge-bucket miscalibration (model diverges from market), away-favored games weaker (ROC-AUC 0.540 vs 0.556), 39 near-duplicate column groups (engineering overlap, not leakage), zero leakage; see `docs/research/ml-013-failure-regime-and-redundancy.md` |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 
