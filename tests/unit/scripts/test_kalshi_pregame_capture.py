@@ -616,6 +616,153 @@ def test_main_double_invocation_same_game_does_not_recapture(tmp_path: Path) -> 
     assert second_rows == first_rows
 
 
+def test_main_already_captured_game_with_changed_price_does_not_block_a_due_game(
+    tmp_path: Path,
+) -> None:
+    # PIPE-006 regression: the real bug was never "one game re-run in
+    # isolation" (games_due_for_capture already returns early for that case,
+    # before the fetch/ingest path is ever reached -- see the double-
+    # invocation test above). The real conflict fires when an ALREADY-
+    # captured game's market reappears in the SAME freshly-fetched payload
+    # as a STILL-due game, at the SAME market_ticker + snapshot_timestamp
+    # (Bronze's primary key) but a DIFFERENT price -- Kalshi's full-series
+    # payload includes every open market regardless of this script's own
+    # due-window bookkeeping. Pre-fix, ingesting the whole payload raised
+    # KalshiDataError from the immutability check, which _run_capture's own
+    # `except KalshiDataError` swallows into `return 0` -- silently
+    # abandoning the WHOLE run, including the due game that should have
+    # succeeded. The fix must let the due game capture anyway.
+    database = tmp_path / "mlb.duckdb"
+    odds_books = tmp_path / "odds_books.jsonl"
+    kalshi_json = tmp_path / "kalshi.json"
+
+    now = datetime(2026, 8, 15, 18, 0, tzinfo=timezone.utc)
+    first_pitch_a = now + timedelta(minutes=40)  # due right now
+    first_pitch_b = now + timedelta(hours=4)  # due later, once B nears ITS first pitch
+    updated_a = now - timedelta(minutes=5)
+
+    _write_schedule(
+        database,
+        [
+            {
+                "game_pk": 776001,
+                "official_date": date(2026, 8, 15),
+                "game_date": first_pitch_a,
+                "source_game_json": {
+                    "teams": {
+                        "home": {"team": {"name": "Houston Astros"}},
+                        "away": {"team": {"name": "Seattle Mariners"}},
+                    }
+                },
+            },
+            {
+                "game_pk": 776002,
+                "official_date": date(2026, 8, 15),
+                "game_date": first_pitch_b,
+                "source_game_json": {
+                    "teams": {
+                        "home": {"team": {"name": "San Francisco Giants"}},
+                        "away": {"team": {"name": "Colorado Rockies"}},
+                    }
+                },
+            },
+        ],
+    )
+
+    # Invocation 1: only game A is due; capture it normally.
+    payload = {
+        "markets": [
+            _kalshi_market(
+                "T-SEA", "E-A", "Seattle", "Houston", first_pitch_a, updated_a,
+                yes_bid=0.44, yes_ask=0.46, no_bid=0.54, no_ask=0.56,
+            ),
+            _kalshi_market(
+                "T-HOU", "E-A", "Houston", "Seattle", first_pitch_a, updated_a,
+                yes_bid=0.54, yes_ask=0.56, no_bid=0.44, no_ask=0.46,
+            ),
+        ]
+    }
+    kalshi_json.write_text(json.dumps(payload), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--date", "2026-08-15",
+            "--database", str(database),
+            "--odds-books-output", str(odds_books),
+            "--kalshi-json", str(kalshi_json),
+            "--now", now.isoformat(),
+        ]
+    )
+    assert exit_code == 0
+    rows = [json.loads(line) for line in odds_books.read_text(encoding="utf-8").splitlines()]
+    assert {row["game_pk"] for row in rows} == {776001}
+    game_a_row_after_invocation_1 = rows[0]
+
+    # Invocation 2: game A is already captured (excluded from `due`), game B
+    # is now due. The refreshed Kalshi payload still lists game A's markets
+    # (a real GET /markets response includes every open market, not just
+    # this script's own due ones) at the SAME market_ticker + SAME
+    # updated_time as invocation 1, but a DIFFERENT price -- exactly the
+    # "prices move throughout the day" conflict trigger from the bug report.
+    later_now = now + timedelta(hours=3, minutes=25)  # ~35 min before game B's first pitch
+    later_updated = later_now - timedelta(minutes=2)
+    payload = {
+        "markets": [
+            _kalshi_market(
+                "T-SEA", "E-A", "Seattle", "Houston", first_pitch_a, updated_a,
+                yes_bid=0.10, yes_ask=0.12, no_bid=0.88, no_ask=0.90,  # price moved
+            ),
+            _kalshi_market(
+                "T-HOU", "E-A", "Houston", "Seattle", first_pitch_a, updated_a,
+                yes_bid=0.88, yes_ask=0.90, no_bid=0.10, no_ask=0.12,  # price moved
+            ),
+            _kalshi_market(
+                "T-COL", "E-B", "Colorado", "San Francisco", first_pitch_b, later_updated,
+                yes_bid=0.40, yes_ask=0.42, no_bid=0.58, no_ask=0.60,
+            ),
+            _kalshi_market(
+                "T-SF", "E-B", "San Francisco", "Colorado", first_pitch_b, later_updated,
+                yes_bid=0.58, yes_ask=0.60, no_bid=0.40, no_ask=0.42,
+            ),
+        ]
+    }
+    kalshi_json.write_text(json.dumps(payload), encoding="utf-8")
+
+    exit_code = main(
+        [
+            "--date", "2026-08-15",
+            "--database", str(database),
+            "--odds-books-output", str(odds_books),
+            "--kalshi-json", str(kalshi_json),
+            "--now", later_now.isoformat(),
+        ]
+    )
+
+    # The run must succeed (no immutability conflict) AND actually capture
+    # the due game -- pre-fix, both invocations return 0, but pre-fix the
+    # second one silently captures NOTHING (the conflict aborts before any
+    # write), so exit_code alone cannot distinguish fixed from broken here.
+    assert exit_code == 0
+    rows = [json.loads(line) for line in odds_books.read_text(encoding="utf-8").splitlines()]
+    by_pk = {row["game_pk"]: row for row in rows}
+    assert set(by_pk) == {776001, 776002}
+    assert datetime.fromisoformat(by_pk[776002]["snapshot_timestamp"]) == later_updated
+
+    # Game A's already-captured row is byte-for-byte untouched -- not just
+    # "some row survived," but the EXACT record from invocation 1, proving
+    # the changed price in invocation 2's payload never got re-applied.
+    assert by_pk[776001] == game_a_row_after_invocation_1
+    assert datetime.fromisoformat(by_pk[776001]["snapshot_timestamp"]) == updated_a
+
+    # And Bronze itself was never re-ingested with the conflicting price --
+    # confirms the filter, not luck, is what avoided the conflict.
+    with duckdb.connect(str(database), read_only=True) as connection:
+        stored_yes_bid = connection.execute(
+            "SELECT yes_bid FROM bronze.kalshi_market_snapshots WHERE market_ticker = 'T-SEA'"
+        ).fetchone()[0]
+    assert stored_yes_bid == Decimal("0.4400")
+
+
 def test_main_empty_kalshi_markets_payload_is_a_normal_noop(tmp_path: Path) -> None:
     # An empty Kalshi API response (no markets currently listed) is a normal
     # empty result, not malformed data -- must not crash and must not write

@@ -474,21 +474,41 @@ def _run_capture(args: argparse.Namespace) -> int:
                 # This prevents immutability conflicts from re-ingesting already-captured
                 # games at changed prices on repeated invocations.
                 filtered_markets = []
+                skipped_not_due = 0
+                skipped_unmatched = 0
                 for market in valid_markets:
                     try:
                         result = match_kalshi_market(market, candidates)
-                        if result.status == MATCHED and result.game_pk in due_game_pks:
-                            filtered_markets.append(market)
                     except KalshiMatchingError:
-                        # Skip markets that can't be matched; matching errors
-                        # are counted in build_kalshi_capture_records for audit visibility.
+                        # A market missing a required matching field entirely.
+                        # This market never reaches Bronze, so
+                        # build_kalshi_capture_records's own stats never see
+                        # it either -- it would otherwise be silently
+                        # dropped with no trace, so it is counted/logged here.
+                        skipped_unmatched += 1
                         continue
+                    if result.status == MATCHED and result.game_pk in due_game_pks:
+                        filtered_markets.append(market)
+                    elif result.status == MATCHED:
+                        skipped_not_due += 1
+                    else:
+                        skipped_unmatched += 1
 
-                skipped_not_due = len(valid_markets) - len(filtered_markets)
                 if skipped_not_due:
                     print(
-                        f"[kalshi] skipping {skipped_not_due} market(s) for non-due games, "
-                        "only due games are ingested into bronze",
+                        f"[kalshi] skipping {skipped_not_due} market(s) for non-due games "
+                        "(normal), only due games are ingested into bronze",
+                        flush=True,
+                    )
+                if skipped_unmatched:
+                    # Distinct from "not due" above: this market could not be
+                    # matched to ANY game at all (bad field, no team match,
+                    # ambiguous, or time out of tolerance). If a currently-due
+                    # game's market falls in here, that game silently misses
+                    # capture this run -- worth an operator's attention.
+                    print(
+                        f"[kalshi] skipping {skipped_unmatched} market(s) that failed to "
+                        "match any game (check for a data/matching problem)",
                         flush=True,
                     )
                 inserted = ingest_kalshi_market_snapshots(
