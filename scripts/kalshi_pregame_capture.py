@@ -435,6 +435,12 @@ def _run_capture(args: argparse.Namespace) -> int:
         print("[done] no games due for a near-first-pitch Kalshi capture right now", flush=True)
         return 0
 
+    # Compute due_game_pks and build candidates early, before ingestion.
+    # This allows us to filter markets to only those for due games, preventing
+    # immutability conflicts from re-ingesting already-captured games at changed prices.
+    due_game_pks = {game["game_pk"] for game in due}
+    candidates = _build_kalshi_candidates(schedule)
+
     if args.kalshi_json:
         payload = json.loads(Path(args.kalshi_json).read_text(encoding="utf-8"))
         print(f"[kalshi] loaded payload={args.kalshi_json}", flush=True)
@@ -464,17 +470,35 @@ def _run_capture(args: argparse.Namespace) -> int:
                         "other due games in this payload are unaffected",
                         flush=True,
                     )
+                # Filter valid_markets to only those for due games (PIPE-006).
+                # This prevents immutability conflicts from re-ingesting already-captured
+                # games at changed prices on repeated invocations.
+                filtered_markets = []
+                for market in valid_markets:
+                    try:
+                        result = match_kalshi_market(market, candidates)
+                        if result.status == MATCHED and result.game_pk in due_game_pks:
+                            filtered_markets.append(market)
+                    except KalshiMatchingError:
+                        # Skip markets that can't be matched; matching errors
+                        # are counted in build_kalshi_capture_records for audit visibility.
+                        continue
+
+                skipped_not_due = len(valid_markets) - len(filtered_markets)
+                if skipped_not_due:
+                    print(
+                        f"[kalshi] skipping {skipped_not_due} market(s) for non-due games, "
+                        "only due games are ingested into bronze",
+                        flush=True,
+                    )
                 inserted = ingest_kalshi_market_snapshots(
-                    connection, {"markets": valid_markets}
+                    connection, {"markets": filtered_markets}
                 )
         except KalshiDataError as exc:
             print(f"[kalshi] payload malformed, skipping this run: {exc}", flush=True)
             return 0
         print(f"[kalshi] bronze_inserted={inserted}", flush=True)
         market_rows = _latest_kalshi_markets(connection)
-
-    candidates = _build_kalshi_candidates(schedule)
-    due_game_pks = {game["game_pk"] for game in due}
     records, stats = build_kalshi_capture_records(
         market_rows, candidates, due_game_pks, run_date=run_date, now=now
     )
