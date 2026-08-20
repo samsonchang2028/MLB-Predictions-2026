@@ -1,0 +1,13 @@
+[Unit]
+Description=Enrich MLB prediction results after games finish
+
+[Timer]
+OnCalendar=*-*-* 22:45:00 America/Los_Angeles
+OnCalendar=*-*-* 00:45:00 America/Los_Angeles
+OnCalendar=*-*-* 07:15:00 America/Los_Angeles
+Persistent=true
+AccuracySec=1min
+Unit=mlb-predictions-enrich.service
+
+[Install]
+WantedBy=timers.target

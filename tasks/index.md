@@ -63,7 +63,7 @@ state source of truth.
 | APP-004 | done | APP-003 | Streamlit deployment packaging |
 | ML-011 | done | ML-010 | model diagnostics report for underfit/overfit evidence |
 | DATA-021 | backlog | DATA-020 | targeted retry/normalization of the 39 DATA-018 games |
-| OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
+| OPS-001 | candidate | APP-004, PIPE-003, OBS-002 | homelab wrapper + systemd timers + offline tests + runbook implemented; awaiting reviewer/tester |
 | OBS-002 | candidate | OBS-001, PIPE-003, PIPE-005 | result enrichment operator for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
 | APP-006 | candidate | APP-004, APP-005, OBS-002 | user-friendly homepage overview with model/status/result summary cards |
