@@ -85,7 +85,7 @@ state source of truth.
 | ML-012 | done | ML-009, FEAT-006 | feature-family ablation study — merged; team/starter strongest, bullpen/rest_schedule INVESTIGATE (redundancy interaction), zero leakage found, no production model change; see `docs/research/ml-012-feature-ablation.md` |
 | ML-013 | done | ML-012, ML-009, FEAT-006 | failure-regime + redundancy research — merged; sharpest gap is edge-bucket miscalibration (model diverges from market), away-favored games weaker (ROC-AUC 0.540 vs 0.556), 39 near-duplicate column groups (engineering overlap, not leakage), zero leakage; see `docs/research/ml-013-failure-regime-and-redundancy.md` |
 | ML-014 | candidate | ML-009 | locked-model calibration re-eval on pre-2026 folds; recommendation KEEP RAW; reviewer/tester gates remain |
-| ML-015 | ready | OBS-001, OBS-002, MARKET-001, ML-009, ML-010 | prospective (live, first-week) model + market diagnostic study — PLAY win rate vs. model calibration vs. market/edge vs. selection layer; see `tasks/ML-015-prospective-model-market-diagnostic.md` |
+| ML-015 | done | OBS-001, OBS-002, MARKET-001, ML-009, ML-010 | prospective (live, first-week) diagnostic — merged; N=94, model quality unchanged vs. 2026 holdout (ROC-AUC 0.5473), PLAY shortfall traced to a specific 27/68-game edge-sign crossover subset (not statistically significant, McNemar p≈0.12), edge-bucket disagreement pattern reproduces ML-013 on live data; conclusion MARKET/PLAY LAYER APPEARS MORE CONCERNING; see `docs/research/ml-015-prospective-model-market-diagnostic.md` |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 
