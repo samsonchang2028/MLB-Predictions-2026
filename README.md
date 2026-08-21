@@ -327,6 +327,20 @@ python scripts\daily_predictions.py --date 2026-08-14 --skip-detail-refresh
 python scripts\enrich_prediction_results.py --date 2026-08-14
 ```
 
+### Automated homelab operator
+
+The stable Linux automation entrypoint is:
+
+```bash
+python scripts/run_daily_operator.py --stage all
+```
+
+It refreshes the target-day MLB schedule, normalizes the current slate, runs
+pregame predictions, and enriches completed results through the existing
+append-only operators. Production systemd units and the complete secrets,
+installation, scheduling, logging, rerun, and shutdown instructions are in
+[`docs/homelab-operations.md`](docs/homelab-operations.md).
+
 **3. Open the dashboard:**
 
 ```powershell

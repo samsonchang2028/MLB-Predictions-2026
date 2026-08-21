@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+candidate (OPS-001A-D implemented; awaiting reviewer/tester)
 
 ## Dependencies
 
@@ -131,3 +131,44 @@ Record:
 - test results,
 - secret/artifact setup needed,
 - recommended production schedule.
+
+## Candidate handoff
+
+- OPS-001A: added `scripts/run_daily_operator.py`, the stable application
+  entrypoint. It refreshes the target-day schedule, normalizes Silver, invokes
+  the existing prediction operator, and invokes append-only result enrichment.
+  `--stage predict|enrich|all` supports scheduled and manual operation.
+- OPS-001B: added two oneshot services and two persistent timers under
+  `deploy/systemd/`. They use explicit `America/Los_Angeles` schedules,
+  journald, an external environment file, and a shared `flock` lock under the
+  homelab-owned `data/` directory so DuckDB writers cannot overlap.
+- OPS-001C: added offline wrapper and unit-file tests covering stage order,
+  timestamped/run-keyed logs, failure propagation, downstream stop behavior,
+  stable explicit-timestamp reruns, secret isolation, timer cadence, and the
+  absence of a first-pitch bypass.
+- OPS-001D: added `docs/homelab-operations.md` with environment, secrets, data
+  paths, installation, manual execution, failed-day rerun, logs, Streamlit,
+  and disable instructions; linked it from README.
+- Exact full-workflow command:
+  `python scripts/run_daily_operator.py --stage all`.
+- Required secret: `THE_ODDS_API_KEY` in
+  `/etc/mlb-predictions/mlb-predictions.env`; no secret is committed.
+- Prediction refresh schedule (Pacific): 07:30, 10:30, 13:30, 16:00, 18:00.
+  Result enrichment: 22:45, 00:45, 07:15.
+- Rerun behavior remains owned by the existing append-only stores: identical
+  explicit prediction timestamps deduplicate, later pregame runs create a new
+  snapshot, post-first-pitch games skip, result enrichment is idempotent, and
+  conflicting rewrites fail.
+- Failure behavior: every wrapper stage logs UTC timestamp, run ID, run date,
+  status, and exit code; a failed stage returns non-zero and blocks downstream
+  stages. Systemd exposes output through `journalctl`.
+- Checks:
+  - focused operator/daily/journal suite: 72 passed;
+  - leakage suite: 41 passed;
+  - full suite: 938 passed, 6 xfailed, 1 third-party deprecation warning;
+  - `python scripts/run_daily_operator.py --help` passed;
+  - `python -m compileall -q scripts/run_daily_operator.py` passed;
+  - `git diff --check` passed.
+- No live API smoke or Linux `systemd-analyze verify` was possible in this
+  Windows implementation environment; both are documented homelab install
+  checks. Independent reviewer/tester gates remain required before merge.

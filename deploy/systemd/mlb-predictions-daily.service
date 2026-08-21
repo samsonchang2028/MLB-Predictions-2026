@@ -1,0 +1,17 @@
+[Unit]
+Description=MLB pregame prediction refresh
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=mlbpred
+Group=mlbpred
+WorkingDirectory=/opt/mlb-predictions
+EnvironmentFile=/etc/mlb-predictions/mlb-predictions.env
+ExecStart=/usr/bin/flock --wait 1800 /opt/mlb-predictions/data/operator.lock /opt/mlb-predictions/.venv/bin/python scripts/run_daily_operator.py --stage predict
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mlb-predictions-daily
+TimeoutStartSec=2h
+UMask=0077
