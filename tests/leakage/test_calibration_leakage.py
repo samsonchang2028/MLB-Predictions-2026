@@ -24,6 +24,7 @@ from evaluation.calibration import (
     _fit_calibrator,
     _labeled,
     _partition_train,
+    compare_refit_calibration,
 )
 from evaluation.runner import _positive_class_proba, vectorize_matrix
 from evaluation.splits import (
@@ -155,3 +156,19 @@ def test_holdout_2026_never_enters_any_partition() -> None:
             base_fit_idx, cal_idx = _partition_train(train_idx, 0.2)
             used = set(base_fit_idx) | set(cal_idx) | set(test_idx)
             assert holdout_positions.isdisjoint(used), fold
+
+
+def test_2026_mutation_cannot_influence_refit_calibration_selection() -> None:
+    matrix = _matrix(include_holdout=True)
+    before = compare_refit_calibration(logistic, matrix, expanding_folds())
+
+    mutated_rows = []
+    for row in matrix["rows"]:
+        copied = {**row, "features": dict(row["features"]), "target": dict(row["target"])}
+        if copied["game_date"].year == HOLDOUT_SEASON:
+            copied["features"] = {key: value + 10000.0 for key, value in copied["features"].items()}
+            copied["target"]["home_win"] = not copied["target"]["home_win"]
+        mutated_rows.append(copied)
+
+    after = compare_refit_calibration(logistic, {"rows": mutated_rows}, expanding_folds())
+    assert before == after

@@ -1,0 +1,2302 @@
+{
+  "build_id": "a910017bac839af5",
+  "certification_artifact": "state\\data-certifications\\certification-PASS-a910017bac839af5.json",
+  "comparison": {
+    "calibration_fraction": 0.2,
+    "fold_stability": {
+      "isotonic": {
+        "brier_improved_folds": 1,
+        "ece_improved_folds": 2,
+        "fold_count": 4,
+        "fold_deltas_calibrated_minus_raw": [
+          {
+            "brier": -1.369801077366617e-05,
+            "ece": -0.005696549914308013,
+            "log_loss": -0.00028531586470126324,
+            "test_season": 2022
+          },
+          {
+            "brier": 0.0013912716115680734,
+            "ece": 0.030434851984820658,
+            "log_loss": 0.01664234472576942,
+            "test_season": 2023
+          },
+          {
+            "brier": 0.0020379428297405133,
+            "ece": 0.015169184086664384,
+            "log_loss": 0.004219162279690991,
+            "test_season": 2024
+          },
+          {
+            "brier": 0.0006656769441398258,
+            "ece": -0.007695110040776679,
+            "log_loss": 0.04284943715546374,
+            "test_season": 2025
+          }
+        ],
+        "log_loss_improved_folds": 1,
+        "mean_brier_delta": 0.0010202983436686866,
+        "mean_ece_delta": 0.008053094029100087,
+        "mean_log_loss_delta": 0.015856407074055723,
+        "std_log_loss_delta": 0.01677216486327676
+      },
+      "sigmoid": {
+        "brier_improved_folds": 2,
+        "ece_improved_folds": 1,
+        "fold_count": 4,
+        "fold_deltas_calibrated_minus_raw": [
+          {
+            "brier": -0.00032014005174010873,
+            "ece": 0.0038304570687512224,
+            "log_loss": -0.0008725032879847161,
+            "test_season": 2022
+          },
+          {
+            "brier": 0.0004502728771026143,
+            "ece": 0.011332256943399344,
+            "log_loss": 0.0008272678390061072,
+            "test_season": 2023
+          },
+          {
+            "brier": 0.00038682539671333616,
+            "ece": 0.006705339593454313,
+            "log_loss": 0.0008179605865499262,
+            "test_season": 2024
+          },
+          {
+            "brier": -0.0009115151156033896,
+            "ece": -0.012202307765533216,
+            "log_loss": -0.0018779390847625255,
+            "test_season": 2025
+          }
+        ],
+        "log_loss_improved_folds": 2,
+        "mean_brier_delta": -9.863922338188696e-05,
+        "mean_ece_delta": 0.0024164364600179154,
+        "mean_log_loss_delta": -0.00027630348679780203,
+        "std_log_loss_delta": 0.001154986398725034
+      }
+    },
+    "methods": [
+      "sigmoid",
+      "isotonic"
+    ],
+    "model": "adr-006-tuned-xgboost",
+    "n_features": 240,
+    "random_state": 0,
+    "recommendation": "KEEP RAW",
+    "temporal_methodology": {
+      "base_model_evaluation_fit": "all labeled training rows in each fold",
+      "calibrator_fit": "later chronological calibration_fraction of each fold's training rows; probabilities produced by an earlier-only base fit",
+      "development_seasons": [
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "evaluation": "next season only; labels never used for fitting",
+      "holdout_2026": "excluded from all selection partitions",
+      "row_order": "game_date, game_pk"
+    },
+    "variants": {
+      "isotonic": {
+        "aggregate": {
+          "brier": 0.24510367182907372,
+          "degenerate_single_class": false,
+          "ece": 0.018273933286965558,
+          "log_loss": 0.6970984169274126,
+          "n_folds": 4,
+          "n_test": 9694,
+          "prediction_sha256": "0dc84ca2cf6ed8ecf5977c60c9eedae01304d58bf206467b37b1d067a08cf11c",
+          "probability_max": 1.0,
+          "probability_min": 0.0,
+          "reliability_curve": [
+            {
+              "actual_win_rate": 0.3,
+              "bin": 0,
+              "calibration_gap": 0.29296923734651026,
+              "count": 10,
+              "lower": 0.0,
+              "mean_probability": 0.007030762653489711,
+              "upper": 0.1
+            },
+            {
+              "actual_win_rate": 0.0,
+              "bin": 1,
+              "calibration_gap": -0.16806306856134468,
+              "count": 2,
+              "lower": 0.1,
+              "mean_probability": 0.16806306856134468,
+              "upper": 0.2
+            },
+            {
+              "actual_win_rate": 1.0,
+              "bin": 2,
+              "calibration_gap": 0.7857142857142857,
+              "count": 4,
+              "lower": 0.2,
+              "mean_probability": 0.21428571428571427,
+              "upper": 0.30000000000000004
+            },
+            {
+              "actual_win_rate": 0.40445026178010474,
+              "bin": 3,
+              "calibration_gap": 0.03328350671379482,
+              "count": 764,
+              "lower": 0.30000000000000004,
+              "mean_probability": 0.3711667550663099,
+              "upper": 0.4
+            },
+            {
+              "actual_win_rate": 0.47696245733788395,
+              "bin": 4,
+              "calibration_gap": 0.028520456288569584,
+              "count": 2344,
+              "lower": 0.4,
+              "mean_probability": 0.44844200104931436,
+              "upper": 0.5
+            },
+            {
+              "actual_win_rate": 0.5305219012115564,
+              "bin": 5,
+              "calibration_gap": 0.0025296468194462296,
+              "count": 4292,
+              "lower": 0.5,
+              "mean_probability": 0.5279922543921102,
+              "upper": 0.6000000000000001
+            },
+            {
+              "actual_win_rate": 0.602436323366556,
+              "bin": 6,
+              "calibration_gap": -0.03150340572661958,
+              "count": 1806,
+              "lower": 0.6000000000000001,
+              "mean_probability": 0.6339397290931755,
+              "upper": 0.7000000000000001
+            },
+            {
+              "actual_win_rate": 0.7096069868995634,
+              "bin": 7,
+              "calibration_gap": -0.021031061752267544,
+              "count": 458,
+              "lower": 0.7000000000000001,
+              "mean_probability": 0.7306380486518309,
+              "upper": 0.8
+            },
+            {
+              "actual_win_rate": 0.8181818181818182,
+              "bin": 8,
+              "calibration_gap": 0.006696707888738551,
+              "count": 11,
+              "lower": 0.8,
+              "mean_probability": 0.8114851102930797,
+              "upper": 0.9
+            },
+            {
+              "actual_win_rate": 0.6666666666666666,
+              "bin": 9,
+              "calibration_gap": -0.33333333333333337,
+              "count": 3,
+              "lower": 0.9,
+              "mean_probability": 1.0,
+              "upper": 1.0
+            }
+          ],
+          "secondary": {
+            "accuracy": 0.5561171858881783,
+            "roc_auc": 0.5770610707647199
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.24248380997427882,
+            "degenerate_single_class": false,
+            "ece": 0.013502035332003521,
+            "log_loss": 0.6779424586542255,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_model_train": 2424,
+            "n_test": 2424,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 1939,
+                "row_index_end": 1938,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              },
+              "calibrator_fit": {
+                "count": 485,
+                "row_index_end": 2423,
+                "row_index_start": 1939,
+                "seasons": [
+                  2021
+                ]
+              },
+              "evaluation": {
+                "count": 2424,
+                "row_index_end": 4847,
+                "row_index_start": 2424,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 2424,
+                "row_index_end": 2423,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              }
+            },
+            "prediction_sha256": "54e0e55f81404ddffc71613d5ae7439338c698f43de1997928a1295d7066fc12",
+            "probability_max": 0.75,
+            "probability_min": 0.0,
+            "reliability_curve": [
+              {
+                "actual_win_rate": 0.0,
+                "bin": 0,
+                "calibration_gap": 0.0,
+                "count": 1,
+                "lower": 0.0,
+                "mean_probability": 0.0,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.39514348785871967,
+                "bin": 3,
+                "calibration_gap": 0.01419110690633868,
+                "count": 453,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.380952380952381,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.4834123222748815,
+                "bin": 4,
+                "calibration_gap": 0.03198493533739749,
+                "count": 211,
+                "lower": 0.4,
+                "mean_probability": 0.451427386937484,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5346187554776511,
+                "bin": 5,
+                "calibration_gap": 0.010587038374170077,
+                "count": 1141,
+                "lower": 0.5,
+                "mean_probability": 0.5240317171034811,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6371308016877637,
+                "bin": 6,
+                "calibration_gap": 0.0015513109532215852,
+                "count": 474,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6355794907345421,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.6875,
+                "bin": 7,
+                "calibration_gap": -0.04678061585596638,
+                "count": 144,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7342806158559664,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5754950495049505,
+              "roc_auc": 0.5907767561181065
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24580571633521808,
+            "degenerate_single_class": false,
+            "ece": 0.049514994476539544,
+            "log_loss": 0.6985302828188127,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_model_train": 4848,
+            "n_test": 2423,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 3878,
+                "row_index_end": 3877,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              },
+              "calibrator_fit": {
+                "count": 970,
+                "row_index_end": 4847,
+                "row_index_start": 3878,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation": {
+                "count": 2423,
+                "row_index_end": 7270,
+                "row_index_start": 4848,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 4848,
+                "row_index_end": 4847,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              }
+            },
+            "prediction_sha256": "429f3edbadadc050d94d38cc0348531543cf4c667a00de5b0fde91d1da68e5b7",
+            "probability_max": 1.0,
+            "probability_min": 0.32978723404255317,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.42105263157894735,
+                "bin": 3,
+                "calibration_gap": 0.0601095324706411,
+                "count": 247,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.36094309910830624,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.423728813559322,
+                "bin": 4,
+                "calibration_gap": -0.04279521249936169,
+                "count": 59,
+                "lower": 0.4,
+                "mean_probability": 0.4665240260586837,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.4761491760624458,
+                "bin": 5,
+                "calibration_gap": -0.04525457381796938,
+                "count": 1153,
+                "lower": 0.5,
+                "mean_probability": 0.5214037498804152,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.5745222929936306,
+                "bin": 6,
+                "calibration_gap": -0.05887082869497162,
+                "count": 785,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6333931216886022,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.7344632768361582,
+                "bin": 7,
+                "calibration_gap": 0.018139748142786405,
+                "count": 177,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7163235286933718,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": 0.5,
+                "bin": 9,
+                "calibration_gap": -0.5,
+                "count": 2,
+                "lower": 0.9,
+                "mean_probability": 1.0,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5398266611638465,
+              "roc_auc": 0.5856852829982667
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24535442839425065,
+            "degenerate_single_class": false,
+            "ece": 0.03017012485861775,
+            "log_loss": 0.6837778673391736,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_model_train": 7271,
+            "n_test": 2422,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 5817,
+                "row_index_end": 5816,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1454,
+                "row_index_end": 7270,
+                "row_index_start": 5817,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation": {
+                "count": 2422,
+                "row_index_end": 9692,
+                "row_index_start": 7271,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 7271,
+                "row_index_end": 7270,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              }
+            },
+            "prediction_sha256": "ed3f619339d615f71fdc1ac50269737fd1a5993367d24526b2788830e2c35740",
+            "probability_max": 0.7938582935305586,
+            "probability_min": 0.4,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 3,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.30000000000000004,
+                "mean_probability": null,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.4780077619663648,
+                "bin": 4,
+                "calibration_gap": 0.03299645590158795,
+                "count": 1546,
+                "lower": 0.4,
+                "mean_probability": 0.44501130606477685,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5764895330112721,
+                "bin": 5,
+                "calibration_gap": 0.027827216020368306,
+                "count": 621,
+                "lower": 0.5,
+                "mean_probability": 0.5486623169909038,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6274509803921569,
+                "bin": 6,
+                "calibration_gap": -0.00795181999255401,
+                "count": 153,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6354028003847109,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.7058823529411765,
+                "bin": 7,
+                "calibration_gap": -0.034923450747134654,
+                "count": 102,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7408058036883112,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5503715937241949,
+              "roc_auc": 0.5839485380276782
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.2467705414772291,
+            "degenerate_single_class": false,
+            "ece": 0.028317813418640154,
+            "log_loss": 0.7281198614231066,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_model_train": 9693,
+            "n_test": 2425,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 7754,
+                "row_index_end": 7753,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1939,
+                "row_index_end": 9692,
+                "row_index_start": 7754,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation": {
+                "count": 2425,
+                "row_index_end": 12117,
+                "row_index_start": 9693,
+                "seasons": [
+                  2025
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 9693,
+                "row_index_end": 9692,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              }
+            },
+            "prediction_sha256": "137071e14809bfe3993079ca2ad8516f778ab0f94e1ed5a62137d44649d89e62",
+            "probability_max": 1.0,
+            "probability_min": 0.0,
+            "reliability_curve": [
+              {
+                "actual_win_rate": 0.3333333333333333,
+                "bin": 0,
+                "calibration_gap": 0.32552137482945587,
+                "count": 9,
+                "lower": 0.0,
+                "mean_probability": 0.007811958503877457,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": 0.0,
+                "bin": 1,
+                "calibration_gap": -0.16806306856134468,
+                "count": 2,
+                "lower": 0.1,
+                "mean_probability": 0.16806306856134468,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": 1.0,
+                "bin": 2,
+                "calibration_gap": 0.7857142857142857,
+                "count": 4,
+                "lower": 0.2,
+                "mean_probability": 0.21428571428571427,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.40625,
+                "bin": 3,
+                "calibration_gap": 0.06489020594561529,
+                "count": 64,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3413597940543847,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.4772727272727273,
+                "bin": 4,
+                "calibration_gap": 0.021999100185272014,
+                "count": 528,
+                "lower": 0.4,
+                "mean_probability": 0.4552736270874553,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5519244734931009,
+                "bin": 5,
+                "calibration_gap": 0.024455523476837104,
+                "count": 1377,
+                "lower": 0.5,
+                "mean_probability": 0.5274689500162638,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6065989847715736,
+                "bin": 6,
+                "calibration_gap": -0.025888942004286042,
+                "count": 394,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6324879267758596,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.6857142857142857,
+                "bin": 7,
+                "calibration_gap": -0.07269602983842605,
+                "count": 35,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7584103155527118,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": 0.8181818181818182,
+                "bin": 8,
+                "calibration_gap": 0.006696707888738551,
+                "count": 11,
+                "lower": 0.8,
+                "mean_probability": 0.8114851102930797,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": 1.0,
+                "bin": 9,
+                "calibration_gap": 0.0,
+                "count": 1,
+                "lower": 0.9,
+                "mean_probability": 1.0,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5587628865979382,
+              "roc_auc": 0.5570020685032344
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      },
+      "raw": {
+        "aggregate": {
+          "brier": 0.24408365828875142,
+          "degenerate_single_class": false,
+          "ece": 0.015781569041577716,
+          "log_loss": 0.6812369055020037,
+          "n_folds": 4,
+          "n_test": 9694,
+          "prediction_sha256": "9797797921daa520c450f3a8b1923d51065899e796870052bfc4cd6169b28b5f",
+          "probability_max": 0.8036354780197144,
+          "probability_min": 0.24457278847694397,
+          "reliability_curve": [
+            {
+              "actual_win_rate": null,
+              "bin": 0,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.0,
+              "mean_probability": null,
+              "upper": 0.1
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 1,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.1,
+              "mean_probability": null,
+              "upper": 0.2
+            },
+            {
+              "actual_win_rate": 0.45454545454545453,
+              "bin": 2,
+              "calibration_gap": 0.1672893134933529,
+              "count": 33,
+              "lower": 0.2,
+              "mean_probability": 0.2872561410521016,
+              "upper": 0.30000000000000004
+            },
+            {
+              "actual_win_rate": 0.38811630847029077,
+              "bin": 3,
+              "calibration_gap": 0.01978366075062421,
+              "count": 791,
+              "lower": 0.30000000000000004,
+              "mean_probability": 0.36833264771966656,
+              "upper": 0.4
+            },
+            {
+              "actual_win_rate": 0.47513089005235604,
+              "bin": 4,
+              "calibration_gap": 0.01835826311396993,
+              "count": 3056,
+              "lower": 0.4,
+              "mean_probability": 0.4567726269383861,
+              "upper": 0.5
+            },
+            {
+              "actual_win_rate": 0.5469550369948777,
+              "bin": 5,
+              "calibration_gap": 9.450452125547848e-05,
+              "count": 3514,
+              "lower": 0.5,
+              "mean_probability": 0.5468605324736222,
+              "upper": 0.6000000000000001
+            },
+            {
+              "actual_win_rate": 0.6077908217716115,
+              "bin": 6,
+              "calibration_gap": -0.03518199443562697,
+              "count": 1874,
+              "lower": 0.6000000000000001,
+              "mean_probability": 0.6429728162072385,
+              "upper": 0.7000000000000001
+            },
+            {
+              "actual_win_rate": 0.7058823529411765,
+              "bin": 7,
+              "calibration_gap": -0.020346995942732815,
+              "count": 425,
+              "lower": 0.7000000000000001,
+              "mean_probability": 0.7262293488839093,
+              "upper": 0.8
+            },
+            {
+              "actual_win_rate": 0.0,
+              "bin": 8,
+              "calibration_gap": -0.8036354780197144,
+              "count": 1,
+              "lower": 0.8,
+              "mean_probability": 0.8036354780197144,
+              "upper": 0.9
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 9,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.9,
+              "mean_probability": null,
+              "upper": 1.0
+            }
+          ],
+          "secondary": {
+            "accuracy": 0.5639570868578502,
+            "roc_auc": 0.5844580618112455
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.24249750798505249,
+            "degenerate_single_class": false,
+            "ece": 0.019198585246311534,
+            "log_loss": 0.6782277745189268,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_model_train": 2424,
+            "n_test": 2424,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 1939,
+                "row_index_end": 1938,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              },
+              "calibrator_fit": {
+                "count": 485,
+                "row_index_end": 2423,
+                "row_index_start": 1939,
+                "seasons": [
+                  2021
+                ]
+              },
+              "evaluation": {
+                "count": 2424,
+                "row_index_end": 4847,
+                "row_index_start": 2424,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 2424,
+                "row_index_end": 2423,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              }
+            },
+            "prediction_sha256": "c85cc7028fa0ee188f6117f4c312bac71bba00f94fa056391582f09af87944f7",
+            "probability_max": 0.8036354780197144,
+            "probability_min": 0.24457278847694397,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": 0.5714285714285714,
+                "bin": 2,
+                "calibration_gap": 0.28556673335177557,
+                "count": 14,
+                "lower": 0.2,
+                "mean_probability": 0.2858618380767958,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.35678391959798994,
+                "bin": 3,
+                "calibration_gap": -0.010135352162260525,
+                "count": 199,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.36691927176025046,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.4520766773162939,
+                "bin": 4,
+                "calibration_gap": -0.004535351127100462,
+                "count": 626,
+                "lower": 0.4,
+                "mean_probability": 0.4566120284433944,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5535939470365699,
+                "bin": 5,
+                "calibration_gap": 0.004189622432256512,
+                "count": 793,
+                "lower": 0.5,
+                "mean_probability": 0.5494043246043134,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6003236245954693,
+                "bin": 6,
+                "calibration_gap": -0.04437620817264687,
+                "count": 618,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6446998327681162,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.6936416184971098,
+                "bin": 7,
+                "calibration_gap": -0.035450108478524145,
+                "count": 173,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.729091726975634,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": 0.0,
+                "bin": 8,
+                "calibration_gap": -0.8036354780197144,
+                "count": 1,
+                "lower": 0.8,
+                "mean_probability": 0.8036354780197144,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5804455445544554,
+              "roc_auc": 0.5975365527464472
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24441444472365,
+            "degenerate_single_class": false,
+            "ece": 0.019080142491718886,
+            "log_loss": 0.6818879380930433,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_model_train": 4848,
+            "n_test": 2423,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 3878,
+                "row_index_end": 3877,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              },
+              "calibrator_fit": {
+                "count": 970,
+                "row_index_end": 4847,
+                "row_index_start": 3878,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation": {
+                "count": 2423,
+                "row_index_end": 7270,
+                "row_index_start": 4848,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 4848,
+                "row_index_end": 4847,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              }
+            },
+            "prediction_sha256": "ed19038b19f9ac57463baad191c3eccf95b049faee675469ddea7aeb2eef4f64",
+            "probability_max": 0.7996441721916199,
+            "probability_min": 0.2688516676425934,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": 0.4,
+                "bin": 2,
+                "calibration_gap": 0.11524126529693607,
+                "count": 10,
+                "lower": 0.2,
+                "mean_probability": 0.28475873470306395,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.4148471615720524,
+                "bin": 3,
+                "calibration_gap": 0.04981166996289549,
+                "count": 229,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.36503549160915694,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.45611510791366905,
+                "bin": 4,
+                "calibration_gap": -0.0010518950952900785,
+                "count": 695,
+                "lower": 0.4,
+                "mean_probability": 0.4571670030089591,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5272331154684096,
+                "bin": 5,
+                "calibration_gap": -0.020282248136524572,
+                "count": 918,
+                "lower": 0.5,
+                "mean_probability": 0.5475153636049341,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6185567010309279,
+                "bin": 6,
+                "calibration_gap": -0.024641511120746973,
+                "count": 485,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6431982121516748,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.6976744186046512,
+                "bin": 7,
+                "calibration_gap": -0.027565074521441746,
+                "count": 86,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7252394931260929,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5621130829550145,
+              "roc_auc": 0.5870327150636695
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24331648556451013,
+            "degenerate_single_class": false,
+            "ece": 0.015000940771953365,
+            "log_loss": 0.6795587050594826,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_model_train": 7271,
+            "n_test": 2422,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 5817,
+                "row_index_end": 5816,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1454,
+                "row_index_end": 7270,
+                "row_index_start": 5817,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation": {
+                "count": 2422,
+                "row_index_end": 9692,
+                "row_index_start": 7271,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 7271,
+                "row_index_end": 7270,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              }
+            },
+            "prediction_sha256": "c3ffeef84055035c5e44ecd5c92bdf974a26b6be579a3939cf0f0f4c0fc9a696",
+            "probability_max": 0.7897923588752747,
+            "probability_min": 0.2900810241699219,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": 0.0,
+                "bin": 2,
+                "calibration_gap": -0.293705681959788,
+                "count": 3,
+                "lower": 0.2,
+                "mean_probability": 0.293705681959788,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.3842364532019704,
+                "bin": 3,
+                "calibration_gap": 0.013950129741518325,
+                "count": 203,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3702863234604521,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.47461629279811096,
+                "bin": 4,
+                "calibration_gap": 0.01808844948321614,
+                "count": 847,
+                "lower": 0.4,
+                "mean_probability": 0.4565278433148948,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5395763656633222,
+                "bin": 5,
+                "calibration_gap": -0.005939806251887281,
+                "count": 897,
+                "lower": 0.5,
+                "mean_probability": 0.5455161719152095,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6131578947368421,
+                "bin": 6,
+                "calibration_gap": -0.02806026182676613,
+                "count": 380,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6412181565636083,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.7391304347826086,
+                "bin": 7,
+                "calibration_gap": 0.014211551650710641,
+                "count": 92,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.724918883131898,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5606936416184971,
+              "roc_auc": 0.5884842563396544
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24610486453308927,
+            "degenerate_single_class": false,
+            "ece": 0.03601292345941683,
+            "log_loss": 0.6852704242676428,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_model_train": 9693,
+            "n_test": 2425,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 7754,
+                "row_index_end": 7753,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1939,
+                "row_index_end": 9692,
+                "row_index_start": 7754,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation": {
+                "count": 2425,
+                "row_index_end": 12117,
+                "row_index_start": 9693,
+                "seasons": [
+                  2025
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 9693,
+                "row_index_end": 9692,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              }
+            },
+            "prediction_sha256": "eaa656b7f28e52b43bd9b1566e340f37f348c8823a46fa43d44d953e3c2f69c1",
+            "probability_max": 0.7698173522949219,
+            "probability_min": 0.2858825623989105,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": 0.5,
+                "bin": 2,
+                "calibration_gap": 0.20855291187763214,
+                "count": 6,
+                "lower": 0.2,
+                "mean_probability": 0.29144708812236786,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.39375,
+                "bin": 3,
+                "calibration_gap": 0.021419137343764272,
+                "count": 160,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3723308626562357,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.5067567567567568,
+                "bin": 4,
+                "calibration_gap": 0.04994609488828766,
+                "count": 888,
+                "lower": 0.4,
+                "mean_probability": 0.45681066186846914,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5684326710816777,
+                "bin": 5,
+                "calibration_gap": 0.023131157059806395,
+                "count": 906,
+                "lower": 0.5,
+                "mean_probability": 0.5453015140218713,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6010230179028133,
+                "bin": 6,
+                "calibration_gap": -0.04064585302796808,
+                "count": 391,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6416688709307814,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.7027027027027027,
+                "bin": 7,
+                "calibration_gap": -0.019614470971597187,
+                "count": 74,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7223171736742999,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5525773195876289,
+              "roc_auc": 0.5645327773459828
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      },
+      "sigmoid": {
+        "aggregate": {
+          "brier": 0.2439847784302104,
+          "degenerate_single_class": false,
+          "ece": 0.00629587237772818,
+          "log_loss": 0.6809600971941753,
+          "n_folds": 4,
+          "n_test": 9694,
+          "prediction_sha256": "50dc61b188aa1c0abe87cc706f8b28f3e1ef5fff6045413fb3fb30d0917556f2",
+          "probability_max": 0.7761750204564367,
+          "probability_min": 0.30876353961310443,
+          "reliability_curve": [
+            {
+              "actual_win_rate": null,
+              "bin": 0,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.0,
+              "mean_probability": null,
+              "upper": 0.1
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 1,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.1,
+              "mean_probability": null,
+              "upper": 0.2
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 2,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.2,
+              "mean_probability": null,
+              "upper": 0.30000000000000004
+            },
+            {
+              "actual_win_rate": 0.39488636363636365,
+              "bin": 3,
+              "calibration_gap": 0.0158901444185629,
+              "count": 352,
+              "lower": 0.30000000000000004,
+              "mean_probability": 0.37899621921780074,
+              "upper": 0.4
+            },
+            {
+              "actual_win_rate": 0.4681163679106671,
+              "bin": 4,
+              "calibration_gap": 0.007903344273702317,
+              "count": 3403,
+              "lower": 0.4,
+              "mean_probability": 0.46021302363696476,
+              "upper": 0.5
+            },
+            {
+              "actual_win_rate": 0.5496980956804459,
+              "bin": 5,
+              "calibration_gap": 0.0042694710884461085,
+              "count": 4306,
+              "lower": 0.5,
+              "mean_probability": 0.5454286245919998,
+              "upper": 0.6000000000000001
+            },
+            {
+              "actual_win_rate": 0.6315112540192926,
+              "bin": 6,
+              "calibration_gap": -0.005276280580361337,
+              "count": 1555,
+              "lower": 0.6000000000000001,
+              "mean_probability": 0.636787534599654,
+              "upper": 0.7000000000000001
+            },
+            {
+              "actual_win_rate": 0.6923076923076923,
+              "bin": 7,
+              "calibration_gap": -0.025061751559526058,
+              "count": 78,
+              "lower": 0.7000000000000001,
+              "mean_probability": 0.7173694438672183,
+              "upper": 0.8
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 8,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.8,
+              "mean_probability": null,
+              "upper": 0.9
+            },
+            {
+              "actual_win_rate": null,
+              "bin": 9,
+              "calibration_gap": null,
+              "count": 0,
+              "lower": 0.9,
+              "mean_probability": null,
+              "upper": 1.0
+            }
+          ],
+          "secondary": {
+            "accuracy": 0.5597276665978956,
+            "roc_auc": 0.5812626959780594
+          },
+          "test_positive_rate": 0.5297090984113885
+        },
+        "folds": [
+          {
+            "brier": 0.24217736793331238,
+            "degenerate_single_class": false,
+            "ece": 0.023029042315062757,
+            "log_loss": 0.6773552712309421,
+            "n_base_fit": 1939,
+            "n_calibration": 485,
+            "n_model_train": 2424,
+            "n_test": 2424,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 1939,
+                "row_index_end": 1938,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              },
+              "calibrator_fit": {
+                "count": 485,
+                "row_index_end": 2423,
+                "row_index_start": 1939,
+                "seasons": [
+                  2021
+                ]
+              },
+              "evaluation": {
+                "count": 2424,
+                "row_index_end": 4847,
+                "row_index_start": 2424,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 2424,
+                "row_index_end": 2423,
+                "row_index_start": 0,
+                "seasons": [
+                  2021
+                ]
+              }
+            },
+            "prediction_sha256": "073e57523af67e5c6e5e22f1d42b88e1b9ab863f4083c52f1662fc2945793ecc",
+            "probability_max": 0.7153881400837766,
+            "probability_min": 0.30876353961310443,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.3942307692307692,
+                "bin": 3,
+                "calibration_gap": 0.017076603174156324,
+                "count": 104,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3771541660566129,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.44365361803084225,
+                "bin": 4,
+                "calibration_gap": -0.015443237803508258,
+                "count": 843,
+                "lower": 0.4,
+                "mean_probability": 0.4590968558343505,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5822550831792976,
+                "bin": 5,
+                "calibration_gap": 0.0353831372125375,
+                "count": 1082,
+                "lower": 0.5,
+                "mean_probability": 0.5468719459667601,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6275510204081632,
+                "bin": 6,
+                "calibration_gap": -0.004139390231358675,
+                "count": 392,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6316904106395219,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.3333333333333333,
+                "bin": 7,
+                "calibration_gap": -0.37352897952808,
+                "count": 3,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7068623128614133,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5812706270627063,
+              "roc_auc": 0.5975365527464472
+            },
+            "test_positive_rate": 0.533003300330033,
+            "test_season": 2022,
+            "train_seasons": [
+              2021
+            ]
+          },
+          {
+            "brier": 0.24486471760075262,
+            "degenerate_single_class": false,
+            "ece": 0.03041239943511823,
+            "log_loss": 0.6827152059320494,
+            "n_base_fit": 3878,
+            "n_calibration": 970,
+            "n_model_train": 4848,
+            "n_test": 2423,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 3878,
+                "row_index_end": 3877,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              },
+              "calibrator_fit": {
+                "count": 970,
+                "row_index_end": 4847,
+                "row_index_start": 3878,
+                "seasons": [
+                  2022
+                ]
+              },
+              "evaluation": {
+                "count": 2423,
+                "row_index_end": 7270,
+                "row_index_start": 4848,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 4848,
+                "row_index_end": 4847,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022
+                ]
+              }
+            },
+            "prediction_sha256": "17f1cd85d4cb579a6a77a71e4786f5a4dda09dc960decefac7a259e47b91e912",
+            "probability_max": 0.7761750204564367,
+            "probability_min": 0.3288440275147257,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.38571428571428573,
+                "bin": 3,
+                "calibration_gap": 0.007990432773070155,
+                "count": 70,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3777238529412156,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.45674740484429066,
+                "bin": 4,
+                "calibration_gap": -0.004242679686276618,
+                "count": 578,
+                "lower": 0.4,
+                "mean_probability": 0.4609900845305673,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.4969108561341571,
+                "bin": 5,
+                "calibration_gap": -0.053250367045518776,
+                "count": 1133,
+                "lower": 0.5,
+                "mean_probability": 0.5501612231796759,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.629059829059829,
+                "bin": 6,
+                "calibration_gap": -0.012444151108477408,
+                "count": 585,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6415039801683065,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.6666666666666666,
+                "bin": 7,
+                "calibration_gap": -0.053774568727659955,
+                "count": 57,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7204412353943266,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5472554684275691,
+              "roc_auc": 0.5870327150636695
+            },
+            "test_positive_rate": 0.520016508460586,
+            "test_season": 2023,
+            "train_seasons": [
+              2021,
+              2022
+            ]
+          },
+          {
+            "brier": 0.24370331096122347,
+            "degenerate_single_class": false,
+            "ece": 0.021706280365407678,
+            "log_loss": 0.6803766656460325,
+            "n_base_fit": 5817,
+            "n_calibration": 1454,
+            "n_model_train": 7271,
+            "n_test": 2422,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 5817,
+                "row_index_end": 5816,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1454,
+                "row_index_end": 7270,
+                "row_index_start": 5817,
+                "seasons": [
+                  2023
+                ]
+              },
+              "evaluation": {
+                "count": 2422,
+                "row_index_end": 9692,
+                "row_index_start": 7271,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 7271,
+                "row_index_end": 7270,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023
+                ]
+              }
+            },
+            "prediction_sha256": "fa4125dbe170ef7550c0e16194558b7c1f62b7808d484c92659ca4752a01c2c5",
+            "probability_max": 0.7126822572627202,
+            "probability_min": 0.3319736432451317,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.3548387096774194,
+                "bin": 3,
+                "calibration_gap": -0.026421957981666855,
+                "count": 124,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.3812606676590862,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.48050770625566636,
+                "bin": 4,
+                "calibration_gap": 0.022395793649316598,
+                "count": 1103,
+                "lower": 0.4,
+                "mean_probability": 0.45811191260634976,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5565843621399177,
+                "bin": 5,
+                "calibration_gap": 0.016381105974008547,
+                "count": 972,
+                "lower": 0.5,
+                "mean_probability": 0.5402032561659091,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.669683257918552,
+                "bin": 6,
+                "calibration_gap": 0.036586321829200075,
+                "count": 221,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6330969360893519,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 1.0,
+                "bin": 7,
+                "calibration_gap": 0.29285786455248586,
+                "count": 2,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7071421354475141,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5549132947976878,
+              "roc_auc": 0.5884842563396544
+            },
+            "test_positive_rate": 0.5222956234516928,
+            "test_season": 2024,
+            "train_seasons": [
+              2021,
+              2022,
+              2023
+            ]
+          },
+          {
+            "brier": 0.24519334941748588,
+            "degenerate_single_class": false,
+            "ece": 0.023810615693883617,
+            "log_loss": 0.6833924851828803,
+            "n_base_fit": 7754,
+            "n_calibration": 1939,
+            "n_model_train": 9693,
+            "n_test": 2425,
+            "partition_trace": {
+              "calibrator_base_fit": {
+                "count": 7754,
+                "row_index_end": 7753,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              },
+              "calibrator_fit": {
+                "count": 1939,
+                "row_index_end": 9692,
+                "row_index_start": 7754,
+                "seasons": [
+                  2024
+                ]
+              },
+              "evaluation": {
+                "count": 2425,
+                "row_index_end": 12117,
+                "row_index_start": 9693,
+                "seasons": [
+                  2025
+                ]
+              },
+              "evaluation_base_refit": {
+                "count": 9693,
+                "row_index_end": 9692,
+                "row_index_start": 0,
+                "seasons": [
+                  2021,
+                  2022,
+                  2023,
+                  2024
+                ]
+              }
+            },
+            "prediction_sha256": "60336e96c1f12f2f125d885fb622b418bc59864a4d6a2354ce22e0787694fe31",
+            "probability_max": 0.7269351325423512,
+            "probability_min": 0.3358478957035316,
+            "reliability_curve": [
+              {
+                "actual_win_rate": null,
+                "bin": 0,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.0,
+                "mean_probability": null,
+                "upper": 0.1
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 1,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.1,
+                "mean_probability": null,
+                "upper": 0.2
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 2,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.2,
+                "mean_probability": null,
+                "upper": 0.30000000000000004
+              },
+              {
+                "actual_win_rate": 0.5,
+                "bin": 3,
+                "calibration_gap": 0.12100660371914224,
+                "count": 54,
+                "lower": 0.30000000000000004,
+                "mean_probability": 0.37899339628085776,
+                "upper": 0.4
+              },
+              {
+                "actual_win_rate": 0.48350398179749715,
+                "bin": 4,
+                "calibration_gap": 0.02009492434043003,
+                "count": 879,
+                "lower": 0.4,
+                "mean_probability": 0.4634090574570671,
+                "upper": 0.5
+              },
+              {
+                "actual_win_rate": 0.5656836461126006,
+                "bin": 5,
+                "calibration_gap": 0.02190350214362824,
+                "count": 1119,
+                "lower": 0.5,
+                "mean_probability": 0.5437801439689723,
+                "upper": 0.6000000000000001
+              },
+              {
+                "actual_win_rate": 0.6162464985994398,
+                "bin": 6,
+                "calibration_gap": -0.020693904923146378,
+                "count": 357,
+                "lower": 0.6000000000000001,
+                "mean_probability": 0.6369404035225862,
+                "upper": 0.7000000000000001
+              },
+              {
+                "actual_win_rate": 0.8125,
+                "bin": 7,
+                "calibration_gap": 0.10282531283205265,
+                "count": 16,
+                "lower": 0.7000000000000001,
+                "mean_probability": 0.7096746871679473,
+                "upper": 0.8
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 8,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.8,
+                "mean_probability": null,
+                "upper": 0.9
+              },
+              {
+                "actual_win_rate": null,
+                "bin": 9,
+                "calibration_gap": null,
+                "count": 0,
+                "lower": 0.9,
+                "mean_probability": null,
+                "upper": 1.0
+              }
+            ],
+            "secondary": {
+              "accuracy": 0.5554639175257732,
+              "roc_auc": 0.5645327773459828
+            },
+            "test_positive_rate": 0.5435051546391753,
+            "test_season": 2025,
+            "train_seasons": [
+              2021,
+              2022,
+              2023,
+              2024
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "generated_at": "2026-08-19T17:27:25.253041+00:00",
+  "holdout_2026": "not loaded, not scored, and not used for selection",
+  "input_counts": {
+    "bullpen_features": 24236,
+    "games": 14520,
+    "pitcher_appearances": 132448,
+    "pitcher_starters": 28941,
+    "starter_features": 24240,
+    "team_features": 24300,
+    "team_game_statistics_regular": 24300
+  },
+  "locked_hyperparameters": {
+    "colsample_bytree": 0.8,
+    "learning_rate": 0.03,
+    "max_depth": 2,
+    "min_child_weight": 3.0,
+    "n_estimators": 300,
+    "reg_lambda": 10.0,
+    "subsample": 0.8
+  },
+  "n_feature_columns": 240,
+  "n_rows": 12118,
+  "production_promotion": "not authorized by this evaluation",
+  "runtime_seconds": 32.798,
+  "selection_metric_order": [
+    "log_loss",
+    "brier",
+    "ece"
+  ],
+  "selection_rule": "calibrated pooled log loss and Brier must both beat raw, and log loss must improve in a strict majority of temporal folds",
+  "status": "PRE_2026_CALIBRATION_EVIDENCE"
+}

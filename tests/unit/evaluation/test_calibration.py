@@ -17,9 +17,14 @@ import pytest
 
 from evaluation.calibration import (
     CALIBRATION_METHODS,
+    _calibrate,
+    _fit_calibrator,
     _partition_train,
     compare_calibration,
+    compare_refit_calibration,
+    deserialize_calibrator,
     evaluate_calibration,
+    serialize_calibrator,
 )
 from evaluation.splits import Fold, expanding_folds
 from models import logistic
@@ -255,3 +260,57 @@ def test_partition_train_split_is_chronological_and_sized() -> None:
     assert cal == (8, 9)
     # cal rows are chronologically after all base rows.
     assert max(base) < min(cal)
+
+
+def test_refit_comparison_uses_same_base_predictions_and_reports_diagnostics() -> None:
+    result = compare_refit_calibration(
+        logistic, _synthetic_matrix(), expanding_folds(), random_state=0
+    )
+
+    assert set(result["variants"]) == {"raw", "sigmoid", "isotonic"}
+    assert result["recommendation"] in {
+        "KEEP RAW",
+        "USE PLATT",
+        "USE ISOTONIC",
+        "INCONCLUSIVE",
+    }
+    assert result["temporal_methodology"]["holdout_2026"].startswith("excluded")
+    for variant in result["variants"].values():
+        aggregate = variant["aggregate"]
+        assert 0.0 <= aggregate["probability_min"] <= 1.0
+        assert 0.0 <= aggregate["probability_max"] <= 1.0
+        assert sum(bucket["count"] for bucket in aggregate["reliability_curve"]) == aggregate["n_test"]
+        assert len(aggregate["prediction_sha256"]) == 64
+        for fold in variant["folds"]:
+            assert fold["n_model_train"] == fold["n_base_fit"] + fold["n_calibration"]
+
+
+def test_evaluation_labels_do_not_change_refit_predictions() -> None:
+    matrix = _synthetic_matrix(per_season=40)
+    fold = [Fold((2021,), 2022)]
+    before = compare_refit_calibration(logistic, matrix, fold)
+
+    mutated = {"rows": []}
+    for row in matrix["rows"]:
+        copied = {**row, "target": dict(row["target"])}
+        if copied["game_date"].year == 2022:
+            copied["target"]["home_win"] = not copied["target"]["home_win"]
+        mutated["rows"].append(copied)
+    after = compare_refit_calibration(logistic, mutated, fold)
+
+    for method in ("raw", "sigmoid", "isotonic"):
+        assert (
+            before["variants"][method]["aggregate"]["prediction_sha256"]
+            == after["variants"][method]["aggregate"]["prediction_sha256"]
+        )
+
+
+@pytest.mark.parametrize("method", CALIBRATION_METHODS)
+def test_calibrator_serialization_round_trip_preserves_predictions(method: str) -> None:
+    p_fit = np.linspace(0.05, 0.95, 40)
+    y_fit = np.asarray(([0, 1] * 20), dtype=int)
+    calibrator = _fit_calibrator(method, p_fit, y_fit, random_state=0)
+    p_test = np.asarray([0.01, 0.2, 0.5, 0.8, 0.99])
+
+    restored = deserialize_calibrator(serialize_calibrator(calibrator))
+    assert np.array_equal(_calibrate(calibrator, p_test), _calibrate(restored, p_test))

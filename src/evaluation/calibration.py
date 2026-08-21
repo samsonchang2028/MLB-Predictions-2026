@@ -50,6 +50,8 @@ partition with too few labeled rows or only one class) raise a clear
 from __future__ import annotations
 
 from collections.abc import Sequence
+import hashlib
+import pickle
 from typing import Any
 
 import numpy as np
@@ -227,6 +229,189 @@ def compare_calibration(
     }
 
 
+def compare_refit_calibration(
+    model: Any,
+    matrix: Any,
+    folds: Sequence[Fold],
+    *,
+    methods: Sequence[str] = CALIBRATION_METHODS,
+    random_state: int = 0,
+    calibration_fraction: float = 0.2,
+    n_bins: int = 10,
+    model_name: str | None = None,
+) -> dict[str, Any]:
+    """Compare raw and calibrated probabilities from the same refit base model.
+
+    Within each development fold, an earlier inner partition fits a temporary
+    base model and the later inner partition fits the calibrators from that
+    model's probabilities. The base model is then refit on *all* labeled fold
+    training rows. Raw, sigmoid, and isotonic variants score the identical
+    refit-base probabilities on the untouched test season. Thus calibration is
+    the only difference between variants, while no test label fits anything.
+
+    This is the appropriate production-candidate comparison for ML-014. The
+    older :func:`compare_calibration` remains unchanged for ML-008 artifact
+    compatibility.
+    """
+    if not folds:
+        raise ValueError("at least one development fold is required")
+    if not isinstance(n_bins, int) or n_bins < 2:
+        raise ValueError(f"n_bins must be an integer >= 2, got {n_bins!r}")
+    for method in methods:
+        if method not in CALIBRATION_METHODS:
+            raise ValueError(
+                f"method must be one of {CALIBRATION_METHODS}, got {method!r}"
+            )
+
+    require_historical_feature_completeness(matrix)
+    build = _resolve_build_model(model)
+    name = model_name or _model_name(model, build)
+    X, y, seasons, feature_columns = vectorize_matrix(matrix)
+
+    variant_names = ["raw", *methods]
+    fold_reports: dict[str, list[dict[str, Any]]] = {v: [] for v in variant_names}
+    pooled: dict[str, tuple[list[np.ndarray], list[np.ndarray]]] = {
+        v: ([], []) for v in variant_names
+    }
+
+    for fold in folds:
+        train_idx, test_idx = fold_indices(fold, seasons)
+        base_fit_idx, cal_idx = _partition_train(train_idx, calibration_fraction)
+        X_test, y_test = _labeled(X, y, test_idx)
+        if len(y_test) == 0:
+            raise ValueError(f"test partition has no labeled rows in fold {fold}")
+
+        inner_base = _fit_base(build, X, y, base_fit_idx, random_state)
+        X_cal, y_cal = _labeled(X, y, cal_idx)
+        p_cal = _positive_class_proba(inner_base, X_cal)
+        calibrators = {
+            method: _fit_calibrator(method, p_cal, y_cal, random_state)
+            for method in methods
+        }
+
+        refit_base = _fit_base(build, X, y, train_idx, random_state)
+        p_raw = _positive_class_proba(refit_base, X_test)
+        probabilities = {"raw": p_raw}
+        probabilities.update(
+            {
+                method: _calibrate(calibrators[method], p_raw)
+                for method in methods
+            }
+        )
+
+        meta = {
+            "n_base_fit": len(_labeled(X, y, base_fit_idx)[1]),
+            "n_calibration": len(y_cal),
+            "n_model_train": len(_labeled(X, y, train_idx)[1]),
+            "n_test": len(y_test),
+        }
+        partition_trace = {
+            "calibrator_base_fit": _partition_descriptor(base_fit_idx, seasons),
+            "calibrator_fit": _partition_descriptor(cal_idx, seasons),
+            "evaluation_base_refit": _partition_descriptor(train_idx, seasons),
+            "evaluation": _partition_descriptor(test_idx, seasons),
+        }
+        for variant, p_test in probabilities.items():
+            _require_probability_bounds(p_test, variant)
+            metrics = _variant_fold_metrics(y_test, p_test, fold, meta)
+            metrics["reliability_curve"] = reliability_curve(
+                y_test, p_test, n_bins=n_bins
+            )
+            metrics["prediction_sha256"] = _prediction_sha256(p_test)
+            metrics["probability_min"] = float(np.min(p_test))
+            metrics["probability_max"] = float(np.max(p_test))
+            metrics["partition_trace"] = partition_trace
+            fold_reports[variant].append(metrics)
+            pooled[variant][0].append(y_test)
+            pooled[variant][1].append(p_test)
+
+    variants_out: dict[str, Any] = {}
+    for variant in variant_names:
+        ys, ps = pooled[variant]
+        pooled_y = np.concatenate(ys)
+        pooled_p = np.concatenate(ps)
+        aggregate = _probability_metrics(pooled_y, pooled_p)
+        aggregate["n_folds"] = len(folds)
+        aggregate["reliability_curve"] = reliability_curve(
+            pooled_y, pooled_p, n_bins=n_bins
+        )
+        aggregate["prediction_sha256"] = _prediction_sha256(pooled_p)
+        aggregate["probability_min"] = float(np.min(pooled_p))
+        aggregate["probability_max"] = float(np.max(pooled_p))
+        variants_out[variant] = {
+            "folds": fold_reports[variant],
+            "aggregate": aggregate,
+        }
+
+    stability = _fold_stability(variants_out, methods)
+    recommendation = _calibration_recommendation(variants_out, stability, methods)
+    return {
+        "model": name,
+        "random_state": random_state,
+        "calibration_fraction": calibration_fraction,
+        "methods": list(methods),
+        "n_features": len(feature_columns),
+        "temporal_methodology": {
+            "development_seasons": sorted(set(seasons) - {2026}),
+            "holdout_2026": "excluded from all selection partitions",
+            "row_order": "game_date, game_pk",
+            "calibrator_fit": (
+                "later chronological calibration_fraction of each fold's "
+                "training rows; probabilities produced by an earlier-only base fit"
+            ),
+            "base_model_evaluation_fit": "all labeled training rows in each fold",
+            "evaluation": "next season only; labels never used for fitting",
+        },
+        "variants": variants_out,
+        "fold_stability": stability,
+        "recommendation": recommendation,
+    }
+
+
+def reliability_curve(
+    y_true: np.ndarray, p: np.ndarray, *, n_bins: int = 10
+) -> list[dict[str, Any]]:
+    """Equal-width probability buckets with counts and observed win rates."""
+    _require_probability_bounds(p, "reliability")
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    bin_ids = np.clip(np.digitize(p, edges[1:-1]), 0, n_bins - 1)
+    buckets: list[dict[str, Any]] = []
+    for bin_id in range(n_bins):
+        mask = bin_ids == bin_id
+        count = int(mask.sum())
+        mean_probability = float(np.mean(p[mask])) if count else None
+        actual_win_rate = float(np.mean(y_true[mask])) if count else None
+        buckets.append(
+            {
+                "bin": bin_id,
+                "lower": float(edges[bin_id]),
+                "upper": float(edges[bin_id + 1]),
+                "count": count,
+                "mean_probability": mean_probability,
+                "actual_win_rate": actual_win_rate,
+                "calibration_gap": (
+                    None
+                    if count == 0
+                    else float(actual_win_rate - mean_probability)
+                ),
+            }
+        )
+    return buckets
+
+
+def serialize_calibrator(calibrator: tuple[str, Any]) -> bytes:
+    """Serialize a fitted calibrator for trusted local artifact storage only."""
+    _validate_calibrator(calibrator)
+    return pickle.dumps(calibrator, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def deserialize_calibrator(payload: bytes) -> tuple[str, Any]:
+    """Load a trusted local calibrator artifact and validate its shape."""
+    calibrator = pickle.loads(payload)  # noqa: S301 - explicitly trusted artifacts only
+    _validate_calibrator(calibrator)
+    return calibrator
+
+
 def _fold_variants(
     build: Any,
     X: np.ndarray,
@@ -390,6 +575,112 @@ def _calibrate(calibrator: tuple[str, Any], p: np.ndarray) -> np.ndarray:
     return np.clip(model.predict(p), 0.0, 1.0)
 
 
+def _validate_calibrator(calibrator: Any) -> None:
+    if not isinstance(calibrator, tuple) or len(calibrator) != 2:
+        raise ValueError("calibrator artifact must be a (method, fitted_model) tuple")
+    method, model = calibrator
+    if method not in CALIBRATION_METHODS:
+        raise ValueError(f"unknown calibrator artifact method {method!r}")
+    if method == "sigmoid" and not callable(getattr(model, "predict_proba", None)):
+        raise ValueError("sigmoid calibrator artifact has no predict_proba")
+    if method == "isotonic" and not callable(getattr(model, "predict", None)):
+        raise ValueError("isotonic calibrator artifact has no predict")
+
+
+def _require_probability_bounds(p: np.ndarray, variant: str) -> None:
+    if not np.all(np.isfinite(p)) or np.any(p < 0.0) or np.any(p > 1.0):
+        raise ValueError(f"{variant} produced probabilities outside [0, 1]")
+
+
+def _prediction_sha256(p: np.ndarray) -> str:
+    canonical = np.asarray(p, dtype="<f8")
+    return hashlib.sha256(canonical.tobytes()).hexdigest()
+
+
+def _partition_descriptor(
+    indices: Sequence[int], seasons: Sequence[int]
+) -> dict[str, Any]:
+    """Identify a partition in the canonical vectorized row order."""
+    if not indices:
+        return {"count": 0, "row_index_start": None, "row_index_end": None, "seasons": []}
+    return {
+        "count": len(indices),
+        "row_index_start": int(indices[0]),
+        "row_index_end": int(indices[-1]),
+        "seasons": sorted({int(seasons[index]) for index in indices}),
+    }
+
+
+def _fold_stability(
+    variants: dict[str, Any], methods: Sequence[str]
+) -> dict[str, Any]:
+    raw_folds = variants["raw"]["folds"]
+    stability: dict[str, Any] = {}
+    for method in methods:
+        deltas: list[dict[str, Any]] = []
+        for raw, calibrated in zip(raw_folds, variants[method]["folds"]):
+            deltas.append(
+                {
+                    "test_season": raw["test_season"],
+                    "log_loss": calibrated["log_loss"] - raw["log_loss"],
+                    "brier": calibrated["brier"] - raw["brier"],
+                    "ece": calibrated["ece"] - raw["ece"],
+                }
+            )
+        log_loss_deltas = np.asarray([row["log_loss"] for row in deltas])
+        brier_deltas = np.asarray([row["brier"] for row in deltas])
+        ece_deltas = np.asarray([row["ece"] for row in deltas])
+        stability[method] = {
+            "fold_count": len(deltas),
+            "log_loss_improved_folds": int(np.sum(log_loss_deltas < 0.0)),
+            "brier_improved_folds": int(np.sum(brier_deltas < 0.0)),
+            "ece_improved_folds": int(np.sum(ece_deltas < 0.0)),
+            "mean_log_loss_delta": float(np.mean(log_loss_deltas)),
+            "std_log_loss_delta": float(np.std(log_loss_deltas)),
+            "mean_brier_delta": float(np.mean(brier_deltas)),
+            "mean_ece_delta": float(np.mean(ece_deltas)),
+            "fold_deltas_calibrated_minus_raw": deltas,
+        }
+    return stability
+
+
+def _calibration_recommendation(
+    variants: dict[str, Any],
+    stability: dict[str, Any],
+    methods: Sequence[str],
+) -> str:
+    """Return a conservative pre-2026 recommendation from primary metrics.
+
+    A calibrated method must improve pooled log loss and Brier and improve log
+    loss in a strict majority of temporal folds. Otherwise raw is retained when
+    no method clears those gates. This rule deliberately ignores accuracy, AUC,
+    ROI, and all 2026 evidence.
+    """
+    raw = variants["raw"]["aggregate"]
+    eligible = []
+    for method in methods:
+        aggregate = variants[method]["aggregate"]
+        method_stability = stability[method]
+        if (
+            aggregate["log_loss"] < raw["log_loss"]
+            and aggregate["brier"] < raw["brier"]
+            and method_stability["log_loss_improved_folds"]
+            > method_stability["fold_count"] / 2
+        ):
+            eligible.append(method)
+    if not eligible:
+        return "KEEP RAW"
+    winner = min(
+        eligible,
+        key=lambda method: (
+            variants[method]["aggregate"]["log_loss"],
+            variants[method]["aggregate"]["brier"],
+            variants[method]["aggregate"]["ece"],
+        ),
+    )
+    return "USE PLATT" if winner == "sigmoid" else "USE ISOTONIC"
+
+
 def _logit(p: np.ndarray) -> np.ndarray:
     """Numerically safe logit; clips into ``[_EPS, 1 - _EPS]`` first."""
     clipped = np.clip(np.asarray(p, dtype=float), _EPS, 1.0 - _EPS)
@@ -408,4 +699,6 @@ def _variant_fold_metrics(
     metrics["test_season"] = fold.test_season
     metrics["n_base_fit"] = meta["n_base_fit"]
     metrics["n_calibration"] = meta["n_calibration"]
+    if "n_model_train" in meta:
+        metrics["n_model_train"] = meta["n_model_train"]
     return metrics
