@@ -171,4 +171,6 @@ Record:
   - `git diff --check` passed.
 - No live API smoke or Linux `systemd-analyze verify` was possible in this
   Windows implementation environment; both are documented homelab install
-  checks. Independent reviewer/tester gates remain required before merge.
+  checks.
+- Merged to `main` (`add07cf`). Tester gate: **PASS** (2026-08-21; 56 focused
+  operator/journal + 947 full suite). Reviewer gate: pending.

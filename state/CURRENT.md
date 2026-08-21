@@ -509,8 +509,7 @@ loss in only 2/4 folds and worsened log loss and Brier in both 2023 and 2024.
 Candidate recommendation: **KEEP RAW**. 2026 was not loaded or used, and no
 production promotion is authorized. Artifact:
 `reports/experiments/v1-locked-calibration-pre2026-a910017bac839af5.json`.
-Committed on `main` (`f653334`); implementer tests passed (22 calibration/leakage);
-independent reviewer/tester gates remain.
+Committed on `main` (`f653334`); tester **PASS** (947 suite); reviewer pending.
 
 ## PIPE-006 immutability-conflict fix
 
@@ -680,6 +679,7 @@ The homelab remains sole owner of DuckDB and local artifacts; services load
 `flock`, and expose structured stage failures through journald. Full suite:
 938 passed, 6 expected xfails. Status remains candidate until independent
 reviewer/tester gates and a Linux `systemd-analyze verify` install check pass.
+Tester gate: **PASS** (2026-08-21). Reviewer: pending.
 
 ## Deferred follow-ups
 

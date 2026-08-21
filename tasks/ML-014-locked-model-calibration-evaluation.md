@@ -116,4 +116,5 @@ recommendation, and whether production promotion is authorized.
 - 2026 was not loaded, scored, trained on, or used for selection.
 - Tests: `python -m pytest tests/leakage tests/unit/evaluation -q` -> 96 passed.
 - Production promotion is not authorized; ADR-006 remains unchanged.
-- Awaiting required independent reviewer and tester gates.
+- Tester gate: **PASS** (2026-08-21; 60 evaluation + 42 leakage + 947 full suite).
+- Reviewer gate: pending.
