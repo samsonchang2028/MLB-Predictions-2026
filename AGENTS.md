@@ -14,6 +14,14 @@ Before changing code:
 
 Do not rely on remembered context from Codex, Claude, Cursor, or another harness when repository state disagrees with it.
 
+## Token-efficient execution
+
+All coding agents should apply the harness-agnostic `token-efficient-coding` skill (Cursor, Claude Code, Codex, or any Agent Skills–compatible harness) when gathering repository context, using shell/Git tools, querying GitHub, and handing context between agents.
+
+Prefer persistent repository context (`state/repo-map.md`, `state/task-context/`) and orchestrator-prepared context packs over repeated repository discovery.
+
+Token efficiency is subordinate to correctness, safety, architecture validation, and test quality.
+
 ## Roles
 
 This project defines four roles:

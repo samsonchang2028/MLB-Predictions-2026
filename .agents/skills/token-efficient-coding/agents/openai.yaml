@@ -1,0 +1,6 @@
+interface:
+  display_name: "Token-Efficient Coding"
+  short_description: "Progressive discovery, bounded shell/Git output, and shared context packs"
+
+policy:
+  allow_implicit_invocation: true

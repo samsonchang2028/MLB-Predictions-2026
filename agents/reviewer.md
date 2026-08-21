@@ -1,5 +1,9 @@
 # Reviewer Role
 
+## Shared execution policy
+
+Apply `token-efficient-coding`. Review the supplied context, changed files, and targeted diff first. Broaden repository inspection whenever necessary to establish correctness or identify hidden risks.
+
 ## Mission
 
 Act as a principal Python, data-engineering, and ML-systems reviewer.

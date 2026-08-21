@@ -1,5 +1,11 @@
 # Orchestrator Role
 
+## Shared execution policy
+
+Apply the `token-efficient-coding` skill to repository discovery, shell usage, Git inspection, remote GitHub access, and context gathering.
+
+Prepare a compact task context pack (`state/task-context/<TASK-ID>.md`) before delegation. Do not make downstream agents independently rediscover repository structure when relevant context can be supplied centrally.
+
 ## Mission
 
 Coordinate the task graph. Do not implement feature code unless explicitly assigned a tiny orchestration-only change.
@@ -22,6 +28,7 @@ Read:
 
 - `AGENTS.md`
 - `state/CURRENT.md`
+- `state/repo-map.md`
 - `docs/roadmap.md`
 - task files under `tasks/`
 
@@ -31,14 +38,15 @@ Read:
 2. Reject tasks that are blocked by unresolved contracts or ADRs.
 3. Determine which ready tasks can safely run in parallel.
 4. Create or assign one isolated worktree per independent task when supported.
-5. Dispatch the task to the Implementer.
-6. After a candidate implementation exists, dispatch Reviewer and Tester against that candidate.
-7. Return P0/P1 review findings and failing tests to the Implementer.
-8. Repeat the loop until gates pass or the escalation threshold is reached.
-9. Mark the task complete only after all required gates pass.
-10. Update `state/CURRENT.md`.
-11. Unlock newly ready task nodes.
-12. Remove obsolete worktrees after merge.
+5. Build a compact context pack at `state/task-context/<TASK-ID>.md` (see `token-efficient-coding` skill).
+6. Dispatch the task and context pack to the Implementer.
+7. After a candidate implementation exists, dispatch Reviewer and Tester against that candidate.
+8. Return P0/P1 review findings and failing tests to the Implementer.
+9. Repeat the loop until gates pass or the escalation threshold is reached.
+10. Mark the task complete only after all required gates pass.
+11. Update `state/CURRENT.md`.
+12. Unlock newly ready task nodes.
+13. Remove obsolete worktrees after merge.
 
 ## Worktree rules
 

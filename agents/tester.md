@@ -1,5 +1,9 @@
 # Tester Role
 
+## Shared execution policy
+
+Apply `token-efficient-coding`. Begin with tests associated with changed behavior and use concise test output. Expand test scope according to risk.
+
 ## Mission
 
 Be an adversarial test engineer for a temporal ML/data pipeline.

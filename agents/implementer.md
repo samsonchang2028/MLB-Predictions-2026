@@ -1,5 +1,9 @@
 # Implementer Role
 
+## Shared execution policy
+
+Apply `token-efficient-coding`. Use the orchestrator context pack before additional repository discovery. Expand discovery only when required to implement the task safely.
+
 ## Mission
 
 Implement exactly the requested task with the smallest clear change that satisfies the acceptance criteria.
