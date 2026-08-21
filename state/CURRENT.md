@@ -509,8 +509,8 @@ loss in only 2/4 folds and worsened log loss and Brier in both 2023 and 2024.
 Candidate recommendation: **KEEP RAW**. 2026 was not loaded or used, and no
 production promotion is authorized. Artifact:
 `reports/experiments/v1-locked-calibration-pre2026-a910017bac839af5.json`.
-Implementer gate: 96 relevant evaluation/leakage tests passed; independent
-reviewer/tester gates remain.
+Committed on `main` (`f653334`); implementer tests passed (22 calibration/leakage);
+independent reviewer/tester gates remain.
 
 ## PIPE-006 immutability-conflict fix
 
@@ -667,21 +667,19 @@ Streamlit dashboard.
 
 None required for V1. Optional follow-ups currently in flight or queued:
 DATA-021 targeted retry of the 39 DATA-018 games, OPS-001 independent
-review/test of the candidate homelab automation, OBS-002 result enrichment, MARKET-002
-persisted market-relative reporting, and independent review/test gates for
-APP-006/007/008/009 if required before marking those UI tasks done.
+review/test of the merged homelab automation candidate, MARKET-002 persisted
+market-relative reporting, and ML-014 independent review/test gates.
 
 ## OPS-001 homelab automation candidate
 
-OPS-001A-D are implemented on `agent/OPS-001-homelab-automation`: stable wrapper
-`scripts/run_daily_operator.py`, schedule refresh before predictions, four
-systemd service/timer units, offline operational tests, and
-`docs/homelab-operations.md`. The homelab remains sole owner of DuckDB and local
-artifacts; services load `THE_ODDS_API_KEY` from an external environment file,
-serialize writers with `flock`, and expose structured stage failures through
-journald. Full suite: 938 passed, 6 expected xfails. Status remains candidate
-until independent reviewer/tester gates and a Linux `systemd-analyze verify`
-install check pass.
+OPS-001A-D are merged to `main`: stable wrapper `scripts/run_daily_operator.py`,
+schedule refresh before predictions, four systemd service/timer units under
+`deploy/systemd/`, offline operational tests, and `docs/homelab-operations.md`.
+The homelab remains sole owner of DuckDB and local artifacts; services load
+`THE_ODDS_API_KEY` from an external environment file, serialize writers with
+`flock`, and expose structured stage failures through journald. Full suite:
+938 passed, 6 expected xfails. Status remains candidate until independent
+reviewer/tester gates and a Linux `systemd-analyze verify` install check pass.
 
 ## Deferred follow-ups
 
