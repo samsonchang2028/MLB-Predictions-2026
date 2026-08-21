@@ -271,3 +271,60 @@ def test_homepage_play_performance_7d_aggregates_last_seven_slates(tmp_path: Pat
     assert summary["play_performance_7d"]["losses"] == 1
     assert summary["play_performance_7d"]["win_rate"] == 0.5
     assert summary["holdout_metrics"]["accuracy"] == 0.54
+
+
+def test_homepage_play_performance_uses_latest_game_across_run_dates(
+    tmp_path: Path,
+) -> None:
+    predictions = tmp_path / "daily.jsonl"
+    journal = tmp_path / "journal.jsonl"
+    skipped = tmp_path / "skipped.jsonl"
+    holdout = tmp_path / "holdout.json"
+    diagnostics = tmp_path / "diagnostics.json"
+    original = {
+        "game_pk": 7,
+        "run_date": "2026-08-13",
+        "edge": 0.05,
+        "prediction_timestamp": "2026-08-13T16:00:00+00:00",
+        "odds_snapshot_timestamp": "2026-08-13T15:59:00+00:00",
+    }
+    rescheduled = {
+        **original,
+        "run_date": "2026-08-14",
+        "edge": 0.06,
+        "prediction_timestamp": "2026-08-14T16:00:00+00:00",
+        "odds_snapshot_timestamp": "2026-08-14T15:59:00+00:00",
+    }
+    _write_jsonl(predictions, [original, rescheduled])
+    _write_jsonl(
+        journal,
+        [
+            {
+                "game_pk": 7,
+                "prediction_timestamp": original["prediction_timestamp"],
+                "correct": True,
+                "enrichment_timestamp": "2026-08-14T06:00:00+00:00",
+            }
+        ],
+    )
+    skipped.write_text("", encoding="utf-8")
+    holdout.write_text("{}", encoding="utf-8")
+    diagnostics.write_text("{}", encoding="utf-8")
+
+    summary = build_homepage_summary(
+        ArtifactPaths(
+            predictions=predictions,
+            journal=journal,
+            skipped=skipped,
+            holdout_report=holdout,
+            diagnostics_report=diagnostics,
+        )
+    )
+
+    performance = summary["play_performance_7d"]
+    by_date = {row["run_date"]: row for row in performance["daily"]}
+    assert performance["wins"] == 0
+    assert performance["losses"] == 0
+    assert performance["pending"] == 1
+    assert by_date["2026-08-13"]["pending"] == 0
+    assert by_date["2026-08-14"]["pending"] == 1

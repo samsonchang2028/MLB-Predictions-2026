@@ -360,11 +360,13 @@ The API is read-only — run `daily_predictions.py` first so `state/predictions/
 
 Sidebar pages (Streamlit):
 
-- **Home** — 7-day play win rate, today's slate charts, minimal holdout context  
-- **Daily Predictions** — full slate, PLAY/PASS, best plays  
-- **Model Performance** — development vs 2026 holdout evidence  
-- **Game Detail** — per-game features and multi-book odds  
-- **About** — plain-English methodology  
+- **Daily Predictions** — today's slate (model, market, edge, PLAY/PASS)
+- **Model Quality** — historical holdout + prospective probability metrics
+- **Market Edge** — model-vs-market disagreement
+- **Betting Results** — PLAY win rate and flat-stake ROI (not model evidence)
+- **Prospective Evaluation** — frozen production monitoring
+- **Game Detail** — per-game features and multi-book odds
+- **About** — plain-English methodology
 
 **5. Rebuild README charts** (optional, after experiment JSON changes):
 
