@@ -63,15 +63,15 @@ state source of truth.
 | APP-004 | done | APP-003 | Streamlit deployment packaging |
 | ML-011 | done | ML-010 | model diagnostics report for underfit/overfit evidence |
 | DATA-021 | backlog | DATA-020 | targeted retry/normalization of the 39 DATA-018 games |
-| OPS-001 | backlog | APP-004, PIPE-003 | scheduled daily operator / GitHub Actions; needs secret + data artifact strategy |
-| OBS-002 | candidate | OBS-001, PIPE-003, PIPE-005 | result enrichment operator for daily predictions after games finish |
+| OPS-001 | candidate | APP-004, PIPE-003, OBS-002 | homelab daily operator wrapper + systemd timers; see `docs/homelab-operations.md` |
+| OBS-002 | done | OBS-001, PIPE-003, PIPE-005 | result enrichment operator for daily predictions after games finish |
 | MARKET-002 | backlog | MARKET-001, OBS-002 | persisted market-relative report/ROI artifact |
-| APP-006 | candidate | APP-004, APP-005, OBS-002 | user-friendly homepage overview with model/status/result summary cards |
-| APP-007 | candidate | APP-006, OBS-002 | friendlier daily picks board for non-technical users |
-| APP-008 | candidate | APP-007 | best plays of the day chart/ranking |
-| APP-009 | candidate | APP-006 | plain-English about/methodology page |
+| APP-006 | done | APP-004, APP-005, OBS-002 | user-friendly homepage overview with model/status/result summary cards |
+| APP-007 | done | APP-006, OBS-002 | friendlier daily picks board for non-technical users |
+| APP-008 | done | APP-007 | best plays of the day chart/ranking |
+| APP-009 | done | APP-006 | plain-English about/methodology page |
 | APP-011 | done | APP-006 | chart-first homepage (merged) |
-| API-001 | ready | APP-001 | minimal read-only FastAPI prediction adapter |
+| API-001 | done | APP-001 | minimal read-only FastAPI prediction adapter; see `docs/api.md` |
 | APP-001A | done | APP-001 | malformed/stale prediction-record hardening for xfail-pinned P2 |
 | OPS-002 | done | - | git remote updated to github.com/samsonchang2028/MLB-Predictions-2026 |
 | PIPE-004 | merged, self-reviewed only | PIPE-003, DATA-003 | persist per-game feature breakdown + multi-book odds comparison artifacts |
@@ -84,6 +84,7 @@ state source of truth.
 | APP-012 | done | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table — merged; confirmed zero production-code changes needed, schema-reuse design validated |
 | ML-012 | done | ML-009, FEAT-006 | feature-family ablation study — merged; team/starter strongest, bullpen/rest_schedule INVESTIGATE (redundancy interaction), zero leakage found, no production model change; see `docs/research/ml-012-feature-ablation.md` |
 | ML-013 | done | ML-012, ML-009, FEAT-006 | failure-regime + redundancy research — merged; sharpest gap is edge-bucket miscalibration (model diverges from market), away-favored games weaker (ROC-AUC 0.540 vs 0.556), 39 near-duplicate column groups (engineering overlap, not leakage), zero leakage; see `docs/research/ml-013-failure-regime-and-redundancy.md` |
+| ML-014 | candidate | ML-009 | locked-model calibration re-eval on pre-2026 folds; recommendation KEEP RAW; reviewer/tester gates remain |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 
