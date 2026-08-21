@@ -189,9 +189,159 @@ separate per its own stated interpretation rule.
 
 ## Handoff
 
-Record: summary, files changed, N of eligible/resolved predictions actually
-available (this determines how much of the analysis is meaningful),
-all 5 analysis parts' key numbers, historical-comparison deltas, any data-
-quality issues found in the journal/enrichment data itself, the final
-conclusion label with justification, and recommended measurements for the
-next 2-4 weeks.
+**Summary.** Implemented a read-only diagnostic study of the first week+ of
+real, live production predictions from the ADR-006 locked model. No model,
+feature, calibration, threshold, or production file was modified. All
+computation reuses existing, unmodified pipeline code:
+`app.board.load_daily_board_with_diagnostics` (same join/dedup/PLAY-PASS
+logic the live dashboard uses), `evaluation.runner._probability_metrics`
+(same formulas as the 2026 holdout report), and
+`experiments.failure_regimes.slice_by` / `feature_value_by_game_pk` /
+`tercile_labels` (ML-013's own slice machinery, for direct comparability).
+
+**Files changed** (all new; nothing in the "do not modify" list touched):
+- `src/experiments/prospective_diagnostic.py` -- core diagnostic module
+  (row assembly/join, Parts 1-5, historical comparison).
+- `scripts/ml015_prospective_diagnostic.py` -- operator entry point; reads
+  `state/predictions/{daily,journal,game_features,skipped}.jsonl` (paths
+  overridable via CLI flags, since `state/predictions/*.jsonl` is gitignored
+  and a worktree checkout won't have it) plus
+  `reports/experiments/v1-holdout-2026.json`, writes
+  `reports/experiments/ml-015-prospective-diagnostic.json`.
+- `tests/unit/experiments/test_prospective_diagnostic.py` -- 16 tests: 6
+  synthetic games with explicit hand-computed membership (including a
+  raw-favorite/edge-sign "crossover" case), a regression/determinism test,
+  and 2 tests confirming the 2026 holdout is never a computation input
+  (`build_report` takes no holdout parameter at all;
+  `historical_comparison` is proven not to mutate its inputs).
+- `reports/experiments/ml-015-prospective-diagnostic.json` -- generated
+  artifact (real run against the live journal, see below).
+- `docs/research/ml-015-prospective-model-market-diagnostic.md` -- full
+  written report.
+
+**Commands run**: `python -m pytest tests/unit/experiments -q` (83 passed,
+1 xfailed, includes the pre-existing ML-012/013/etc. suites plus this
+task's 16 new tests); `python scripts/ml015_prospective_diagnostic.py
+--daily <main-repo>/state/predictions/daily.jsonl --journal
+<main-repo>/state/predictions/journal.jsonl --game-features
+<main-repo>/state/predictions/game_features.jsonl --skipped
+<main-repo>/state/predictions/skipped.jsonl` (the worktree's own
+`state/predictions/` is empty since it's gitignored; the real journal was
+read read-only from the main checkout via explicit paths, same pattern
+ML-012/013 used for the DuckDB file).
+
+**N of eligible/resolved predictions**: **94** (one locked
+`model_version`, deduped to the latest prediction per `game_pk` with a Final
+journal result, same convention the live board itself uses). PLAY subset:
+**68**. PASS: 26. Every bucket/slice below N=94 is small; every reported
+statistic in the JSON carries its own N and a `low_confidence` flag
+(threshold 30, reused from ML-013). This is meaningfully larger than the
+~50-60 plays originally cited on the dashboard -- the sample has grown
+during this task's execution window, itself informative (see Part 2 below).
+
+**Part 1 (all resolved predictions, N=94)**: log loss 0.70125 (holdout
+0.68878, delta +0.01247), Brier 0.25373 (holdout 0.24781, delta +0.00592),
+ROC-AUC 0.54727 (holdout 0.54968, delta **-0.00241**, essentially
+unchanged), accuracy 0.58511 (holdout 0.53812, delta +0.04699). 10-bin ECE
+looks large (0.134 vs holdout 0.022) but is unreliable at N=94/10 bins; the
+scalar calibration gap (`|avg_p - actual_rate|` = 0.047) is the more
+trustworthy summary and is modest. **No evidence of broad model-quality
+failure in the raw probability metrics.**
+
+**Part 2 (PLAY subset, N=68)**: 30 wins / 38 losses, win rate **44.12%**
+(not the ~39% originally cited -- recomputation over the now-larger sample
+shows a higher, though still sub-50%, rate). Avg model P(selected side)
+52.45% vs. actual selected-side win rate 44.12% -- an 8.33pp gap, ~1.4
+binomial standard errors at this N (suggestive, not conclusive). The no-vig
+market's own average implied probability on these same picks (46.33%) is
+much closer to the actual rate (2.2pp gap) than the model's own confidence
+is. ROI not computed: no stake/wager field exists in `daily.jsonl` or the
+OBS-001 journal (confirmed against `src/observability/journal.py`'s schema
+and `app.performance.MARKET_RELATIVE_NOTE`, the same repo-wide finding) --
+fabricating one would be worse than omitting it.
+
+**Part 3 (probability buckets)**: 6 buckets (<45%, 45-50%, 50-55%, 55-60%,
+60-65%, >=65%), N from 3 to 24 per bucket, all `low_confidence`. No
+monotonic miscalibration pattern; the two most-off buckets (45-50% and
+>=65%) have N=24 and N=3 respectively -- the latter is not interpretable.
+
+**Part 4 (edge buckets, selected side)**: 0-2% (N=26, 65.4% win rate),
+2-4% (N=25, 52.0%), 4-6% (N=13, 30.8%), 6-8% (N=11, 63.6%), **8%+ (N=19,
+31.6%)**. The highest-disagreement bucket has one of the worst win rates and
+the largest average model-vs-market gap (10.9pp); this **directionally
+mirrors ML-013's own historical finding on the identical edge-bucket
+dimension** (`docs/research/ml-013-failure-regime-and-redundancy.md`:
+calibration gap 5-7x larger where the model diverges most from the no-vig
+market). Not monotonic (4-6% is also low, also low-N) so not proof, but the
+same locked model reproducing the same qualitative weak spot on genuinely
+new live data 8+ months later is the single most notable finding in this
+study.
+
+**Part 5 (failure regimes, raw P(home_win) framing)**: favorite/underdog,
+home/away selection (PLAY pick side -- distinct from raw favorite; a
+synthetic-test "crossover" case is covered explicitly in the unit tests),
+home/away outcome, near-50%-vs-confident, high-edge(PLAY)-vs-low-edge(PASS),
+starter-quality tercile (proxy for "starter uncertainty" -- true
+missing-late-starter games never reach a prediction row, see data quality),
+bullpen-workload tercile, and time-to-first-pitch all computed, N and
+low_confidence stated per group; no dimension in Part 5 shows a pattern as
+sharp as Part 4's edge-bucket finding. `sportsbook` and the true
+"missing-late-starter" per-row slice were **skipped cleanly with stated
+reasons** (single canonical sportsbook pinned per-prediction; starter-missing
+games are excluded entirely upstream, never reach a resolved prediction row)
+rather than fabricated.
+
+**Historical-comparison deltas**: see Part 1 table above (log loss
++0.01247, Brier +0.00592, ECE +0.11163 [unreliable at this N], ROC-AUC
+-0.00241, accuracy +0.04699). The 2026 holdout was read only for this
+side-by-side display -- `build_report` takes no holdout parameter at all,
+and `historical_comparison` is a separate, pure, read-only function proven
+by test not to mutate its inputs.
+
+**Data-quality issues found**: none active/blocking. One historical issue
+was checked and confirmed already resolved: `state/predictions/
+journal.before-edge-side-fix.jsonl` is a preserved backup of 4 pre-fix
+records from commit `93787ad` ("OBS-002: score edge-side picks correctly"),
+committed the same morning (07:15 local) strictly before any result
+enrichment ran (14:15 that day) -- the live `journal.jsonl` this study reads
+is entirely post-fix. Minor coverage gap noted, not urgent: 5 of 94 resolved
+predictions lack a usable `diff_starter_season_era_before` feature value in
+`game_features.jsonl` (the `starter_quality_regime` `missing` bucket),
+worth checking as a follow-up if it grows. **No P0/P1 correctness defect
+found; nothing escalated.**
+
+**Final conclusion**: **MARKET/PLAY LAYER APPEARS MORE CONCERNING**.
+Justification: Part 1's raw-probability-model metrics show no evidence of
+broad model-quality failure (ROC-AUC essentially unchanged from the 2026
+holdout, delta -0.00241), so per this task's explicit instruction the PLAY
+win-rate shortfall is **not** attributed to bad model calibration. The
+selection layer built on top of the model (PLAY when |edge|>=2%) shows a
+specific, structurally-motivated weak spot instead: the highest-edge bucket
+has one of the worst win rates in the sample (Part 4), the PLAY subset's
+own model confidence overshoots its actual outcome rate by more than the
+no-vig market's own gap on the same games (Part 2), and this pattern
+directionally reproduces ML-013's own historical finding on the identical
+edge-bucket dimension using genuinely new, independent prospective data.
+Every cited number is `low_confidence` at N<=68, so this is not yet strong
+enough evidence to act on, and it explicitly does not rise to "MODEL QUALITY
+APPEARS CONCERNING" -- but of the two systems, the market/PLAY selection
+layer is where this report's evidence points continued monitoring toward.
+
+**Recommended measurements, next 2-4 weeks**:
+1. Re-run `scripts/ml015_prospective_diagnostic.py` weekly; watch whether
+   the 8%+ edge bucket's win rate stays anomalously low once its N passes
+   30 (currently 19).
+2. Track the Part 2 model-vs-actual gap (currently +8.33pp) over time --
+   persisting/growing strengthens the market/PLAY-layer concern; closing
+   toward 0 supports "it was just this week's variance."
+3. Track the Part 1 ROC-AUC delta vs. the 2026 holdout (currently -0.00241,
+   essentially zero) -- a delta growing substantially more negative over
+   several weeks would be the first real signal of raw model-quality drift,
+   distinct from the PLAY-layer concern above.
+4. Track `starter_quality_regime`'s `missing` count and
+   `starter_uncertainty_skip_count` as data-quality/coverage health checks.
+5. Do not retune, recalibrate, or change the PLAY/PASS threshold based on
+   this study alone (per ADR-006 and this task's constraints). If the
+   edge-bucket pattern persists with a larger N over the next several
+   weeks, the appropriate next step is a dedicated, properly-governed
+   follow-up task -- not a change made inside this monitoring study.

@@ -265,6 +265,27 @@ to certify cleanly.
 
 ## In progress
 
+- ML-015 - prospective model and market diagnostic study completed
+  (candidate for review/test gates): `src/experiments/prospective_diagnostic.py`
+  reuses `app.board.load_daily_board_with_diagnostics` (live-board join/dedup/
+  PLAY-PASS logic), `evaluation.runner._probability_metrics`, and
+  `experiments.failure_regimes.slice_by`/`tercile_labels` unmodified to
+  diagnose the first week+ of real, live production predictions
+  (`state/predictions/`), without touching the locked ADR-006 model.
+  `scripts/ml015_prospective_diagnostic.py` runs it against the live journal
+  (94 resolved eligible predictions as of this run; 68 PLAY / 26 PASS). Part
+  1 (all resolved predictions, raw P(home_win)) shows ROC-AUC essentially
+  unchanged from the 2026 holdout (delta -0.00241) -- no evidence of broad
+  model-quality failure. Part 4 (edge buckets) reproduces ML-013's own
+  historical finding: the highest model-vs-market-disagreement bucket (8%+,
+  N=19) has one of the worst actual win rates (31.6%), while the
+  lowest-disagreement bucket has the best (65.4%, N=26). Final conclusion:
+  **MARKET/PLAY LAYER APPEARS MORE CONCERNING** (hedged -- every supporting
+  slice is low-N). No production model/threshold change. Report:
+  `reports/experiments/ml-015-prospective-diagnostic.json`. Markdown:
+  `docs/research/ml-015-prospective-model-market-diagnostic.md`. See
+  `tasks/ML-015-prospective-model-market-diagnostic.md` Handoff for full
+  detail.
 - ML-013 - failure-regime and redundancy research (extends ML-012) completed
   (candidate for review/test gates): `src/experiments/failure_regimes.py` and
   `src/experiments/redundancy.py` reuse the ML-004 runner, ML-012's family
