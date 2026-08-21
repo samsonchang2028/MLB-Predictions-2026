@@ -14,3 +14,8 @@ data/
 mlb_odds_dataset.json
 .kiro/
 .env
+
+# Local operator logs and runtime prediction artifacts (reproducible from scripts)
+logs/
+state/predictions/*.jsonl
+state/predictions/*.jsonl.*
