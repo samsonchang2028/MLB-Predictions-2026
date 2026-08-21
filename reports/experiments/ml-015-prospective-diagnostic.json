@@ -1,0 +1,444 @@
+{
+  "data_quality": {
+    "daily_board_malformed_skips": 0,
+    "starter_uncertainty_skip_count": 5
+  },
+  "edge_threshold": 0.02,
+  "generated_at": "2026-08-21T17:59:26.900017+00:00",
+  "historical_comparison_2026_holdout": {
+    "metrics": {
+      "accuracy": {
+        "delta": 0.0469872956108881,
+        "holdout_2026": 0.5381190873678353,
+        "prospective": 0.5851063829787234
+      },
+      "brier": {
+        "delta": 0.005921432757887063,
+        "holdout_2026": 0.24781049460286877,
+        "prospective": 0.25373192736075584
+      },
+      "ece": {
+        "delta": 0.11162955290923232,
+        "holdout_2026": 0.022240705701066947,
+        "prospective": 0.13387025861029928
+      },
+      "log_loss": {
+        "delta": 0.012468963271841549,
+        "holdout_2026": 0.6887796135101659,
+        "prospective": 0.7012485767820075
+      },
+      "roc_auc": {
+        "delta": -0.0024093156018037964,
+        "holdout_2026": 0.549682042874531,
+        "prospective": 0.5472727272727272
+      }
+    },
+    "n_holdout": 1797
+  },
+  "inputs": {
+    "daily": "C:/Users/sfkim/OneDrive/Desktop/sideproj/predictions-1/state/predictions/daily.jsonl",
+    "game_features": "C:/Users/sfkim/OneDrive/Desktop/sideproj/predictions-1/state/predictions/game_features.jsonl",
+    "holdout_2026": "reports\\experiments\\v1-holdout-2026.json",
+    "journal": "C:/Users/sfkim/OneDrive/Desktop/sideproj/predictions-1/state/predictions/journal.jsonl",
+    "skipped": "C:/Users/sfkim/OneDrive/Desktop/sideproj/predictions-1/state/predictions/skipped.jsonl"
+  },
+  "model_version_filter": null,
+  "n_resolved_eligible_predictions": 94,
+  "part1_all_predictions": {
+    "accuracy": 0.5851063829787234,
+    "actual_home_win_rate": 0.46808510638297873,
+    "avg_predicted_home_probability": 0.5149930303401136,
+    "brier": 0.25373192736075584,
+    "calibration_gap": 0.046907923957134834,
+    "ece": 0.13387025861029928,
+    "log_loss": 0.7012485767820075,
+    "low_confidence": false,
+    "n": 94,
+    "roc_auc": 0.5472727272727272
+  },
+  "part2_play_subset": {
+    "actual_selected_side_win_rate": 0.4411764705882353,
+    "avg_abs_edge": 0.061226311572972904,
+    "avg_market_probability_selected_side": 0.463292764230924,
+    "avg_selected_side_american_odds": 42.23529411764706,
+    "avg_selected_side_model_probability": 0.524519075803897,
+    "edge_threshold": 0.02,
+    "losses": 38,
+    "low_confidence": false,
+    "model_vs_actual_gap": 0.08334260521566172,
+    "n": 68,
+    "roi": null,
+    "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated.",
+    "win_rate": 0.4411764705882353,
+    "wins": 30
+  },
+  "part3_probability_buckets": {
+    "buckets": {
+      "45-50%": {
+        "actual_win_rate": 0.3333333333333333,
+        "avg_predicted_probability": 0.47950204089283943,
+        "brier": 0.2446573069741955,
+        "calibration_gap": 0.14616870755950612,
+        "log_loss": 0.6824647757030017,
+        "low_confidence": true,
+        "n": 24,
+        "roc_auc": 0.484375
+      },
+      "50-55%": {
+        "actual_win_rate": 0.5909090909090909,
+        "avg_predicted_probability": 0.5233430320566351,
+        "brier": 0.2470190080780606,
+        "calibration_gap": 0.06756605885245581,
+        "log_loss": 0.6871799706903412,
+        "low_confidence": true,
+        "n": 22,
+        "roc_auc": 0.5042735042735043
+      },
+      "55-60%": {
+        "actual_win_rate": 0.6153846153846154,
+        "avg_predicted_probability": 0.577540058356065,
+        "brier": 0.23711831383808693,
+        "calibration_gap": 0.037844557028550385,
+        "log_loss": 0.6672179479564899,
+        "low_confidence": true,
+        "n": 13,
+        "roc_auc": 0.5249999999999999
+      },
+      "60-65%": {
+        "actual_win_rate": 0.46153846153846156,
+        "avg_predicted_probability": 0.6224546294945937,
+        "brier": 0.27888359590393547,
+        "calibration_gap": 0.16091616795613217,
+        "log_loss": 0.7528782651312137,
+        "low_confidence": true,
+        "n": 13,
+        "roc_auc": 0.2857142857142857
+      },
+      "<45%": {
+        "actual_win_rate": 0.42105263157894735,
+        "avg_predicted_probability": 0.4088144914100045,
+        "brier": 0.257429802646834,
+        "calibration_gap": 0.012238140168942868,
+        "log_loss": 0.7095075918676074,
+        "low_confidence": true,
+        "n": 19,
+        "roc_auc": 0.3068181818181818
+      },
+      ">=65%": {
+        "actual_win_rate": 0.3333333333333333,
+        "avg_predicted_probability": 0.6734476288159689,
+        "brier": 0.31513884995896174,
+        "calibration_gap": 0.34011429548263555,
+        "log_loss": 0.8261190766081516,
+        "low_confidence": true,
+        "n": 3,
+        "roc_auc": 1.0
+      }
+    },
+    "n_excluded": 0
+  },
+  "part4_edge_buckets": {
+    "0-2%": {
+      "actual_win_rate": 0.6538461538461539,
+      "avg_edge": 0.00996226825193868,
+      "avg_market_probability_selected_side": 0.47410624122589673,
+      "avg_model_probability_selected_side": 0.4840685094778354,
+      "low_confidence": true,
+      "n": 26,
+      "roi": null,
+      "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated."
+    },
+    "2-4%": {
+      "actual_win_rate": 0.52,
+      "avg_edge": 0.028437179760990475,
+      "avg_market_probability_selected_side": 0.47291198806280094,
+      "avg_model_probability_selected_side": 0.5013491678237915,
+      "low_confidence": true,
+      "n": 25,
+      "roi": null,
+      "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated."
+    },
+    "4-6%": {
+      "actual_win_rate": 0.3076923076923077,
+      "avg_edge": 0.050687793918461704,
+      "avg_market_probability_selected_side": 0.48085167374640364,
+      "avg_model_probability_selected_side": 0.5315394676648654,
+      "low_confidence": true,
+      "n": 13,
+      "roi": null,
+      "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated."
+    },
+    "6-8%": {
+      "actual_win_rate": 0.6363636363636364,
+      "avg_edge": 0.0662208917533137,
+      "avg_market_probability_selected_side": 0.4977017708732996,
+      "avg_model_probability_selected_side": 0.5639226626266133,
+      "low_confidence": true,
+      "n": 11,
+      "roi": null,
+      "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated."
+    },
+    "8%+": {
+      "actual_win_rate": 0.3157894736842105,
+      "avg_edge": 0.10868887172162855,
+      "avg_market_probability_selected_side": 0.4187008962012246,
+      "avg_model_probability_selected_side": 0.5273897679228532,
+      "low_confidence": true,
+      "n": 19,
+      "roi": null,
+      "roi_note": "no stake/wager amount field exists in daily.jsonl or the OBS-001 journal (see app.performance.MARKET_RELATIVE_NOTE, the same repo-wide finding); ROI is not computed here rather than fabricated."
+    }
+  },
+  "part5_failure_regimes": {
+    "dimensions": {
+      "bullpen_workload_regime": {
+        "buckets": {
+          "high_tercile": {
+            "actual_win_rate": 0.45454545454545453,
+            "avg_predicted_probability": 0.5085643150589683,
+            "brier": 0.25169004958172636,
+            "calibration_gap": 0.05401886051351373,
+            "log_loss": 0.6969513913789896,
+            "low_confidence": false,
+            "n": 33,
+            "roc_auc": 0.5703703703703703
+          },
+          "low_tercile": {
+            "actual_win_rate": 0.41935483870967744,
+            "avg_predicted_probability": 0.5114900854326063,
+            "brier": 0.26433772776183523,
+            "calibration_gap": 0.09213524672292889,
+            "log_loss": 0.7227160406083523,
+            "low_confidence": false,
+            "n": 31,
+            "roc_auc": 0.4658119658119658
+          },
+          "mid_tercile": {
+            "actual_win_rate": 0.5333333333333333,
+            "avg_predicted_probability": 0.5256843268871307,
+            "brier": 0.24501866583657286,
+            "calibration_gap": 0.007649006446202589,
+            "log_loss": 0.6837924347714371,
+            "low_confidence": false,
+            "n": 30,
+            "roc_auc": 0.6026785714285714
+          }
+        },
+        "n_excluded": 0
+      },
+      "favorite_underdog": {
+        "buckets": {
+          "model_favors_away": {
+            "actual_win_rate": 0.37209302325581395,
+            "avg_predicted_probability": 0.448268007400424,
+            "brier": 0.2503009678528032,
+            "calibration_gap": 0.07617498414461005,
+            "log_loss": 0.6944139270315485,
+            "low_confidence": false,
+            "n": 43,
+            "roc_auc": 0.4097222222222222
+          },
+          "model_favors_home": {
+            "actual_win_rate": 0.5490196078431373,
+            "avg_predicted_probability": 0.5712513830147538,
+            "brier": 0.2566246971419708,
+            "calibration_gap": 0.022231775171616452,
+            "log_loss": 0.7070111246108257,
+            "low_confidence": false,
+            "n": 51,
+            "roc_auc": 0.4208074534161491
+          }
+        },
+        "n_excluded": 0
+      },
+      "high_edge_vs_low_edge": {
+        "buckets": {
+          "high_edge_play": {
+            "actual_win_rate": 0.4852941176470588,
+            "avg_predicted_probability": 0.5115466683226473,
+            "brier": 0.25363115568681427,
+            "calibration_gap": 0.02625255067558846,
+            "log_loss": 0.7010132056237535,
+            "low_confidence": false,
+            "n": 68,
+            "roc_auc": 0.5454545454545455
+          },
+          "low_edge_pass": {
+            "actual_win_rate": 0.4230769230769231,
+            "avg_predicted_probability": 0.5240065925396405,
+            "brier": 0.2539954840464492,
+            "calibration_gap": 0.10092966946271748,
+            "log_loss": 0.7018641628882095,
+            "low_confidence": true,
+            "n": 26,
+            "roc_auc": 0.5272727272727272
+          }
+        },
+        "n_excluded": 0
+      },
+      "home_away_outcome": {
+        "buckets": {
+          "away_win": {
+            "actual_win_rate": 0.0,
+            "avg_predicted_probability": 0.511790423989296,
+            "brier": 0.2675014998795192,
+            "calibration_gap": 0.511790423989296,
+            "log_loss": 0.7294620266805186,
+            "low_confidence": false,
+            "n": 50,
+            "roc_auc": null
+          },
+          "home_win": {
+            "actual_win_rate": 1.0,
+            "avg_predicted_probability": 0.5186323557387699,
+            "brier": 0.23808468586216106,
+            "calibration_gap": 0.48136764426123013,
+            "log_loss": 0.6691878382609717,
+            "low_confidence": false,
+            "n": 44,
+            "roc_auc": null
+          }
+        },
+        "n_excluded": 0
+      },
+      "home_away_selection": {
+        "buckets": {
+          "away": {
+            "actual_win_rate": 0.47761194029850745,
+            "avg_predicted_probability": 0.5011661675438952,
+            "brier": 0.24571705878387864,
+            "calibration_gap": 0.02355422724538775,
+            "log_loss": 0.6851530512619692,
+            "low_confidence": false,
+            "n": 67,
+            "roc_auc": 0.6196428571428572
+          },
+          "home": {
+            "actual_win_rate": 0.4444444444444444,
+            "avg_predicted_probability": 0.5493041343159146,
+            "brier": 0.2736206753107844,
+            "calibration_gap": 0.10485968987147021,
+            "log_loss": 0.741189325294694,
+            "low_confidence": true,
+            "n": 27,
+            "roc_auc": 0.43333333333333335
+          }
+        },
+        "n_excluded": 0
+      },
+      "near_50_vs_confident": {
+        "buckets": {
+          "confident": {
+            "actual_win_rate": 0.4791666666666667,
+            "avg_predicted_probability": 0.5289114409436783,
+            "brier": 0.2613459922252713,
+            "calibration_gap": 0.04974477427701157,
+            "log_loss": 0.7170885884468571,
+            "low_confidence": false,
+            "n": 48,
+            "roc_auc": 0.4678260869565217
+          },
+          "near_50": {
+            "actual_win_rate": 0.45652173913043476,
+            "avg_predicted_probability": 0.5004694714494373,
+            "brier": 0.24578681619778317,
+            "calibration_gap": 0.043947732319002564,
+            "log_loss": 0.6847198689578162,
+            "low_confidence": false,
+            "n": 46,
+            "roc_auc": 0.6266666666666666
+          }
+        },
+        "n_excluded": 0
+      },
+      "starter_quality_regime": {
+        "buckets": {
+          "high_tercile": {
+            "actual_win_rate": 0.3939393939393939,
+            "avg_predicted_probability": 0.48362937659928296,
+            "brier": 0.25380337846945417,
+            "calibration_gap": 0.08968998265988903,
+            "log_loss": 0.7013416114523653,
+            "low_confidence": false,
+            "n": 33,
+            "roc_auc": 0.5076923076923077
+          },
+          "low_tercile": {
+            "actual_win_rate": 0.6551724137931034,
+            "avg_predicted_probability": 0.5198157974358263,
+            "brier": 0.2372753009733773,
+            "calibration_gap": 0.13535661635727714,
+            "log_loss": 0.667468817063826,
+            "low_confidence": true,
+            "n": 29,
+            "roc_auc": 0.6526315789473685
+          },
+          "mid_tercile": {
+            "actual_win_rate": 0.2962962962962963,
+            "avg_predicted_probability": 0.5353117750750648,
+            "brier": 0.2744246760549412,
+            "calibration_gap": 0.2390154787787685,
+            "log_loss": 0.7435177866256183,
+            "low_confidence": true,
+            "n": 27,
+            "roc_auc": 0.45394736842105265
+          },
+          "missing": {
+            "actual_win_rate": 0.8,
+            "avg_predicted_probability": 0.584299874305725,
+            "brier": 0.23696794014154107,
+            "calibration_gap": 0.215700125694275,
+            "log_loss": 0.6683034211675992,
+            "low_confidence": true,
+            "n": 5,
+            "roc_auc": 0.0
+          }
+        },
+        "n_excluded": 0
+      },
+      "time_to_first_pitch": {
+        "buckets": {
+          "2-6h": {
+            "actual_win_rate": 0.4857142857142857,
+            "avg_predicted_probability": 0.5201080543654305,
+            "brier": 0.2505723631953498,
+            "calibration_gap": 0.034393768651144796,
+            "log_loss": 0.6945616650332133,
+            "low_confidence": false,
+            "n": 35,
+            "roc_auc": 0.5718954248366013
+          },
+          "6-24h": {
+            "actual_win_rate": 0.5217391304347826,
+            "avg_predicted_probability": 0.5172126746695974,
+            "brier": 0.25543804710933976,
+            "calibration_gap": 0.004526455765185178,
+            "log_loss": 0.7049022031940879,
+            "low_confidence": true,
+            "n": 23,
+            "roc_auc": 0.48484848484848486
+          },
+          "<2h": {
+            "actual_win_rate": 0.4166666666666667,
+            "avg_predicted_probability": 0.5086019842161073,
+            "brier": 0.2557137049044164,
+            "calibration_gap": 0.09193531754944056,
+            "log_loss": 0.7054154796633945,
+            "low_confidence": false,
+            "n": 36,
+            "roc_auc": 0.5460317460317461
+          }
+        },
+        "n_excluded": 0
+      }
+    },
+    "high_edge_threshold": 0.02,
+    "near_fifty_band": 0.05,
+    "skipped_dimensions": {
+      "sportsbook": "every canonical journal prediction is pinned to a single sportsbook (draftkings via the_odds_api; see PIPE-004); no cross-book variation exists in this data to slice by.",
+      "starter_uncertainty_missing_late_starter": "games with no announced starter are excluded upstream before a prediction row is ever written (state/predictions/skipped.jsonl, reason=no_starter_announced); they cannot appear in the resolved-prediction set by construction. starter_quality_regime above is the nearest available proxy (ML-013's starter-ERA-differential tercile); see data_quality.starter_uncertainty_skip_count for the aggregate coverage count instead."
+    }
+  },
+  "runtime_seconds": 0.202,
+  "status": "ML015_PROSPECTIVE_DIAGNOSTIC_EVIDENCE"
+}
