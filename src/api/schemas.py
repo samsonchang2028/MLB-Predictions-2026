@@ -5,39 +5,41 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
     status: Literal["ok"]
 
 
-class PredictionSummary(BaseModel):
+class Prediction(BaseModel):
     game_pk: int
     run_date: str | None = None
-    matchup: str
+    first_pitch: str | None = Field(default=None, validation_alias="game_start_pacific")
+    home_team: str
+    away_team: str
+    pick: str
+    recommendation: str
     model_probability: float
     market_probability: float
     edge: float
-    play: bool
-    model_side: str
-    action_label: str
-    result_status: str
-    result_label: str | None = None
-    actual_home_win: bool | None = None
-    correct: bool | None = None
-    game_start_pacific: str | None = None
-    prediction_timestamp: datetime | None = None
-    prediction_timestamp_pacific: str | None = None
     odds_snapshot_timestamp: str
     odds_snapshot_pacific: str | None = None
+    prediction_timestamp: datetime | None = None
+    prediction_timestamp_pacific: str | None = None
+    model_version: str
+    result_status: str
+    result_label: str | None = None
+    correct: bool | None = None
+
+    model_config = {"populate_by_name": True}
 
 
 class PredictionListResponse(BaseModel):
     run_date: str
-    predictions: list[PredictionSummary]
+    predictions: list[Prediction]
 
 
 class PredictionDetailResponse(BaseModel):
     run_date: str
-    prediction: PredictionSummary
+    prediction: Prediction

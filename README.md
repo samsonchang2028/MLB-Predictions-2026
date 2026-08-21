@@ -15,6 +15,7 @@ It is built for trustworthy evaluation first: certified historical data, point-i
 | **Locked V1 model** | Tuned shallow XGBoost, expanding window, uncalibrated probs (ADR-006) |
 | **Daily operator** | Refreshes today's starters, trains on 2021–2025 only, fetches live odds, writes predictions |
 | **Streamlit app** | Chart-first homepage, daily board, model performance, and per-game detail |
+| **Read-only HTTP API** | Same artifact-backed daily board rows as JSON (`/docs` OpenAPI) |
 
 **Target:** binary home-team win probability.  
 **Primary metrics:** log loss → Brier score → calibration (ECE).  
@@ -40,8 +41,9 @@ It is built for trustworthy evaluation first: certified historical data, point-i
                                                           ▼
                                               state/predictions/*.jsonl
                                                           │
-                                                          ▼
-                                                   Streamlit dashboards
+                                    ┌─────────────────────┴─────────────────────┐
+                                    ▼                                           ▼
+                             Streamlit dashboards                    FastAPI read-only API
 ```
 
 ### 1. Data layers
@@ -244,10 +246,12 @@ src/
   market/        American odds → no-vig probs + edge
   pipelines/     Daily prediction contract
   app/           Streamlit pages
+  api/           Read-only FastAPI (artifact-backed JSON)
   validation/    Certification & leakage checks
 scripts/
   daily_predictions.py          Live daily operator
   enrich_prediction_results.py  Post-game journal enrichment (wins/losses on board)
+  run_api.py                    Start uvicorn for the read-only API
   smoke_sim_yesterday.py        Offline Monte Carlo smoke on a past slate (research)
   holdout_2026.py               One-shot holdout evaluation
   generate_readme_charts.py     Rebuild docs/images/*.png from experiment JSON
@@ -258,8 +262,11 @@ state/
 reports/
   experiments/           Model comparison + holdout JSON
 docs/
+  api.md                 HTTP API reference (endpoints, config, examples)
   decisions/             ADRs
   images/                README charts
+.github/
+  README.md              GitHub repo guide (links, dev setup, API summary)
 tasks/                   Task graph for agents / contributors
 ```
 
@@ -326,7 +333,18 @@ python scripts\enrich_prediction_results.py --date 2026-08-14
 python -m streamlit run streamlit_app.py
 ```
 
-Sidebar pages:
+**4. Read-only JSON API** (optional; same artifacts as the dashboard):
+
+```powershell
+pip install -e ".[app,api]"
+python -m uvicorn api.main:app --reload --port 8000
+```
+
+Open http://127.0.0.1:8000/docs for interactive OpenAPI docs. Full reference: [`docs/api.md`](docs/api.md). GitHub browsing guide: [`.github/README.md`](.github/README.md).
+
+The API is read-only — run `daily_predictions.py` first so `state/predictions/daily.jsonl` exists.
+
+Sidebar pages (Streamlit):
 
 - **Home** — 7-day play win rate, today's slate charts, minimal holdout context  
 - **Daily Predictions** — full slate, PLAY/PASS, best plays  
@@ -334,7 +352,7 @@ Sidebar pages:
 - **Game Detail** — per-game features and multi-book odds  
 - **About** — plain-English methodology  
 
-**4. Rebuild README charts** (optional, after experiment JSON changes):
+**5. Rebuild README charts** (optional, after experiment JSON changes):
 
 ```powershell
 python scripts\generate_readme_charts.py
@@ -379,6 +397,25 @@ python scripts\daily_predictions.py --date 2026-08-14 --enable-simulation
 
 ---
 
+## Read-only HTTP API
+
+Minimal FastAPI v1 over `app.board.load_daily_board` — same board rows as the Streamlit daily page, no recompute at the HTTP layer.
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /health` | Liveness |
+| `GET /v1/predictions/today` | Latest slate |
+| `GET /v1/predictions?date=YYYY-MM-DD` | One slate |
+| `GET /v1/predictions/{game_pk}` | Single game (`?date=` optional) |
+
+**Docs:** [`docs/api.md`](docs/api.md) · [`.github/README.md`](.github/README.md) · live Swagger at `/docs`.
+
+**Config:** `PREDICTIONS_STORE_PATH`, `PREDICTION_JOURNAL_PATH`; set `CORS_ORIGINS` (comma-separated) only when a browser frontend needs it — CORS is off by default.
+
+**Not in v1:** auth, POST triggers, slate listing, summary, best plays, feature breakdown.
+
+---
+
 ## Design principles worth remembering
 
 1. **Never train or select on the final holdout (2026).**  
@@ -403,9 +440,11 @@ python scripts\daily_predictions.py --date 2026-08-14 --enable-simulation
 | 2026 holdout report | `reports/experiments/v1-holdout-2026.json` |
 | Gold completeness | `reports/data-quality/gold-completeness-a910017bac839af5.json` |
 | Task index | `tasks/index.md` |
+| HTTP API reference | `docs/api.md` |
+| GitHub repo guide | `.github/README.md` |
 
 ---
 
 ## Status
 
-V1 historical + model work is **complete**. The daily operator and Streamlit board are the main day-to-day surface. Optional follow-ups (scheduled ops, richer market reports, data retries) live in `tasks/index.md` and `state/CURRENT.md`.
+V1 historical + model work is **complete**. The daily operator, Streamlit board, and read-only HTTP API are the main day-to-day surfaces. Optional follow-ups (scheduled ops, richer market reports, data retries) live in `tasks/index.md` and `state/CURRENT.md`.
