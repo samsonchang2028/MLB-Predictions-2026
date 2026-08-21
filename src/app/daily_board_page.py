@@ -6,7 +6,7 @@ figures are read verbatim from PIPE-001 prediction records via
 math (see that module's docstring for the pass/play threshold caveat).
 
 Run via the multipage root entrypoint (required for the row click-through to
-``pages/3_Game_Detail.py`` to resolve correctly -- ``st.switch_page`` paths
+``pages/6_Game_Detail.py`` to resolve correctly -- ``st.switch_page`` paths
 are relative to whatever script ``streamlit run`` was pointed at, not to this
 file):
 
@@ -14,7 +14,7 @@ file):
 
 then open "Daily Predictions" from the sidebar. Running this file directly
 (``streamlit run src/app/daily_board_page.py``) still renders the board, but
-clicking a row will fail to find ``pages/3_Game_Detail.py``.
+clicking a row will fail to find ``pages/6_Game_Detail.py``.
 
 The prediction store path defaults to ``state/predictions/daily.jsonl``
 (same convention as ``state/data-certifications/``); override with the
@@ -69,6 +69,10 @@ def _journal_path() -> Path:
 
 st.set_page_config(page_title="MLB Daily Predictions", layout="wide")
 st.title("MLB Daily Predictions")
+st.caption(
+    "Today's slate: model probability, market price, edge, and PLAY/PASS labels. "
+    "MODEL estimates P(home); MARKET compares to the book; BETTING STRATEGY is the display threshold only."
+)
 
 path = _store_path()
 if not path.exists():
@@ -191,4 +195,4 @@ else:
                 # documented way to pass data across a page switch.
                 st.session_state["selected_game_pk"] = str(selected_game_pk)
                 st.session_state["selected_run_date"] = str(selected_date)
-                st.switch_page("pages/3_Game_Detail.py")
+                st.switch_page("pages/6_Game_Detail.py")

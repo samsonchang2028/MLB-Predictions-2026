@@ -1,4 +1,4 @@
-"""Streamlit multipage wrapper for the model performance dashboard."""
+"""Streamlit multipage wrapper for market edge dashboard."""
 
 from __future__ import annotations
 
@@ -11,4 +11,4 @@ _SRC = _ROOT / "src"
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-runpy.run_path(str(_SRC / "app" / "performance_page.py"), run_name="__main__")
+runpy.run_path(str(_SRC / "app" / "market_edge_page.py"), run_name="__main__")

@@ -207,6 +207,11 @@ def _build_play_performance_7d(
             if row.get("run_date") is not None
         }
     )[-7:]
+    selected_predictions = _latest_prediction_per_game(
+        row
+        for row in prediction_list
+        if str(row.get("run_date")) in run_dates
+    )
     daily: list[dict[str, Any]] = []
     total_wins = 0
     total_losses = 0
@@ -214,12 +219,10 @@ def _build_play_performance_7d(
     for run_date in run_dates:
         day_predictions = [
             row
-            for row in prediction_list
+            for row in selected_predictions
             if str(row.get("run_date")) == run_date
         ]
-        play_rows = [
-            row for row in _latest_prediction_per_game(day_predictions) if _is_play(row)
-        ]
+        play_rows = [row for row in day_predictions if _is_play(row)]
         day_wins = 0
         day_losses = 0
         day_pending = 0
