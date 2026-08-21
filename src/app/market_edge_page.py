@@ -12,8 +12,6 @@ from app.dashboard_analytics import (
     DashboardPaths,
     EDGE_PROFITABILITY_NOTE,
     build_market_edge_summary,
-    read_jsonl,
-    resolved_prediction_rows,
 )
 from observability.journal import JsonLinesJournalStore
 from pipelines.daily import JsonLinesPredictionStore
@@ -51,8 +49,7 @@ journal_store = (
     JsonLinesJournalStore(paths.journal) if paths.journal.exists() else None
 )
 rows = load_daily_board(store, run_date=selected_date, journal_store=journal_store)
-resolved = resolved_prediction_rows(read_jsonl(paths.predictions), read_jsonl(paths.journal))
-summary = build_market_edge_summary(rows, resolved_rows=resolved)
+summary = build_market_edge_summary(rows)
 
 metric_cols = st.columns(4)
 metric_cols[0].metric("Games on slate", summary["game_count"])
@@ -76,7 +73,3 @@ st.dataframe(summary["edge_distribution"], use_container_width=True, hide_index=
 
 st.subheader("Largest model-market disagreements")
 st.dataframe(summary["largest_disagreements"], use_container_width=True, hide_index=True)
-
-st.subheader("Edge bucket performance (resolved production predictions)")
-st.caption("Uses journaled results across all slates; not simulated holdout ROI.")
-st.dataframe(summary["edge_bucket_performance"], use_container_width=True, hide_index=True)

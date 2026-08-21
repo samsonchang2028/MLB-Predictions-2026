@@ -521,21 +521,23 @@ def build_signal_dashboard(
         "edge_buckets": prepare_edge_buckets(board_rows),
         "board_rows_by_game": {row["game_pk"]: row for row in board_rows},
         "raw_by_game": raw_by_game,
+        "pending_starter_pks": pending_starter_pks,
         "holdout_metrics": summary["holdout_metrics"],
         "prospective": prospective,
         "finished_play_results": {
-            "wins": summary["play_wins"],
-            "losses": summary["play_losses"],
-            "pending": summary["play_pending"],
-            "win_rate": (
-                summary["play_wins"] / (summary["play_wins"] + summary["play_losses"])
-                if summary["play_wins"] + summary["play_losses"]
-                else None
+            "window_label": (
+                "Latest prediction per game across all stored slates "
+                "(resolved PLAY rows only)."
             ),
+            "note": betting["note"],
+            "wins": betting["wins"],
+            "losses": betting["losses"],
+            "pending": betting["pending"],
+            "win_rate": betting["win_rate"],
             "average_edge_pp": format_edge_pp(betting["average_edge"]),
             "roi": betting["roi"],
             "units": betting["units"],
-            "play_count": summary["plays_count"],
+            "play_count": betting["play_count"],
         },
         "methodology_label": summary["methodology_label"],
     }

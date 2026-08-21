@@ -67,7 +67,7 @@ else:
         {
             "Matchup": row["matchup"],
             "First pitch": row["first_pitch"],
-            "Model side": row["model_side"],
+            "Value side": row["model_side"],
             "Model P (side)": format_probability(row["model_side_probability"]),
             "Market P (side)": format_probability(row["market_side_probability"]),
             "Edge": row["edge_pp_display"],
@@ -98,7 +98,7 @@ else:
             dashboard["board_rows_by_game"][selected["game_pk"]],
             raw_record=dashboard["raw_by_game"].get(selected["game_pk"]),
             features_path=Path("state/predictions/game_features.jsonl"),
-            pending_starter_game_pks=set(),
+            pending_starter_game_pks=dashboard["pending_starter_pks"],
         )
         st.subheader("Selected game detail")
         st.write(detail["interpretation"])
@@ -173,8 +173,11 @@ if prospective:
     st.caption(dashboard["prospective"]["note"])
 
 st.subheader("Finished PLAY results")
-st.caption("Short-term PLAY win rate is noisy and should not be used alone to judge model quality.")
 finished = dashboard["finished_play_results"]
+st.caption(
+    f"{finished['window_label']} {finished['note']} "
+    "Short-term PLAY win rate is noisy and should not be used alone to judge model quality."
+)
 f_cols = st.columns(5)
 f_cols[0].metric("Finished plays", finished["play_count"])
 f_cols[1].metric("Wins", finished["wins"])
