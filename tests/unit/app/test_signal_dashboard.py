@@ -138,3 +138,49 @@ def test_build_signal_dashboard_handles_missing_artifacts(tmp_path):
     )
     assert dashboard["signal_table"] == []
     assert dashboard["freshness_warnings"]
+
+
+def test_build_signal_dashboard_summarizes_board_edges(tmp_path):
+    import json
+
+    from app.homepage import ArtifactPaths
+
+    daily = tmp_path / "daily.jsonl"
+    journal = tmp_path / "journal.jsonl"
+    skipped = tmp_path / "skipped.jsonl"
+    holdout = tmp_path / "holdout.json"
+    diagnostics = tmp_path / "diagnostics.json"
+    record = {
+        "game_pk": 1,
+        "model_probability": 0.58,
+        "market_probability": 0.52,
+        "edge": 0.06,
+        "odds_snapshot_timestamp": "2026-08-14T19:55:00+00:00",
+        "prediction_timestamp": "2026-08-14T20:00:00+00:00",
+        "game_start_timestamp": "2026-08-15T02:05:00+00:00",
+        "model_version": "v1",
+        "home_team_id": 147,
+        "away_team_id": 111,
+        "run_date": "2026-08-14",
+        "home_american": -120,
+        "away_american": 110,
+        "build_id": "abc123",
+    }
+    daily.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    journal.write_text("", encoding="utf-8")
+    skipped.write_text("", encoding="utf-8")
+    holdout.write_text("{}", encoding="utf-8")
+    diagnostics.write_text("{}", encoding="utf-8")
+
+    dashboard = build_signal_dashboard(
+        ArtifactPaths(
+            predictions=daily,
+            journal=journal,
+            skipped=skipped,
+            holdout_report=holdout,
+            diagnostics_report=diagnostics,
+        )
+    )
+
+    assert dashboard["signal_summary"]["largest_home_edge_pp"] == "+6.0 pp"
+    assert len(dashboard["signal_table"]) == 1

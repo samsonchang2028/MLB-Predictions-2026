@@ -466,7 +466,7 @@ def build_signal_dashboard(
         pending_starter_game_pks=pending_starter_pks,
     )
     edges = [
-        float(row["raw_edge"])
+        float(row["edge"])
         for row in board_rows
         if isinstance(row.get("edge"), (int, float)) and not isinstance(row.get("edge"), bool)
     ]
