@@ -138,16 +138,44 @@ The live dashboard's originally-cited ~39% has since drifted to 44.1% as
 more of the sample resolved -- both figures are within normal small-sample
 variance of each other (n=68), not a meaningful revision.
 
-**The interesting comparison is against Part 1's raw accuracy.** Simply
-following the model's raw favorite on *every* resolved game (all 94, no
-selection) would have gone 58.5%. The actual PLAY selections -- the subset
-the edge/selection layer specifically chose as its *highest-confidence,
-market-disagreement* picks -- won only 44.1% of a smaller, cherry-picked
-subset. A selection mechanism that underperforms simply "always take the raw
-favorite" over the same window, on the games it chose to highlight, is a
-selection-layer/market-disagreement signal, not (by itself) evidence the
-underlying probability model is broken -- Part 1's raw metrics for the exact
-same period look fine.
+**The interesting comparison is against the raw favorite on the same 68
+games**, not against Part 1's all-94-game accuracy (58.5%) -- that mixes two
+different populations. Restricted to the same 68 PLAY games, simply always
+taking the model's raw favorite (`model_probability >= 0.5`) would have gone
+**39/68 = 57.4%**, still clearly above the actual PLAY win rate of 44.1%.
+
+**Mechanistic decomposition (why the gap exists).** `pick_side` is the sign
+of `edge = model_probability - market_probability`, which is *not* always
+the same side as the raw favorite -- when the model narrowly favors one side
+(< 50-point-something) but the market disagrees enough to flip the sign of
+edge, PLAY bets the opposite side from the raw favorite. This exact mechanic
+is the "crossover" case already covered by
+`test_part5_home_away_selection_diverges_from_favorite_on_the_crossover_game`.
+Splitting the 68 PLAY rows by this mechanism:
+
+| subset | n | raw-favorite win rate | actual PLAY (edge-sign) win rate |
+|---|---|---|---|
+| non-crossover (PLAY = raw favorite) | 41 | 51.2% (21/41) | 51.2% (21/41, identical by construction) |
+| crossover (PLAY bets *against* raw favorite) | 27 | 66.7% (18/27) | **33.3% (9/27)** |
+
+The entire 44.1%-vs-57.4% gap is concentrated in the 27/68 (40%) crossover
+games -- on the 41 games where PLAY agrees with the raw favorite, the two
+"strategies" are identical by construction and both go 51.2%. This isolates
+the mechanism precisely: it is the edge-sign crossover logic specifically,
+not PLAY selection broadly, that drives the shortfall. That is a sharper,
+more decision-useful finding than a diffuse "PLAY underperforms" claim, and
+it does not (by itself) implicate the underlying probability model -- Part
+1's raw metrics for the exact same period look fine.
+
+**Significance caveat.** The crossover/non-crossover split is a paired
+comparison (same 68 games under two rules that agree on 41 of them), so the
+right test is McNemar's, not a two-sample comparison of 44.1% vs. 57.4% in
+isolation. On the 27 discordant crossover games, raw-favorite wins 18 and
+edge-sign wins 9 (b=18, c=9); continuity-corrected McNemar's
+chi-squared = 2.37, **p ≈ 0.12** -- not significant at conventional
+thresholds. This pattern should be read as a real, mechanistically
+identifiable, and worth-monitoring signal, not yet a proven effect at
+n=27 discordant pairs.
 
 Model-vs-actual gap (avg model P(selected side) 52.5% vs. actual 44.1%,
 n=68) is an 8.3-point overconfidence gap on the selected side specifically.
@@ -258,10 +286,16 @@ Raw P(home_win) framing throughout (comparable to ML-013's own convention),
 - The `journal.before-edge-side-fix.jsonl` backup file in
   `state/predictions/` (4 stale records from before the OBS-002 edge-side
   scoring fix, commit `93787ad`) predates all enrichment in the current
-  `journal.jsonl` (enrichment starts 2026-08-14T14:15 UTC; the fix landed
-  2026-08-14T07:15 UTC, same morning, before any enrichment ran) -- confirmed
-  the current journal is entirely post-fix and this study never reads the
-  stale backup file.
+  `journal.jsonl`. Precisely: the fix commit's timestamp is
+  `2026-08-14T07:15:27-07:00`, i.e. **2026-08-14T14:15:27 UTC** (the commit
+  metadata is local time, not UTC -- an earlier draft of this report
+  mislabeled it as UTC directly). The live journal's earliest
+  `enrichment_timestamp` is `2026-08-14T14:15:38 UTC`, just **11 seconds**
+  after the fix landed, not "the same morning" as previously stated. The 4
+  stale backup records carry `enrichment_timestamp = 2026-08-13T20:53:31
+  UTC`, roughly **17.5 hours before** the fix -- confirmed the current
+  journal is entirely post-fix (with essentially zero margin, not a loose
+  same-day margin) and this study never reads the stale backup file.
 
 ## 10. Historical comparison summary
 
@@ -283,19 +317,30 @@ show no monotonic or concentrated calibration failure. In contrast, Part 4's
 edge buckets show a real, directionally consistent pattern (lowest
 disagreement performs best at 65.4%, highest disagreement performs worst at
 31.6%, same qualitative shape ML-013 already found in historical dev-fold
-data), and Part 2 shows the PLAY selection specifically underperforming
-what simply following the model's raw favorite would have achieved over the
-identical window (44.1% vs. 58.5%). Together these point at the
-market-disagreement/selection layer -- not the underlying probability model
--- as the more concerning locus, consistent with this repo's own
-`src/app/board.py` warning that PLAY/PASS is a synthetic display threshold
-that has never been validated as a staking policy.
+data), and Part 2 shows the PLAY selection underperforming the raw favorite
+computed on the *same 68 games* (44.1% vs. 57.4%) -- and, more precisely,
+that this entire gap is concentrated in the 27/68 (40%) "crossover" games
+where the edge-sign pick disagrees with the raw favorite (raw-favorite 66.7%
+vs. actual PLAY 33.3% on exactly those 27 games; identical 51.2% on the
+other 41 where the two rules agree by construction). This is a sharper,
+mechanistically-identifiable finding than a diffuse "PLAY underperforms"
+claim: it is specifically the edge-sign crossover logic, not PLAY selection
+broadly, that drives the shortfall -- which supports pointing at the
+market-disagreement/selection layer, not the underlying probability model,
+even more directly than the original headline number did. This is
+consistent with this repo's own `src/app/board.py` warning that PLAY/PASS is
+a synthetic display threshold that has never been validated as a staking
+policy.
 
 This conclusion is **hedged, not certain**: every slice supporting it is
 individually below `LOW_N_THRESHOLD=30` (Part 2 n=68 is above threshold, but
-the edge-bucket breakdown within it is not). It should be treated as a
-strong hypothesis to monitor, not a settled finding, until more prospective
-data accumulates.
+the edge-bucket breakdown and the 27-game crossover subset within it are
+not). McNemar's test on the crossover subset's discordant outcomes
+(chi-squared ≈ 2.37, p ≈ 0.12) is **not statistically significant**
+at conventional thresholds -- this should be read as a real, mechanistically
+identifiable, worth-monitoring pattern, not yet a proven effect. It should
+be treated as a strong hypothesis to monitor, not a settled finding, until
+more prospective data accumulates.
 
 ## 12. Recommended measurements for the next 2-4 weeks
 
