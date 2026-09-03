@@ -21,6 +21,11 @@ from app.dashboard_analytics import (
 )
 from app.game_detail import _group_features, _load_raw_features, _notable_stat_gaps
 from app.homepage import MODEL_IDENTITY, ArtifactPaths, build_homepage_summary
+from app.uncertainty_challenger import (
+    build_shadow_strategy_comparison,
+    build_uncertainty_profile,
+    prepare_uncertainty_candidate_rows,
+)
 from features.build import _COMPONENTS as FEATURE_COMPONENTS
 from market.engine import expected_value
 
@@ -465,6 +470,14 @@ def build_signal_dashboard(
         now=now,
         pending_starter_game_pks=pending_starter_pks,
     )
+    uncertainty_profile = build_uncertainty_profile(predictions, journal)
+    uncertainty_candidates = prepare_uncertainty_candidate_rows(
+        board_rows,
+        raw_records_by_game=raw_by_game,
+        uncertainty_profile=uncertainty_profile,
+        now=now,
+    )
+    shadow_strategy_comparison = build_shadow_strategy_comparison(predictions, journal)
     edges = [
         float(row["edge"])
         for row in board_rows
@@ -518,6 +531,9 @@ def build_signal_dashboard(
             ),
         },
         "signal_table": signal_table,
+        "uncertainty_profile": uncertainty_profile,
+        "uncertainty_candidates": uncertainty_candidates,
+        "shadow_strategy_comparison": shadow_strategy_comparison,
         "edge_buckets": prepare_edge_buckets(board_rows),
         "board_rows_by_game": {row["game_pk"]: row for row in board_rows},
         "raw_by_game": raw_by_game,

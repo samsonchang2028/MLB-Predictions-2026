@@ -22,6 +22,7 @@ dashboard = build_signal_dashboard(ArtifactPaths())
 status = dashboard["system_status"]
 signal_summary = dashboard["signal_summary"]
 signal_table = dashboard["signal_table"]
+uncertainty_candidates = dashboard["uncertainty_candidates"]
 
 st.title("MLB Moneyline Predictor")
 st.markdown(
@@ -134,6 +135,97 @@ else:
             st.dataframe(detail["feature_groups"], use_container_width=True, hide_index=True)
         else:
             st.info("Feature context not available for this game yet.")
+
+st.subheader("Uncertainty-Adjusted Signals")
+st.caption(
+    "Shadow view only. Expected wins per 100 similar games come from resolved "
+    "raw-favorite bucket win rates. The live table uses current resolved history; "
+    "shadow comparison uses expanding as-of resolved history (only games whose "
+    "first pitch is strictly before the scored game's prediction time). "
+    "The uncertainty-adjusted range is a Wilson interval on those "
+    "favorite outcomes, not a current-sample CI around today's model P. "
+    "Pending games are excluded from bucket estimates."
+)
+if not uncertainty_candidates:
+    st.info("No confidence-adjusted candidates for the latest slate yet.")
+else:
+    st.dataframe(
+        [
+            {
+                "Matchup": row["matchup"],
+                "First pitch": row["first_pitch"],
+                "Raw model favorite": row["raw_model_favorite_label"],
+                "Model favorite probability": format_probability(row["model_favorite_probability"]),
+                "Expected wins per 100 similar games": row["similar_games_wins_per_100"],
+                "Uncertainty-adjusted range": row["uncertainty_range_per_100"],
+                "Market-implied wins per 100": row["market_wins_per_100"],
+                "Conservative edge per 100": row["conservative_edge_per_100"],
+                "Offered odds": row["offered_odds"],
+                "Lower-bound EV ($1)": round(row["lower_bound_ev"], 3)
+                if row["lower_bound_ev"] is not None
+                else "—",
+                "Baseline label": row["baseline_label"],
+                "Challenger label": row["challenger_label"],
+                "Risk flags": ", ".join(row["risk_flags"]) if row["risk_flags"] else "—",
+                "Bucket N": row["bucket_n"],
+            }
+            for row in uncertainty_candidates
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+comparison = dashboard.get("shadow_strategy_comparison")
+if comparison:
+    st.subheader("Shadow strategy comparison (resolved journal)")
+    st.caption(comparison["window_label"])
+    st.caption(comparison["note"])
+    strategy_rows = []
+    labels = {
+        "baseline_play": "Baseline PLAY",
+        "raw_model_favorite": "Raw model favorite",
+        "uncertainty_challenger": "Uncertainty-adjusted challenger",
+    }
+    for key, metrics in comparison["strategies"].items():
+        strategy_rows.append(
+            {
+                "Strategy": labels.get(key, key),
+                "N": metrics["n"],
+                "Resolved": metrics.get("n_resolved", metrics["wins"] + metrics["losses"]),
+                "Wins": metrics["wins"],
+                "Losses": metrics["losses"],
+                "Pending": metrics["pending"],
+                "Win rate": f"{metrics['win_rate']:.1%}" if metrics["win_rate"] is not None else "—",
+                "ROI": f"{metrics['roi']:.1%}" if metrics["roi"] is not None else "—",
+                "Units": round(metrics["units"], 2) if metrics["units"] is not None else "—",
+                "Avg model P": f"{metrics['average_model_probability']:.1%}"
+                if metrics["average_model_probability"] is not None
+                else "—",
+                "Avg market P": f"{metrics['average_market_probability']:.1%}"
+                if metrics["average_market_probability"] is not None
+                else "—",
+                "Avg edge": f"{metrics['average_edge'] * 100:+.1f} pp"
+                if metrics["average_edge"] is not None
+                else "—",
+                "Favorite / underdog": f"{metrics['favorite_count']} / {metrics['underdog_count']}",
+                "Home / away": f"{metrics['home_count']} / {metrics['away_count']}",
+            }
+        )
+    st.dataframe(strategy_rows, use_container_width=True, hide_index=True)
+    with st.expander("Strategy bucket breakdown"):
+        for key, metrics in comparison["strategies"].items():
+            label = labels.get(key, key)
+            prob_buckets = metrics.get("model_probability_buckets") or []
+            edge_buckets = metrics.get("edge_buckets") or []
+            if not prob_buckets and not edge_buckets:
+                continue
+            st.markdown(f"**{label}**")
+            if prob_buckets:
+                st.caption("Model probability buckets")
+                st.dataframe(prob_buckets, use_container_width=True, hide_index=True)
+            if edge_buckets:
+                st.caption("Edge buckets")
+                st.dataframe(edge_buckets, use_container_width=True, hide_index=True)
 
 st.subheader("Today's edge distribution")
 if dashboard["edge_buckets"]:
