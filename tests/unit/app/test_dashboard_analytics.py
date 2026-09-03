@@ -10,6 +10,7 @@ from app.dashboard_analytics import (
     HISTORICAL_EVIDENCE_LABEL,
     PROSPECTIVE_EVIDENCE_LABEL,
     build_betting_results_summary,
+    build_daily_monitoring_summary,
     build_edge_buckets,
     build_market_edge_summary,
     build_probability_buckets,
@@ -48,11 +49,16 @@ def _prediction(
     }
 
 
-def _journal_for(prediction: dict, *, correct: bool = True) -> dict:
+def _journal_for(
+    prediction: dict,
+    *,
+    correct: bool = True,
+    actual_home_win: bool | None = None,
+) -> dict:
     return {
         "game_pk": prediction["game_pk"],
         "prediction_timestamp": prediction["prediction_timestamp"],
-        "actual_home_win": correct,
+        "actual_home_win": correct if actual_home_win is None else actual_home_win,
         "correct": correct,
         "enrichment_timestamp": "2026-08-14T06:00:00+00:00",
     }
@@ -212,6 +218,108 @@ def test_betting_results_counts_latest_unresolved_play_as_pending():
     assert summary["losses"] == 0
     assert summary["pending"] == 1
     assert summary["win_rate"] is None
+
+
+def test_daily_monitoring_summary_uses_latest_snapshot_and_daily_denominators():
+    stale = _prediction(1, timestamp="2026-08-13T16:00:00+00:00")
+    latest = _prediction(1, timestamp="2026-08-13T18:00:00+00:00")
+    pass_row = _prediction(2, edge=0.005, timestamp="2026-08-13T18:30:00+00:00")
+    away_play = {
+        **_prediction(3, edge=-0.05, timestamp="2026-08-13T19:00:00+00:00", away_american=120),
+        "model_probability": 0.45,
+    }
+
+    [row] = build_daily_monitoring_summary(
+        [stale, latest, pass_row, away_play],
+        [
+            _journal_for(stale),
+            _journal_for(latest, correct=False, actual_home_win=False),
+            _journal_for(pass_row, correct=False),
+            _journal_for(away_play, correct=True, actual_home_win=False),
+        ],
+    )
+
+    assert row["run_date"] == "2026-08-13"
+    assert row["games"] == 3
+    assert row["resolved"] == 3
+    assert row["pending"] == 0
+    assert row["play_count"] == 2
+    assert row["play_wins"] == 1
+    assert row["play_losses"] == 1
+    assert row["play_pending"] == 0
+    assert row["play_win_rate"] == 0.5
+    assert row["play_staked_units"] == 2
+    assert row["play_units"] == pytest.approx(0.2)
+    assert row["play_roi"] == pytest.approx(0.1)
+    assert row["log_loss"] is not None
+
+
+def test_daily_monitoring_summary_excludes_pending_from_metrics_and_win_rate():
+    resolved = _prediction(1)
+    pending = _prediction(2, timestamp="2026-08-13T18:00:00+00:00")
+
+    [row] = build_daily_monitoring_summary([resolved, pending], [_journal_for(resolved)])
+
+    assert row["games"] == 2
+    assert row["resolved"] == 1
+    assert row["pending"] == 1
+    assert row["play_count"] == 2
+    assert row["play_wins"] == 1
+    assert row["play_losses"] == 0
+    assert row["play_pending"] == 1
+    assert row["play_win_rate"] == 1.0
+    assert row["play_staked_units"] == 1
+
+
+def test_daily_monitoring_summary_treats_stale_journal_as_pending():
+    first = _prediction(1, timestamp="2026-08-13T16:00:00+00:00")
+    latest = _prediction(1, timestamp="2026-08-13T18:00:00+00:00")
+
+    [row] = build_daily_monitoring_summary([first, latest], [_journal_for(first)])
+
+    assert row["games"] == 1
+    assert row["resolved"] == 0
+    assert row["pending"] == 1
+    assert row["play_count"] == 1
+    assert row["play_pending"] == 1
+    assert row["play_win_rate"] is None
+    assert row["log_loss"] is None
+
+
+def test_daily_monitoring_summary_keeps_single_class_metrics_with_nullable_auc():
+    first = _prediction(1, timestamp="2026-08-13T16:00:00+00:00")
+    second = _prediction(2, timestamp="2026-08-13T18:00:00+00:00")
+
+    [row] = build_daily_monitoring_summary(
+        [first, second],
+        [_journal_for(first), _journal_for(second)],
+    )
+
+    assert math.isfinite(row["log_loss"])
+    assert math.isfinite(row["brier"])
+    assert row["roc_auc"] is None
+
+
+def test_daily_monitoring_summary_groups_dates_and_tracks_missing_odds():
+    missing_odds_play = _prediction(1, run_date="2026-08-14", home_american=None)
+    next_day_play = _prediction(
+        2,
+        run_date="2026-08-15",
+        timestamp="2026-08-15T16:00:00+00:00",
+        home_american=100,
+    )
+
+    rows = build_daily_monitoring_summary(
+        [next_day_play, missing_odds_play],
+        [_journal_for(missing_odds_play), _journal_for(next_day_play, correct=False)],
+    )
+
+    assert [row["run_date"] for row in rows] == ["2026-08-14", "2026-08-15"]
+    assert rows[0]["play_wins"] == 1
+    assert rows[0]["play_staked_units"] == 0
+    assert rows[0]["play_missing_odds"] == 1
+    assert rows[0]["play_roi"] is None
+    assert rows[1]["play_losses"] == 1
 
 
 def test_build_market_edge_summary_does_not_imply_profitability_note():

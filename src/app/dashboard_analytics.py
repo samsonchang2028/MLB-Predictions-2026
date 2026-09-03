@@ -337,6 +337,85 @@ def build_betting_results_summary(
     }
 
 
+def build_daily_monitoring_summary(
+    predictions: Sequence[Mapping[str, Any]],
+    journal: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Summarize prospective model quality and PLAY outcomes by slate date.
+
+    Model-quality fields use every resolved latest prediction for the day.
+    PLAY fields use only latest predictions whose edge crosses the display
+    threshold. Pending rows are excluded from win rate and ROI.
+    """
+    latest_predictions = _latest_predictions_per_game(predictions)
+    resolved = resolved_prediction_rows(predictions, journal)
+    run_dates = sorted(
+        {
+            str(row.get("run_date"))
+            for row in latest_predictions
+            if row.get("run_date") is not None
+        }
+    )
+    resolved_keys = {prediction_key(row) for row in resolved}
+
+    rows: list[dict[str, Any]] = []
+    for run_date in run_dates:
+        predictions_for_day = [
+            row for row in latest_predictions if str(row.get("run_date")) == run_date
+        ]
+        resolved_for_day = [
+            row for row in resolved if str(row.get("run_date")) == run_date
+        ]
+        plays_for_day = [row for row in predictions_for_day if is_play(row)]
+        resolved_plays = [row for row in resolved_for_day if row["play"]]
+        pending_predictions = sum(
+            1 for row in predictions_for_day if prediction_key(row) not in resolved_keys
+        )
+        pending_plays = sum(
+            1 for row in plays_for_day if prediction_key(row) not in resolved_keys
+        )
+        wins = sum(1 for row in resolved_plays if row.get("correct") is True)
+        losses = sum(1 for row in resolved_plays if row.get("correct") is False)
+        profits = [
+            profit
+            for row in resolved_plays
+            if (profit := flat_stake_profit(
+                won=row.get("correct") is True,
+                american=row.get("pick_american"),
+            )) is not None
+        ]
+        metrics = compute_probability_metrics(
+            [row["actual_home_win"] for row in resolved_for_day],
+            [row["model_probability"] for row in resolved_for_day],
+        )
+        rows.append(
+            {
+                "run_date": run_date,
+                "games": len(predictions_for_day),
+                "resolved": len(resolved_for_day),
+                "pending": pending_predictions,
+                "log_loss": None if metrics is None else metrics["log_loss"],
+                "brier": None if metrics is None else metrics["brier"],
+                "ece": None if metrics is None else metrics["ece"],
+                "accuracy": None if metrics is None else metrics["accuracy"],
+                "roc_auc": None if metrics is None else metrics["roc_auc"],
+                "home_win_rate": None if metrics is None else metrics["positive_rate"],
+                "play_count": len(plays_for_day),
+                "play_wins": wins,
+                "play_losses": losses,
+                "play_pending": pending_plays,
+                "play_win_rate": wins / (wins + losses) if wins + losses else None,
+                "play_roi": sum(profits) / len(profits) if profits else None,
+                "play_units": float(sum(profits)) if profits else None,
+                "play_staked_units": len(profits),
+                "play_missing_odds": sum(
+                    1 for row in resolved_plays if row.get("pick_american") is None
+                ),
+            }
+        )
+    return rows
+
+
 def build_probability_buckets(resolved_rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     buckets: list[dict[str, Any]] = []
     for label, lower, upper in PROBABILITY_BUCKET_SPECS:
@@ -410,11 +489,11 @@ def _pending_prediction_count(
     predictions: Sequence[Mapping[str, Any]],
     journal: Sequence[Mapping[str, Any]],
 ) -> int:
-    journal_by_key = latest_journal_by_key(journal)
+    resolved_keys = {prediction_key(row) for row in resolved_prediction_rows(predictions, journal)}
     pending = 0
     for prediction in _latest_predictions_per_game(predictions):
         key = prediction_key(prediction)
-        if key not in journal_by_key:
+        if key not in resolved_keys:
             pending += 1
     return pending
 
