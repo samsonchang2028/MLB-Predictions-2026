@@ -152,19 +152,27 @@ def selected_side_market_probability(row: Mapping[str, Any]) -> float | None:
 
 def pick_american_odds(row: Mapping[str, Any]) -> int | None:
     field = "home_american" if picked_home(row) else "away_american"
-    value = row.get(field)
-    if isinstance(value, bool) or not isinstance(value, int):
-        return None
-    return value
+    return _valid_american(row.get(field))
 
 
 def flat_stake_profit(*, won: bool, american: int | None) -> float | None:
+    american = _valid_american(american)
     if american is None:
         return None
     if won:
         return american_to_decimal(american) - 1.0
     return -1.0
 
+
+
+def _valid_american(value: Any) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    try:
+        american_to_decimal(value)
+    except ValueError:
+        return None
+    return value
 
 def resolved_prediction_rows(
     predictions: Sequence[Mapping[str, Any]],

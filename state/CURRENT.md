@@ -408,6 +408,22 @@ script itself works, it just isn't wired to cron/Task Scheduler yet.
 
 Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
 
+## Recently shipped (market/play-layer challengers)
+
+- **MARKET-004** — uncertainty-adjusted PLAY challenger completed as a read-only
+  shadow strategy. It preserves the baseline 2% `abs(edge)` PLAY/PASS display
+  rule and does not change the locked ADR-006 V1 model. Reviewer/tester gates
+  passed after the as-of Wilson uncertainty buckets were fixed to use only
+  strictly earlier resolved games by first pitch.
+- **MARKET-005** — consensus-confirmed PLAY challenger completed as a read-only
+  shadow strategy. It classifies model/market agreement, compares baseline
+  edge-selected PLAY, raw model favorite, uncertainty-adjusted challenger, and
+  consensus-confirmed challenger, and keeps large disagreement as a review/risk
+  state rather than automatic value. Repair pass fixed large-gap classification,
+  stale-odds blocking, dashboard risk-flag propagation, invalid American-odds
+  handling, and Strategy Comparison display. Re-review APPROVE; re-test PASS
+  (`89 passed` focused app suite); `git diff --check` passed.
+
 ## In review
 
 - None.

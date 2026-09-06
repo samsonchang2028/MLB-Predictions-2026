@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 from app.board import DEFAULT_EDGE_THRESHOLD
-from market.engine import expected_value
+from market.engine import american_to_decimal, expected_value
 
 MIN_BUCKET_N = 30
 FAVORITE_MODEL_PROBABILITY_MIN = 0.55
@@ -323,7 +323,8 @@ def build_shadow_strategy_comparison(
     journal: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Compare baseline PLAY, raw model favorite, and challenger on resolved journal rows."""
-    from app.dashboard_analytics import flat_stake_profit, is_play, prediction_key, resolved_prediction_rows
+    from app.consensus_strategy import build_consensus_strategy_metrics
+    from app.dashboard_analytics import is_play, prediction_key, resolved_prediction_rows
 
     resolved = resolved_prediction_rows(predictions, journal)
     resolved_by_pk = {row["game_pk"]: row for row in resolved}
@@ -351,8 +352,11 @@ def build_shadow_strategy_comparison(
         "window_label": "Prospective daily.jsonl + journal (one window; latest prediction per game_pk)",
         "note": (
             "Shadow strategy comparison on this prospective daily.jsonl and journal "
-            "window only. Challenger Wilson buckets use expanding as-of resolved "
-            "history (strictly earlier games), not a current-sample CI. "
+            "window only. Baseline PLAY follows model-market disagreement via edge; "
+            "raw model favorite is diagnostic, not a betting strategy; consensus-confirmed "
+            "PLAY requires model/market directional confirmation. All challengers are "
+            "SHADOW, DIAGNOSTIC, and NOT PRODUCTION. The uncertainty-adjusted challenger "
+            "uses expanding as-of resolved history (strictly earlier games), not a current-sample CI. "
             "N is selected rows including pending; averages use resolved rows. "
             "Pending games are excluded from win rate and ROI."
         ),
@@ -364,6 +368,7 @@ def build_shadow_strategy_comparison(
             "uncertainty_challenger": _strategy_metrics(
                 challenger_latest, resolved_by_pk, resolved_keys, "uncertainty_challenger"
             ),
+            "consensus_confirmed_play": build_consensus_strategy_metrics(predictions, journal),
         },
     }
 
@@ -374,6 +379,10 @@ def _strategy_metrics(
     resolved_keys: set[tuple[Any, str | None]],
     strategy: str,
 ) -> dict[str, Any]:
+    from app.consensus_strategy import (
+        CONSENSUS_RELATIONSHIP_BUCKETS,
+        classify_model_market_relationship,
+    )
     from app.dashboard_analytics import EDGE_BUCKET_SPECS, flat_stake_profit
 
     wins = losses = pending = 0
@@ -381,16 +390,48 @@ def _strategy_metrics(
     model_ps: list[float] = []
     market_ps: list[float] = []
     edges: list[float] = []
+    odds_values: list[int] = []
     favorite_count = underdog_count = home_count = away_count = 0
     edge_bucket_counts: dict[str, int] = {label: 0 for label, _, _ in EDGE_BUCKET_SPECS}
     prob_bucket_counts: dict[str, int] = {label: 0 for label, _, _ in BUCKET_SPECS}
+    relationship_counts: dict[str, int] = {
+        label: 0 for label in CONSENSUS_RELATIONSHIP_BUCKETS
+    }
 
     for prediction in selected_latest:
         game_pk = prediction.get("game_pk")
         key = _prediction_key(prediction)
-        model_p = selected_model_probability(prediction)
-        market_p = selected_market_probability(prediction)
-        edge = favorite_edge(prediction)
+        favorite_model_p = selected_model_probability(prediction)
+        favorite_home = raw_model_favorite_home(prediction) if favorite_model_p is not None else True
+        if strategy == "baseline_play":
+            side_home = _baseline_picked_home(prediction)
+            if side_home is None:
+                continue
+            model_probability_home = _probability_or_none(prediction.get("model_probability"))
+            market_probability_home = _probability_or_none(prediction.get("market_probability"))
+            model_p = (
+                None
+                if model_probability_home is None
+                else model_probability_home if side_home else 1.0 - model_probability_home
+            )
+            market_p = (
+                None
+                if market_probability_home is None
+                else market_probability_home if side_home else 1.0 - market_probability_home
+            )
+            edge = None if model_p is None or market_p is None else model_p - market_p
+            is_favorite_side = side_home == favorite_home
+            american = prediction.get("home_american") if side_home else prediction.get("away_american")
+        else:
+            side_home = favorite_home
+            model_p = favorite_model_p
+            market_p = selected_market_probability(prediction)
+            edge = favorite_edge(prediction)
+            is_favorite_side = True
+            american = _favorite_american(prediction, favorite_home)
+
+        relationship = classify_model_market_relationship(prediction)
+        relationship_counts[relationship] = relationship_counts.get(relationship, 0) + 1
         if model_p is not None:
             bucket = probability_bucket(model_p)
             if bucket is not None:
@@ -405,15 +446,6 @@ def _strategy_metrics(
                     edge_bucket_counts[label] += 1
                     break
 
-        favorite_home = raw_model_favorite_home(prediction) if model_p is not None else True
-        if strategy == "baseline_play":
-            side_home = _baseline_picked_home(prediction)
-            if side_home is None:
-                continue
-            is_favorite_side = side_home == favorite_home
-        else:
-            side_home = favorite_home
-            is_favorite_side = True
         if is_favorite_side:
             favorite_count += 1
         else:
@@ -422,6 +454,9 @@ def _strategy_metrics(
             home_count += 1
         else:
             away_count += 1
+        american = _valid_american(american)
+        if american is not None:
+            odds_values.append(american)
 
         if key not in resolved_keys:
             pending += 1
@@ -449,9 +484,10 @@ def _strategy_metrics(
             wins += 1
         else:
             losses += 1
-        profit = flat_stake_profit(won=won, american=american if isinstance(american, int) else None)
+        profit = flat_stake_profit(won=won, american=american)
         if profit is not None:
             profits.append(profit)
+
 
     finished = wins + losses
     return {
@@ -468,10 +504,15 @@ def _strategy_metrics(
         "average_model_probability": sum(model_ps) / len(model_ps) if model_ps else None,
         "average_market_probability": sum(market_ps) / len(market_ps) if market_ps else None,
         "average_edge": sum(edges) / len(edges) if edges else None,
+        "average_odds": sum(odds_values) / len(odds_values) if odds_values else None,
         "favorite_count": favorite_count,
         "underdog_count": underdog_count,
         "home_count": home_count,
         "away_count": away_count,
+        "relationship_buckets": [
+            {"bucket": label, "n": relationship_counts.get(label, 0)}
+            for label in CONSENSUS_RELATIONSHIP_BUCKETS
+        ],
         "model_probability_buckets": [
             {"bucket": label, "n": prob_bucket_counts.get(label, 0)} for label, _, _ in BUCKET_SPECS
         ],
@@ -480,6 +521,16 @@ def _strategy_metrics(
         ],
     }
 
+
+
+def _valid_american(value: Any) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    try:
+        american_to_decimal(value)
+    except ValueError:
+        return None
+    return value
 
 def _similar_games_display(
     bucket_win_rate: float | None,

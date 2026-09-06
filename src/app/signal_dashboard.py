@@ -12,6 +12,20 @@ from pathlib import Path
 from typing import Any
 
 from app.board import DEFAULT_EDGE_THRESHOLD
+from app.consensus_strategy import (
+    LARGE_MODEL_MARKET_DISAGREEMENT,
+    MODEL_AWAY_MARKET_NEUTRAL,
+    MODEL_HOME_MARKET_NEUTRAL,
+    MODEL_MARKET_AGREE_AWAY,
+    MODEL_MARKET_AGREE_HOME,
+    MODEL_MARKET_DISAGREE,
+    STALE_ODDS_WINDOW,
+    classify_model_market_relationship,
+    consensus_confirmed_play,
+    edge_selected_side,
+    market_side,
+    raw_model_side,
+)
 from app.dashboard_analytics import (
     build_betting_results_summary,
     build_prospective_model_quality,
@@ -27,7 +41,7 @@ from app.uncertainty_challenger import (
     prepare_uncertainty_candidate_rows,
 )
 from features.build import _COMPONENTS as FEATURE_COMPONENTS
-from market.engine import expected_value
+from market.engine import american_to_decimal, expected_value
 
 SIGNAL_CONTEXT_NOTE = (
     "Model context is directional. These values show what the model saw, but "
@@ -40,7 +54,7 @@ LARGE_EDGE_THRESHOLD = 0.08
 NEAR_FIFTY_LOW = 0.48
 NEAR_FIFTY_HIGH = 0.52
 LOW_EDGE_THRESHOLD = 0.01
-STALE_ODDS_HOURS = 4
+STALE_ODDS_HOURS = STALE_ODDS_WINDOW.total_seconds() / 3600
 STALE_PREDICTION_HOURS = 12
 STARTING_SOON_MINUTES = 30
 
@@ -115,12 +129,23 @@ def derive_signal_label(row: Mapping[str, Any]) -> str:
     edge = row.get("edge")
     if not isinstance(edge, (int, float)) or isinstance(edge, bool):
         return "DATA WARNING"
-    value = float(edge)
-    if abs(value) >= LARGE_EDGE_THRESHOLD:
-        return "REVIEW LARGE EDGE"
+    relationship = classify_model_market_relationship(row)
+    if relationship == LARGE_MODEL_MARKET_DISAGREEMENT:
+        return "LARGE DISAGREEMENT — REVIEW"
+    if relationship == MODEL_MARKET_DISAGREE:
+        return "MARKET CONTRADICTS MODEL"
     if not is_play(row):
+        if relationship in {
+            MODEL_MARKET_AGREE_HOME,
+            MODEL_MARKET_AGREE_AWAY,
+            MODEL_HOME_MARKET_NEUTRAL,
+            MODEL_AWAY_MARKET_NEUTRAL,
+        }:
+            return "MODEL-MARKET AGREEMENT"
         return "NO EDGE"
-    return "VALUE ON HOME" if picked_home(row) else "VALUE ON AWAY"
+    if edge_selected_side(row) == raw_model_side(row):
+        return "MODEL STRONGER THAN MARKET"
+    return "MARKET CONTRADICTS MODEL"
 
 
 def _parse_timestamp(value: Any) -> datetime | None:
@@ -154,11 +179,11 @@ def derive_risk_flags(
     edge = row.get("edge")
     edge_value = float(edge) if isinstance(edge, (int, float)) and not isinstance(edge, bool) else None
 
-    if row.get("home_american") is None or row.get("away_american") is None:
+    if _valid_american(row.get("home_american")) is None or _valid_american(row.get("away_american")) is None:
         flags.append("MISSING_ODDS")
 
     odds_ts = _parse_timestamp(row.get("odds_snapshot_timestamp"))
-    if odds_ts is not None and now - odds_ts > timedelta(hours=STALE_ODDS_HOURS):
+    if odds_ts is not None and now - odds_ts > STALE_ODDS_WINDOW:
         flags.append("STALE_ODDS")
 
     prediction_ts = _parse_timestamp(row.get("prediction_timestamp"))
@@ -229,16 +254,13 @@ def prepare_daily_signal_row(
 
     side = derive_model_side(merged)
     side_edge = derive_selected_side_edge(merged)
-    pick_american = (
+    pick_american = _valid_american(
         merged.get("home_american") if picked_home(merged) else merged.get("away_american")
     )
     selected_model_p = derive_selected_side_probability(merged)
     ev = None
-    if selected_model_p is not None and isinstance(pick_american, int):
-        try:
-            ev = expected_value(selected_model_p, pick_american)
-        except ValueError:
-            ev = None
+    if selected_model_p is not None and pick_american is not None:
+        ev = expected_value(selected_model_p, pick_american)
 
     flags = derive_risk_flags(
         merged,
@@ -246,6 +268,7 @@ def prepare_daily_signal_row(
         pending_starter_game_pks=pending_starter_game_pks,
         features_available=features_available,
     )
+    merged_with_flags = {**merged, "risk_flags": flags}
     why_summary = _short_why_summary(side, side_edge)
 
     return {
@@ -260,7 +283,7 @@ def prepare_daily_signal_row(
         "model_probability_home": merged.get("model_probability"),
         "market_probability_home": merged.get("market_probability"),
         "raw_edge": merged.get("edge"),
-        "sportsbook_odds": format_american_odds(pick_american if isinstance(pick_american, int) else None),
+        "sportsbook_odds": format_american_odds(pick_american),
         "odds_snapshot": merged.get("odds_snapshot_pacific")
         or merged.get("odds_snapshot_timestamp"),
         "prediction_timestamp": merged.get("prediction_timestamp_pacific")
@@ -268,6 +291,11 @@ def prepare_daily_signal_row(
         "model_version": merged.get("model_version"),
         "build_id": merged.get("build_id"),
         "signal_label": derive_signal_label(merged),
+        "raw_model_side": raw_model_side(merged),
+        "market_side": market_side(merged),
+        "edge_selected_side": edge_selected_side(merged),
+        "relationship_bucket": classify_model_market_relationship(merged),
+        "consensus_confirmed_play": consensus_confirmed_play(merged_with_flags, now=now),
         "risk_flags": flags,
         "why_summary": why_summary,
         "expected_value": ev,
@@ -558,6 +586,16 @@ def build_signal_dashboard(
         "methodology_label": summary["methodology_label"],
     }
 
+
+
+def _valid_american(value: Any) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    try:
+        american_to_decimal(value)
+    except ValueError:
+        return None
+    return value
 
 def _short_why_summary(side: str, side_edge: float | None) -> str:
     if side_edge is None:

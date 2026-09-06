@@ -16,6 +16,7 @@ from app.signal_dashboard import (
     derive_selected_side_probability,
     derive_signal_label,
     format_edge_pp,
+    prepare_daily_signal_row,
     prepare_daily_signal_table,
     prepare_edge_buckets,
 )
@@ -83,10 +84,19 @@ def test_away_selected_side_transformation():
 
 
 def test_signal_label_mapping():
-    assert derive_signal_label(_board_row(edge=0.005)) == "NO EDGE"
-    assert derive_signal_label(_board_row(edge=0.05)) == "VALUE ON HOME"
-    assert derive_signal_label(_board_row(edge=-0.05)) == "VALUE ON AWAY"
-    assert derive_signal_label(_board_row(edge=0.10)) == "REVIEW LARGE EDGE"
+    assert derive_signal_label(_board_row(edge=0.005)) == "MODEL-MARKET AGREEMENT"
+    assert derive_signal_label(_board_row(edge=0.05)) == "MODEL STRONGER THAN MARKET"
+    assert derive_signal_label(_board_row(edge=-0.05)) == "MARKET CONTRADICTS MODEL"
+    assert (
+        derive_signal_label(
+            {
+                **_board_row(edge=0.10),
+                "model_probability": 0.60,
+                "market_probability": 0.47,
+            }
+        )
+        == "LARGE DISAGREEMENT — REVIEW"
+    )
 
 
 def test_risk_flags_for_stale_odds_and_missing_fields():
@@ -97,6 +107,39 @@ def test_risk_flags_for_stale_odds_and_missing_fields():
     flags = derive_risk_flags(row, now=now)
     assert "STALE_ODDS" in flags
     assert "MISSING_ODDS" in flags
+
+
+def test_derived_major_risk_flags_block_dashboard_consensus_candidate():
+    now = datetime(2026, 8, 14, 21, 0, tzinfo=timezone.utc)
+    raw = _raw_record()
+    raw["odds_snapshot_timestamp"] = "2026-08-14T16:30:00+00:00"
+
+    row = prepare_daily_signal_row(
+        _board_row(),
+        raw_record=raw,
+        now=now,
+        features_available=False,
+    )
+
+    assert "STALE_ODDS" in row["risk_flags"]
+    assert "MISSING_FEATURE_VALUES" in row["risk_flags"]
+    assert row["consensus_confirmed_play"] is False
+
+
+def test_invalid_american_odds_are_dashboard_missing_odds():
+    raw = _raw_record()
+    raw["home_american"] = 50
+
+    row = prepare_daily_signal_row(
+        _board_row(),
+        raw_record=raw,
+        now=datetime(2026, 8, 14, 20, 30, tzinfo=timezone.utc),
+    )
+
+    assert "MISSING_ODDS" in row["risk_flags"]
+    assert row["sportsbook_odds"] == "—"
+    assert row["expected_value"] is None
+    assert row["consensus_confirmed_play"] is False
 
 
 def test_risk_flags_game_starting_soon():
@@ -187,6 +230,7 @@ def test_build_signal_dashboard_summarizes_board_edges(tmp_path):
     assert dashboard["uncertainty_candidates"]
     assert dashboard["uncertainty_candidates"][0]["game_pk"] == 1
     assert dashboard["shadow_strategy_comparison"]["strategies"]["baseline_play"]["n"] >= 0
+    assert "consensus_confirmed_play" in dashboard["shadow_strategy_comparison"]["strategies"]
     assert set(dashboard["uncertainty_profile"]) == {
         "50-55%",
         "55-60%",
