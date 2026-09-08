@@ -14,8 +14,9 @@ It is built for trustworthy evaluation first: certified historical data, point-i
 | **Model lab** | Trains logistic regression, random forest, and XGBoost under expanding / rolling windows |
 | **Locked V1 model** | Tuned shallow XGBoost, expanding window, uncalibrated probs (ADR-006) |
 | **Daily operator** | Refreshes today's starters, trains on 2021–2025 only, fetches live odds, writes predictions |
-| **Streamlit app** | Chart-first homepage, daily board, model performance, and per-game detail |
+| **Streamlit app** | Signal-first homepage, daily board, model monitoring, shadow play challengers, per-game detail |
 | **Read-only HTTP API** | Same artifact-backed daily board rows as JSON (`/docs` OpenAPI) |
+| **Homelab automation** | Optional systemd timers for daily predictions + result enrichment (`docs/homelab-operations.md`) |
 
 **Target:** binary home-team win probability.  
 **Primary metrics:** log loss → Brier score → calibration (ECE).  
@@ -102,8 +103,93 @@ Skipped games get an explicit reason (`prediction_not_before_first_pitch`, missi
 ### 5. Edge vs market
 
 American odds → implied probability → two-way **no-vig** market probability (sums to 1).  
-**Edge** = model P(home) − market P(home) (signs depend on which side you read).  
-UI `PLAY` / `PASS` is a display threshold only — not a staking system.
+**Edge** = model P(home) − market P(home) (home-relative; the picked side depends on which layer you read).
+
+Three layers are kept separate on purpose:
+
+| Layer | What it is | Official pick? |
+|-------|------------|----------------|
+| **Model** | Stored `model_probability` = P(home wins) | N/A — probability only |
+| **Market** | No-vig implied P(home) from live odds | N/A — benchmark only |
+| **Baseline PLAY/PASS** | `abs(edge) ≥ 2%` display threshold (`DEFAULT_EDGE_THRESHOLD`) | **Yes** — still the main daily-board label |
+| **MARKET-004 shadow** | Uncertainty-adjusted challenger (raw model favorite + Wilson buckets) | **No** — compare only |
+| **MARKET-005 shadow** | Consensus-confirmed challenger (model + market agree on direction) | **No** — compare only |
+
+Baseline PLAY follows **edge sign** (can differ from the raw model favorite). The shadow challengers are read-only diagnostics inspired by ML-013 / ML-015: large model–market disagreement often underperforms, while the 2% edge rule was never a validated staking policy. See [Shadow play challengers](#shadow-play-challengers-read-only) below.
+
+---
+
+## Recent dashboard & monitoring updates
+
+### APP-013 — signal-first homepage
+
+The Streamlit home page is now a **daily signal dashboard** (`streamlit_app.py`, `src/app/signal_dashboard.py`):
+
+- System status, today's edge summary, and a sortable signal table
+- Risk flags (stale odds, missing data, large disagreement, game timing)
+- Selected-game drill-down with feature context
+- Edge distribution buckets and a short model-quality snapshot
+- Finished PLAY results kept separate from probability-quality evidence
+
+Dedicated sidebar pages split observability by question:
+
+| Page | Purpose |
+|------|---------|
+| **Daily Predictions** | Full slate with PLAY/PASS and timestamps |
+| **Model Quality** | Holdout + development + daily live monitoring (APP-014) |
+| **Market Edge** | Model-vs-market disagreement views |
+| **Betting Results** | PLAY win rate / flat-stake ROI (not model evidence) |
+| **Prospective Evaluation** | Frozen production monitoring |
+| **Game Detail** | Per-game features + multi-book odds (incl. Kalshi when captured) |
+
+### APP-014 — professor-readable model monitoring
+
+`src/app/model_quality_page.py` adds a clearer **Model Quality** tab:
+
+- **Model Evidence** — locked 2026 holdout vs repaired 2021–2025 development metrics
+- **Daily Monitoring** — artifact-backed live log loss / Brier / ECE by slate date
+- **Trust & Model Evidence** — methodology boundaries (uncalibrated V1, no ROI-as-quality)
+
+Daily monitoring uses the latest prediction per `game_pk`, excludes pending games from win-rate math, and never mixes betting selection into probability-quality tables.
+
+### ML-015 — prospective live diagnostic
+
+First weeks of real production predictions (`docs/research/ml-015-prospective-model-market-diagnostic.md`):
+
+- Core model discrimination (ROC-AUC) matched the 2026 holdout — no broad model-quality failure
+- PLAY shortfall traced mainly to **edge-sign crossover** (PLAY side ≠ raw model favorite) and high-disagreement buckets
+- Conclusion: **market / PLAY layer more concerning than the locked model** — motivates shadow challengers, not a model retune
+
+### Shadow play challengers (read-only)
+
+Both run at **display time** from existing `daily.jsonl` + `journal.jsonl`. **No model re-run required.**
+
+**MARKET-004 — uncertainty-adjusted** (`src/app/uncertainty_challenger.py`)
+
+- Side = **raw model favorite** (P(home) ≥ 50% → home, else away)
+- Gates: favorite ≥ 55%, favorite edge ≥ 3%, Wilson lower bound still beats market, positive lower-bound EV, bucket N ≥ 30
+- Homepage section: **Uncertainty-Adjusted Signals** (CANDIDATE / WATCH)
+- Shadow backtest uses point-in-time resolved history (first pitch before decision time)
+
+**MARKET-005 — consensus-confirmed** (`src/app/consensus_strategy.py`)
+
+- Side = **raw model favorite** when model and market **agree on direction** (or market is neutral within 2 pp)
+- Gates: selected-side model P ≥ 55%, edge ≥ 1%, fresh odds, no major data warnings
+- Large disagreement (≥ 8 pp) stays a **review flag**, not automatic value
+- Included in **Shadow strategy comparison** on the homepage and Betting Results page
+
+**Policy (Option A):** baseline **2% PLAY/PASS is unchanged** and remains the official board label. Shadow rows are for side-by-side comparison only.
+
+Restart Streamlit after pulling code updates:
+
+```bash
+sudo systemctl restart mlb-streamlit.service   # homelab
+# or: python -m streamlit run streamlit_app.py
+```
+
+### Kalshi pregame capture (optional)
+
+`scripts/kalshi_pregame_capture.py` stores Kalshi MLB prices near first pitch; they appear in the Game Detail multi-book table alongside sportsbooks. Scheduler wiring is operator-side (`docs/homelab-operations.md`).
 
 ---
 
@@ -237,7 +323,7 @@ Full write-ups: `docs/decisions/`.
 
 ```text
 src/
-  ingestion/     MLB + odds fetchers, immutable raw storage
+  ingestion/     MLB + odds + Kalshi fetchers, immutable raw storage
   transforms/    Silver normalization
   features/      Team / starter / bullpen / Gold matrix
   models/        Logistic, RF, XGBoost
@@ -245,12 +331,14 @@ src/
   experiments/   Expanding / rolling / comparison runners
   market/        American odds → no-vig probs + edge
   pipelines/     Daily prediction contract
-  app/           Streamlit pages
+  app/           Streamlit pages + signal dashboard + shadow challengers
   api/           Read-only FastAPI (artifact-backed JSON)
   validation/    Certification & leakage checks
 scripts/
   daily_predictions.py          Live daily operator
   enrich_prediction_results.py  Post-game journal enrichment (wins/losses on board)
+  run_daily_operator.py         Homelab wrapper (schedule refresh → predict → enrich)
+  kalshi_pregame_capture.py     Optional Kalshi prices near first pitch
   run_api.py                    Start uvicorn for the read-only API
   smoke_sim_yesterday.py        Offline Monte Carlo smoke on a past slate (research)
   holdout_2026.py               One-shot holdout evaluation
@@ -264,6 +352,8 @@ reports/
 docs/
   api.md                 HTTP API reference (endpoints, config, examples)
   decisions/             ADRs
+  research/              ML-012/013/015 diagnostic write-ups
+  homelab-operations.md  Systemd timers + secrets layout
   images/                README charts
 .github/
   README.md              GitHub repo guide (links, dev setup, API summary)
@@ -347,6 +437,12 @@ installation, scheduling, logging, rerun, and shutdown instructions are in
 python -m streamlit run streamlit_app.py
 ```
 
+Homelab (after code updates):
+
+```bash
+sudo systemctl restart mlb-streamlit.service
+```
+
 **4. Read-only JSON API** (optional; same artifacts as the dashboard):
 
 ```powershell
@@ -358,14 +454,16 @@ Open http://127.0.0.1:8000/docs for interactive OpenAPI docs. Full reference: [`
 
 The API is read-only — run `daily_predictions.py` first so `state/predictions/daily.jsonl` exists.
 
-Sidebar pages (Streamlit):
+**Homepage** (`streamlit_app.py`) — signal dashboard with baseline signals, uncertainty-adjusted shadow table, and resolved strategy comparison.
+
+**Sidebar pages:**
 
 - **Daily Predictions** — today's slate (model, market, edge, PLAY/PASS)
-- **Model Quality** — historical holdout + prospective probability metrics
+- **Model Quality** — holdout + development + daily live probability monitoring (APP-014)
 - **Market Edge** — model-vs-market disagreement
-- **Betting Results** — PLAY win rate and flat-stake ROI (not model evidence)
+- **Betting Results** — PLAY win rate, flat-stake ROI, shadow strategy comparison
 - **Prospective Evaluation** — frozen production monitoring
-- **Game Detail** — per-game features and multi-book odds
+- **Game Detail** — per-game features and multi-book odds (DraftKings, Kalshi, etc.)
 - **About** — plain-English methodology
 
 **5. Rebuild README charts** (optional, after experiment JSON changes):
@@ -439,7 +537,7 @@ Minimal FastAPI v1 over `app.board.load_daily_board` — same board rows as the 
 3. **Probability quality > accuracy > simulated ROI.**  
 4. **Raw API data is immutable; ingestion is idempotent.**  
 5. **Skipped predictions must say why** — silent drops are bugs.  
-6. **UI “PLAY” is not bankroll advice.**
+6. **UI “PLAY” is not bankroll advice** — baseline 2% edge is display-only; shadow challengers (MARKET-004/005) are diagnostic, not production picks.
 
 ---
 
@@ -455,6 +553,9 @@ Minimal FastAPI v1 over `app.board.load_daily_board` — same board rows as the 
 | XGBoost tuning | `reports/experiments/v1-repaired-xgboost-tuning-a910017bac839af5.json` |
 | 2026 holdout report | `reports/experiments/v1-holdout-2026.json` |
 | Gold completeness | `reports/data-quality/gold-completeness-a910017bac839af5.json` |
+| ML-015 prospective diagnostic | `docs/research/ml-015-prospective-model-market-diagnostic.md` |
+| ML-013 failure regimes | `docs/research/ml-013-failure-regime-and-redundancy.md` |
+| Homelab operations | `docs/homelab-operations.md` |
 | Task index | `tasks/index.md` |
 | HTTP API reference | `docs/api.md` |
 | GitHub repo guide | `.github/README.md` |
@@ -463,4 +564,8 @@ Minimal FastAPI v1 over `app.board.load_daily_board` — same board rows as the 
 
 ## Status
 
-V1 historical + model work is **complete**. The daily operator, Streamlit board, and read-only HTTP API are the main day-to-day surfaces. Optional follow-ups (scheduled ops, richer market reports, data retries) live in `tasks/index.md` and `state/CURRENT.md`.
+V1 historical + model work is **complete**. The daily operator, signal dashboard, shadow play challengers (MARKET-004/005), and read-only HTTP API are the main day-to-day surfaces.
+
+**Recently shipped:** APP-013 signal homepage, APP-014 model monitoring tab, ML-015 live diagnostic, MARKET-004 uncertainty shadow, MARKET-005 consensus shadow, Kalshi pregame capture, homelab systemd automation (OPS-001).
+
+Optional follow-ups (data retries, persisted market reports, simulation validation) live in `tasks/index.md` and `state/CURRENT.md`.
