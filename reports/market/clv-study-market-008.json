@@ -1,0 +1,406 @@
+{
+  "adr_007_status": "PROPOSED \u2014 not accepted; observability only",
+  "aggregate": {
+    "outcome_all_latest_per_game": {
+      "losses": 158,
+      "n_candidates": 310,
+      "n_resolved": 293,
+      "pending": 17,
+      "roi": -0.04348977890179463,
+      "staked_units": 293,
+      "units": -12.742505218225828,
+      "win_rate": 0.46075085324232085,
+      "wins": 135
+    },
+    "pregame_latest": {
+      "clv_n": 175,
+      "low_confidence": false,
+      "mean_clv": 0.00011024160365556884,
+      "median_clv": 0.0,
+      "outcome_n": 164,
+      "outcome_roi": -0.07965282881471462,
+      "outcome_units": -13.063063925613198,
+      "population": "pregame_latest",
+      "positive_clv_rate": 0.005714285714285714
+    },
+    "strict_close": {
+      "clv_n": 8,
+      "low_confidence": true,
+      "mean_clv": 0.0024115350799655683,
+      "median_clv": 0.0,
+      "outcome_n": 8,
+      "outcome_roi": 0.12464912280701756,
+      "outcome_units": 0.9971929824561405,
+      "population": "strict_close",
+      "positive_clv_rate": 0.125
+    }
+  },
+  "artifact_hashes": {
+    "journal": "345671ab40fb0391af3515d3b9afe534b61125ce27ddb94bc9013f5eb69745e7",
+    "odds_books": "f1a0153229be87454b0ae8ffc0a1ebe28cf03806a3a97e4b5d9330ca5ff8f062",
+    "predictions": "9d86921f9510ae34da1b3c337d772fcad1ae5bf30a3186b72c5dd5c92b2cdbb2"
+  },
+  "generated_at": "2026-09-09T20:50:17.912842+00:00",
+  "inputs": {
+    "journal": "state/predictions/journal.jsonl",
+    "odds_books": "state/predictions/odds_books.jsonl",
+    "predictions": "state/predictions/daily.jsonl"
+  },
+  "journal_field_normalization": "journal.predicted_home_win records whether the edge-selected side won, not the raw model favorite. Analytics normalize on read; immutable history is never rewritten.",
+  "population": {
+    "journal_predicted_home_win_note": "journal.predicted_home_win records whether the edge-selected side won, not the raw model favorite. Analytics normalize on read; immutable history is never rewritten.",
+    "journal_side_mismatches": 0,
+    "model_version_filter": null,
+    "n_latest_per_game": 310,
+    "n_malformed_daily_skips": 0,
+    "prediction_after_first_pitch": 0,
+    "pregame_latest_closing_definition": "Latest snapshot for source book where snapshot_timestamp <= game_start_timestamp (may equal prediction-time line -> CLV = 0).",
+    "strict_closing_definition": "Latest odds_books.jsonl no-vig snapshot for the prediction source bookmaker on (game_pk, run_date) where prediction_timestamp < snapshot_timestamp <= game_start_timestamp."
+  },
+  "rejection_summary": {
+    "close_after_first_pitch": 134,
+    "close_at_or_before_prediction": 167,
+    "missing_bookmaker_row": 1
+  },
+  "run_id": "market-008",
+  "slices": {
+    "agreement": {
+      "model_market_agree": {
+        "clv_n": 6,
+        "edge_selected_side_counts": {
+          "AWAY": 5,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.00038096796356832757,
+        "median_clv": 0.0,
+        "outcome_n": 6,
+        "outcome_roi": 0.1345321637426901,
+        "outcome_units": 0.8071929824561406,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "model_market_disagree": {
+        "clv_n": 2,
+        "edge_selected_side_counts": {
+          "AWAY": 2
+        },
+        "low_confidence": true,
+        "mean_clv": 0.010789044210567256,
+        "median_clv": 0.010789044210567256,
+        "outcome_n": 2,
+        "outcome_roi": 0.09499999999999997,
+        "outcome_units": 0.18999999999999995,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5
+      }
+    },
+    "bookmaker": {
+      "draftkings": {
+        "clv_n": 8,
+        "edge_selected_side_counts": {
+          "AWAY": 7,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0024115350799655683,
+        "median_clv": 0.0,
+        "outcome_n": 8,
+        "outcome_roi": 0.12464912280701756,
+        "outcome_units": 0.9971929824561405,
+        "population": "strict_close",
+        "positive_clv_rate": 0.125
+      }
+    },
+    "crossover": {
+      "crossover": {
+        "clv_n": 3,
+        "edge_selected_side_counts": {
+          "AWAY": 3
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0007619359271366551,
+        "median_clv": 0.0,
+        "outcome_n": 3,
+        "outcome_roi": 0.6433333333333334,
+        "outcome_units": 1.9300000000000002,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "no_crossover": {
+        "clv_n": 5,
+        "edge_selected_side_counts": {
+          "AWAY": 4,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0043156176842269025,
+        "median_clv": 0.0,
+        "outcome_n": 5,
+        "outcome_roi": -0.18656140350877193,
+        "outcome_units": -0.9328070175438596,
+        "population": "strict_close",
+        "positive_clv_rate": 0.2
+      }
+    },
+    "edge_buckets_coarse_pp": {
+      "0-2pp": {
+        "clv_n": 4,
+        "edge_selected_side_counts": {
+          "AWAY": 3,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0005714519453524913,
+        "median_clv": 0.0,
+        "outcome_n": 4,
+        "outcome_roi": 0.7017982456140351,
+        "outcome_units": 2.8071929824561406,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "2-4pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0022438490391759602,
+        "median_clv": -0.0022438490391759602,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "6-8pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "8pp+": {
+        "clv_n": 2,
+        "edge_selected_side_counts": {
+          "AWAY": 2
+        },
+        "low_confidence": true,
+        "mean_clv": 0.011910968730155236,
+        "median_clv": 0.011910968730155236,
+        "outcome_n": 2,
+        "outcome_roi": 0.09499999999999997,
+        "outcome_units": 0.18999999999999995,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5
+      }
+    },
+    "edge_buckets_fine_pp": {
+      "0-1pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0022858077814099653,
+        "median_clv": -0.0022858077814099653,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "1-2pp": {
+        "clv_n": 3,
+        "edge_selected_side_counts": {
+          "AWAY": 2,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 3,
+        "outcome_roi": 1.2690643274853801,
+        "outcome_units": 3.8071929824561406,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "10pp+": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "2-4pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0022438490391759602,
+        "median_clv": -0.0022438490391759602,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "6-8pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "8-10pp": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.02382193746031047,
+        "median_clv": 0.02382193746031047,
+        "outcome_n": 1,
+        "outcome_roi": 1.19,
+        "outcome_units": 1.19,
+        "population": "strict_close",
+        "positive_clv_rate": 1.0
+      }
+    },
+    "lead_time": {
+      "2_6h": {
+        "clv_n": 3,
+        "edge_selected_side_counts": {
+          "AWAY": 3
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0007619359271366551,
+        "median_clv": 0.0,
+        "outcome_n": 3,
+        "outcome_roi": -0.2666666666666666,
+        "outcome_units": -0.7999999999999998,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "6_24h": {
+        "clv_n": 5,
+        "edge_selected_side_counts": {
+          "AWAY": 4,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0043156176842269025,
+        "median_clv": 0.0,
+        "outcome_n": 5,
+        "outcome_roi": 0.35943859649122806,
+        "outcome_units": 1.7971929824561403,
+        "population": "strict_close",
+        "positive_clv_rate": 0.2
+      }
+    },
+    "market_favorite_role": {
+      "market_favorite": {
+        "clv_n": 3,
+        "edge_selected_side_counts": {
+          "AWAY": 2,
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 3,
+        "outcome_roi": -0.3742690058479532,
+        "outcome_units": -1.1228070175438596,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      },
+      "market_underdog": {
+        "clv_n": 4,
+        "edge_selected_side_counts": {
+          "AWAY": 4
+        },
+        "low_confidence": true,
+        "mean_clv": 0.005394522105283628,
+        "median_clv": 0.0,
+        "outcome_n": 4,
+        "outcome_roi": 0.78,
+        "outcome_units": 3.12,
+        "population": "strict_close",
+        "positive_clv_rate": 0.25
+      },
+      "near_even": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "AWAY": 1
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0022858077814099653,
+        "median_clv": -0.0022858077814099653,
+        "outcome_n": 1,
+        "outcome_roi": -1.0,
+        "outcome_units": -1.0,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      }
+    },
+    "selected_side": {
+      "AWAY": {
+        "clv_n": 7,
+        "edge_selected_side_counts": {
+          "AWAY": 7
+        },
+        "low_confidence": true,
+        "mean_clv": 0.002756040091389221,
+        "median_clv": 0.0,
+        "outcome_n": 7,
+        "outcome_roi": 0.017142857142857158,
+        "outcome_units": 0.1200000000000001,
+        "population": "strict_close",
+        "positive_clv_rate": 0.14285714285714285
+      },
+      "HOME": {
+        "clv_n": 1,
+        "edge_selected_side_counts": {
+          "HOME": 1
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0,
+        "median_clv": 0.0,
+        "outcome_n": 1,
+        "outcome_roi": 0.8771929824561404,
+        "outcome_units": 0.8771929824561404,
+        "population": "strict_close",
+        "positive_clv_rate": 0.0
+      }
+    }
+  },
+  "status": "MARKET_008_CLV_VALIDATION",
+  "verdict": {
+    "adr_007_recommendation": "Do not accept ADR-007 or change production PLAY threshold. File prospective closing-odds capture (MARKET-009) before CLV can gate PLAY promotion.",
+    "case": 4,
+    "rationale": "Strict closing-line CLV sample size 8 is below the 30-game minimum required for evaluation.",
+    "verdict": "CLV DATA INSUFFICIENT"
+  }
+}

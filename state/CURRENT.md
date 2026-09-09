@@ -432,8 +432,16 @@ Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
 - **MARKET-007** — shadow PLAY dashboard merged (PR #2). Daily board shows baseline
   legacy PLAY plus exploratory no-crossover/consensus shadows with NOT PRODUCTION
   labels. Production PLAY unchanged (`DEFAULT_EDGE_THRESHOLD = 0.02`).
+- **MARKET-008** — closing line value (CLV) validation completed (candidate for merge):
+  `src/market/clv.py`, `clv_evaluation.py`, `scripts/market_clv_study.py`, 23 unit
+  tests. Live strict CLV N=**8** (pred < close ≤ first pitch); verdict **CLV DATA
+  INSUFFICIENT** — edge-based PLAY promotion still blocked. Strict-close ROI +12.5%
+  (N=8, not actionable); full-pop ROI −4.3% (N=293). Report:
+  `reports/market/clv-study-market-008.json`. Follow-up: **MARKET-009** prospective
+  closing-odds capture. Reviewer APPROVE; Tester PASS. ADR-007 remains PROPOSED.
 - **ADR-007** — PLAY/staking policy drafted **PROPOSED**. Production promotion blocked
-  until prospective shadow gate (200 resolved games or 30 days per ADR-007 draft).
+  until prospective shadow gate (200 resolved games or 30 days per ADR-007 draft) and
+  adequate CLV evidence (MARKET-009).
 
 ## In review
 
