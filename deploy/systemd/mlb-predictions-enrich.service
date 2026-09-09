@@ -13,5 +13,5 @@ ExecStart=/usr/bin/flock --wait 1800 /opt/mlb-predictions/data/operator.lock /op
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mlb-predictions-enrich
-TimeoutStartSec=30min
+TimeoutStartSec=2h
 UMask=0077

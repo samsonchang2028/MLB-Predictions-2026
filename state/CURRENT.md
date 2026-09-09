@@ -424,6 +424,17 @@ Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
   handling, and Strategy Comparison display. Re-review APPROVE; re-test PASS
   (`89 passed` focused app suite); `git diff --check` passed.
 
+- **MARKET-006** — production PLAY policy study merged (PR #2). Canonical journal
+  population, 135-candidate fixed grid, walk-forward ROI gates, overfitting guard.
+  Verdict: **NO POLICY READY FOR PRODUCTION** (baseline PLAY 40.3% win / -14.5% ROI
+  on 196 plays; large-disagreement 35.1%; crossover 33.7%). Report:
+  `reports/market/play-policy-study-market-006.json`. CLI: `scripts/market_policy_study.py`.
+- **MARKET-007** — shadow PLAY dashboard merged (PR #2). Daily board shows baseline
+  legacy PLAY plus exploratory no-crossover/consensus shadows with NOT PRODUCTION
+  labels. Production PLAY unchanged (`DEFAULT_EDGE_THRESHOLD = 0.02`).
+- **ADR-007** — PLAY/staking policy drafted **PROPOSED**. Production promotion blocked
+  until prospective shadow gate (200 resolved games or 30 days per ADR-007 draft).
+
 ## In review
 
 - None.
@@ -678,6 +689,9 @@ Streamlit dashboard.
 
 ## Blocked
 
+- **Production PLAY policy promotion** is blocked until ADR-007 prospective
+  shadow validation completes (200 resolved games or 30 days); MARKET-006 found no
+  candidate passing walk-forward gates today.
 - Post-holdout methodology changes are blocked by ADR-006 unless treated as a
   new post-V1/V2 methodology with a new untouched evaluation policy.
 

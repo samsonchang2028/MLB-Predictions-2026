@@ -11,6 +11,7 @@ def test_services_use_wrapper_environment_file_journal_and_shared_lock() -> None
     for unit in (daily, enrich):
         assert "EnvironmentFile=/etc/mlb-predictions/mlb-predictions.env" in unit
         assert "scripts/run_daily_operator.py" in unit
+        assert "/usr/bin/flock --wait 1800" in unit
         assert "/opt/mlb-predictions/data/operator.lock" in unit
         assert "StandardOutput=journal" in unit
         assert "StandardError=journal" in unit

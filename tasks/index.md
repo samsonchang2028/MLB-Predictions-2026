@@ -84,12 +84,12 @@ state source of truth.
 | APP-012 | done | PIPE-006, APP-005 | show Kalshi in the existing odds-by-book comparison table — merged; confirmed zero production-code changes needed, schema-reuse design validated |
 | ML-012 | done | ML-009, FEAT-006 | feature-family ablation study — merged; team/starter strongest, bullpen/rest_schedule INVESTIGATE (redundancy interaction), zero leakage found, no production model change; see `docs/research/ml-012-feature-ablation.md` |
 | ML-013 | done | ML-012, ML-009, FEAT-006 | failure-regime + redundancy research — merged; sharpest gap is edge-bucket miscalibration (model diverges from market), away-favored games weaker (ROC-AUC 0.540 vs 0.556), 39 near-duplicate column groups (engineering overlap, not leakage), zero leakage; see `docs/research/ml-013-failure-regime-and-redundancy.md` |
-| ML-014 | candidate | ML-009 | locked-model calibration re-eval on pre-2026 folds; recommendation KEEP RAW; reviewer/tester gates remain |
+| ML-014 | candidate | ML-009 | locked-model calibration re-eval on pre-2026 folds; recommendation KEEP RAW; reviewer APPROVE; KEEP RAW supports ADR-006 |
 | ML-015 | done | OBS-001, OBS-002, MARKET-001, ML-009, ML-010 | prospective (live, first-week) diagnostic — merged; N=94, model quality unchanged vs. 2026 holdout (ROC-AUC 0.5473), PLAY shortfall traced to a specific 27/68-game edge-sign crossover subset (not statistically significant, McNemar p≈0.12), edge-bucket disagreement pattern reproduces ML-013 on live data; conclusion MARKET/PLAY LAYER APPEARS MORE CONCERNING; see `docs/research/ml-015-prospective-model-market-diagnostic.md` |
 | MARKET-004 | done | MARKET-001, OBS-002, APP-013, ML-013, ML-015, APP-014 | uncertainty-adjusted shadow challenger only (Option A: baseline 2% PLAY unchanged); reviewer/tester gates passed |
 | MARKET-005 | done | MARKET-001, OBS-002, APP-013, APP-014, MARKET-004, ML-013, ML-015 | consensus-confirmed PLAY challenger; model/market agreement strategy, shadow analytics only; repair re-review APPROVE + re-test PASS |
-| MARKET-006 | approved (uncommitted) | MARKET-001, OBS-001/002, ML-015, MARKET-004/005 | policy study + gates; verdict **NO POLICY READY FOR PRODUCTION** |
-| MARKET-007 | approved (uncommitted) | MARKET-006 | shadow dashboard on daily board; baseline PLAY unchanged; NOT PRODUCTION labels |
+| MARKET-006 | done | MARKET-001, OBS-001/002, ML-015, MARKET-004/005 | policy study + gates merged PR #2; verdict **NO POLICY READY FOR PRODUCTION** |
+| MARKET-007 | done | MARKET-006 | shadow dashboard merged PR #2; baseline PLAY unchanged |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 
