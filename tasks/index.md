@@ -88,6 +88,8 @@ state source of truth.
 | ML-015 | done | OBS-001, OBS-002, MARKET-001, ML-009, ML-010 | prospective (live, first-week) diagnostic — merged; N=94, model quality unchanged vs. 2026 holdout (ROC-AUC 0.5473), PLAY shortfall traced to a specific 27/68-game edge-sign crossover subset (not statistically significant, McNemar p≈0.12), edge-bucket disagreement pattern reproduces ML-013 on live data; conclusion MARKET/PLAY LAYER APPEARS MORE CONCERNING; see `docs/research/ml-015-prospective-model-market-diagnostic.md` |
 | MARKET-004 | done | MARKET-001, OBS-002, APP-013, ML-013, ML-015, APP-014 | uncertainty-adjusted shadow challenger only (Option A: baseline 2% PLAY unchanged); reviewer/tester gates passed |
 | MARKET-005 | done | MARKET-001, OBS-002, APP-013, APP-014, MARKET-004, ML-013, ML-015 | consensus-confirmed PLAY challenger; model/market agreement strategy, shadow analytics only; repair re-review APPROVE + re-test PASS |
+| MARKET-006 | approved (uncommitted) | MARKET-001, OBS-001/002, ML-015, MARKET-004/005 | policy study + gates; verdict **NO POLICY READY FOR PRODUCTION** |
+| MARKET-007 | approved (uncommitted) | MARKET-006 | shadow dashboard on daily board; baseline PLAY unchanged; NOT PRODUCTION labels |
 
 ## V2 simulation graph (team-level Monte Carlo — no player props)
 

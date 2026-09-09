@@ -37,6 +37,12 @@ from app.board import (
     load_starter_pending_games,
 )
 from app.best_plays import build_best_plays_report
+from app.play_policy_display import (
+    SHADOW_NOT_PRODUCTION_NOTE,
+    build_play_policy_comparison,
+    enrich_board_rows_with_shadow,
+    latest_raw_records_by_game,
+)
 from observability.journal import JsonLinesJournalStore
 from pipelines.daily import JsonLinesPredictionStore
 
@@ -136,6 +142,22 @@ else:
         if not rows:
             st.info(f"No valid predictions found for slate date {selected_date}.")
         else:
+            raw_by_game = latest_raw_records_by_game(store.records(), run_date=selected_date)
+            shadow_rows = enrich_board_rows_with_shadow(rows, raw_records_by_game=raw_by_game)
+            journal_records = list(journal_store.records()) if journal_store is not None else []
+            policy_comparison = build_play_policy_comparison(store.records(), journal_records)
+
+            st.subheader("Shadow policy comparison (resolved slates)")
+            st.warning(SHADOW_NOT_PRODUCTION_NOTE)
+            st.caption(policy_comparison["population_note"])
+            if policy_comparison.get("sample_period"):
+                st.caption(f"Sample period: {policy_comparison['sample_period']}")
+            st.dataframe(
+                policy_comparison["display_rows"],
+                use_container_width=True,
+                hide_index=True,
+            )
+
             best_plays = build_best_plays_report(rows)
             st.subheader("Best plays of the day")
             st.caption(
@@ -168,6 +190,9 @@ else:
                         "Matchup": row["matchup"],
                         "Pick": row["pick"],
                         "Recommendation": row["recommendation"],
+                        "Baseline Policy": row["baseline_play_label"],
+                        "No-Crossover Shadow": row["no_crossover_label"],
+                        "Consensus Shadow": row["consensus_label"],
                         "Result": row["result_label"] or row["result_status"],
                         "Pick Result": _pick_result_label(row),
                         "Model Chance": round(row["model_chance"], 4),
@@ -180,16 +205,42 @@ else:
                         "Raw Edge": round(row["edge"], 4),
                         "Model Version": row["model_version"],
                     }
-                    for row in rows
+                    for row in shadow_rows
                 ],
                 use_container_width=True,
                 hide_index=True,
                 on_select="rerun",
                 selection_mode="single-row",
             )
+            with st.expander("Shadow policy detail (NOT PRODUCTION)"):
+                st.caption(SHADOW_NOT_PRODUCTION_NOTE)
+                st.dataframe(
+                    [
+                        {
+                            "Matchup": row["matchup"],
+                            "Raw model favorite": row["raw_model_favorite"],
+                            "Model P(fav)": row["raw_model_side_probability"],
+                            "Market favorite": row["market_favorite"],
+                            "Market P(fav)": row["market_side_probability"],
+                            "Model-market agree": row["model_market_agree"],
+                            "Edge": round(row["edge"], 4),
+                            "Baseline": row["baseline_play_label"],
+                            "Baseline reasons": ", ".join(row["baseline_reason_codes"]),
+                            "No-crossover shadow": row["no_crossover_label"],
+                            "No-crossover reasons": ", ".join(row["no_crossover_reason_codes"]),
+                            "Consensus shadow": row["consensus_label"],
+                            "Consensus reasons": ", ".join(row["consensus_reason_codes"]),
+                            "Risk flags": ", ".join(row["risk_flags"]) or "—",
+                        }
+                        for row in shadow_rows
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+
             selected_rows = selection.selection.rows if selection is not None else []
             if selected_rows:
-                selected_game_pk = rows[selected_rows[0]]["game_pk"]
+                selected_game_pk = shadow_rows[selected_rows[0]]["game_pk"]
                 # st.query_params set right before st.switch_page does not
                 # reliably survive the navigation; session_state is the
                 # documented way to pass data across a page switch.
