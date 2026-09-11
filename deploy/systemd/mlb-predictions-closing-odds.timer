@@ -1,0 +1,11 @@
+[Unit]
+Description=Capture MLB closing odds every 10 minutes near first pitch
+
+[Timer]
+OnCalendar=*-*-* *:00/10:00 America/Los_Angeles
+Persistent=true
+AccuracySec=1min
+Unit=mlb-predictions-closing-odds.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=MLB pre-first-pitch closing odds capture
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=mlbpred
+Group=mlbpred
+WorkingDirectory=/opt/mlb-predictions
+EnvironmentFile=/etc/mlb-predictions/mlb-predictions.env
+ExecStart=/opt/mlb-predictions/.venv/bin/python scripts/closing_odds_capture.py
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mlb-predictions-closing-odds
+TimeoutStartSec=30min
+UMask=0077

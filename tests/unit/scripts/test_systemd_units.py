@@ -29,3 +29,35 @@ def test_timers_are_persistent_and_explicitly_pacific() -> None:
     for timer in (daily, enrich):
         assert "America/Los_Angeles" in timer
         assert "Persistent=true" in timer
+
+
+def test_closing_odds_services_use_env_file_journal_and_no_operator_lock() -> None:
+    live = (SYSTEMD / "mlb-predictions-closing-odds.service").read_text(encoding="utf-8")
+    backfill = (SYSTEMD / "mlb-predictions-closing-odds-backfill.service").read_text(
+        encoding="utf-8"
+    )
+
+    for unit in (live, backfill):
+        assert "User=mlbpred" in unit
+        assert "Group=mlbpred" in unit
+        assert "WorkingDirectory=/opt/mlb-predictions" in unit
+        assert "EnvironmentFile=/etc/mlb-predictions/mlb-predictions.env" in unit
+        assert "scripts/closing_odds_capture.py" in unit
+        assert "StandardOutput=journal" in unit
+        assert "StandardError=journal" in unit
+        assert "THE_ODDS_API_KEY=" not in unit
+        assert "/usr/bin/flock" not in unit
+        assert "operator.lock" not in unit
+
+    assert "--backfill-from-odds-books" in backfill
+    assert "--anchor earliest" in backfill
+    assert "--backfill-from-odds-books" not in live
+    assert "--date" not in live
+
+
+def test_closing_odds_timer_runs_every_ten_minutes() -> None:
+    timer = (SYSTEMD / "mlb-predictions-closing-odds.timer").read_text(encoding="utf-8")
+
+    assert "OnCalendar=*-*-* *:00/10:00 America/Los_Angeles" in timer
+    assert "Persistent=true" in timer
+    assert "Unit=mlb-predictions-closing-odds.service" in timer

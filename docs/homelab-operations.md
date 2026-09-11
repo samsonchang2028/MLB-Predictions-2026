@@ -129,6 +129,71 @@ local state. The lock lives beside the homelab-owned database in the already
 ignored `data/` directory. This serializes DuckDB writers and waits up to 30
 minutes for another operator invocation to finish.
 
+## Closing odds capture
+
+MARKET-009 appends pre-first-pitch closing odds to
+`state/predictions/odds_closes.jsonl` for strict CLV evaluation. The capture
+script reads DuckDB and existing JSONL artifacts only; it does **not** acquire
+`operator.lock`, so it can run in parallel with scheduled predict/enrich passes.
+
+### Install and verify units
+
+Copy the closing-odds units, reload systemd, and verify syntax:
+
+```bash
+cd /opt/mlb-predictions
+sudo cp deploy/systemd/mlb-predictions-closing-odds.service /etc/systemd/system/
+sudo cp deploy/systemd/mlb-predictions-closing-odds.timer /etc/systemd/system/
+sudo cp deploy/systemd/mlb-predictions-closing-odds-backfill.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemd-analyze verify \
+  /etc/systemd/system/mlb-predictions-closing-odds.service \
+  /etc/systemd/system/mlb-predictions-closing-odds.timer \
+  /etc/systemd/system/mlb-predictions-closing-odds-backfill.service
+```
+
+### One-time backfill
+
+Run the backfill once to populate historical rows from `odds_books.jsonl`:
+
+```bash
+sudo systemctl start mlb-predictions-closing-odds-backfill.service
+wc -l /opt/mlb-predictions/state/predictions/odds_closes.jsonl
+```
+
+On the current homelab artifacts, expect roughly **112–113** strict-window rows.
+Re-running backfill is idempotent for existing keys.
+
+### Enable live capture timer
+
+The timer invokes live capture every 10 minutes (Pacific calendar). The script
+no-ops when no games are in the 60–15 minute pre-first-pitch window:
+
+```bash
+sudo systemctl enable --now mlb-predictions-closing-odds.timer
+systemctl list-timers 'mlb-predictions-closing-odds*'
+```
+
+### Closing odds logs
+
+```bash
+systemctl status mlb-predictions-closing-odds.service
+systemctl status mlb-predictions-closing-odds-backfill.service
+journalctl -u mlb-predictions-closing-odds.service -n 50 --no-pager
+journalctl -u mlb-predictions-closing-odds-backfill.service -n 50 --no-pager
+journalctl -u mlb-predictions-closing-odds.service -f
+```
+
+### Disable closing odds automation
+
+```bash
+sudo systemctl disable --now mlb-predictions-closing-odds.timer
+```
+
+To remove the unit files later, disable the timer first, delete the three
+closing-odds files from `/etc/systemd/system/`, and run
+`sudo systemctl daemon-reload`.
+
 ## Manual execution
 
 Load the protected environment when running as the service account:
@@ -212,8 +277,9 @@ GitHub. Reverse-proxy/TLS configuration is host-specific and outside OPS-001.
 ```bash
 sudo systemctl disable --now mlb-predictions-daily.timer
 sudo systemctl disable --now mlb-predictions-enrich.timer
+sudo systemctl disable --now mlb-predictions-closing-odds.timer
 ```
 
 The repository, database, and artifacts remain intact. To remove only the unit
-installation later, disable the timers first, remove the four files from
+installation later, disable the timers first, remove the unit files from
 `/etc/systemd/system/`, and run `sudo systemctl daemon-reload`.
