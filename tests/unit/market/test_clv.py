@@ -371,6 +371,86 @@ def test_cli_exits_nonzero_on_integrity_failure(tmp_path: Path) -> None:
     assert "integrity failure" in result.stderr
 
 
+def test_load_clv_population_prefers_odds_closes_rejection_over_odds_books() -> None:
+    pred = _prediction(951, edge=0.03)
+    pred_ts = datetime.fromisoformat(pred["prediction_timestamp"])
+    odds_books = [_odds_row(pred, snapshot_offset_minutes=180)]
+    odds_closes = [
+        {
+            "run_date": pred["run_date"],
+            "game_pk": pred["game_pk"],
+            "bookmaker": "draftkings",
+            "prediction_timestamp": pred_ts.isoformat(),
+            "home_american": -130,
+            "away_american": 115,
+            "snapshot_timestamp": (pred_ts - timedelta(minutes=30)).isoformat(),
+            "source": "the_odds_api",
+            "capture_method": "backfill_odds_books",
+        }
+    ]
+    rows, _ = load_clv_population([pred], [], odds_books, odds_closes)
+    assert rows[0]["strict_clv_valid"] is False
+    assert rows[0]["strict_clv_rejection_reason"] == "odds_closes_close_at_or_before_prediction"
+    assert rows[0]["clv"] is None
+
+
+def test_load_clv_population_prefers_odds_closes() -> None:
+    pred = _prediction(950, edge=0.03)
+    pred_ts = datetime.fromisoformat(pred["prediction_timestamp"])
+    odds_books = [_odds_row(pred, snapshot_offset_minutes=30, home_american=-140, away_american=120)]
+    odds_closes = [
+        {
+            "run_date": pred["run_date"],
+            "game_pk": pred["game_pk"],
+            "bookmaker": "draftkings",
+            "prediction_timestamp": pred_ts.isoformat(),
+            "home_american": -130,
+            "away_american": 115,
+            "snapshot_timestamp": (pred_ts + timedelta(minutes=45)).isoformat(),
+            "source": "the_odds_api",
+            "capture_method": "backfill_odds_books",
+        }
+    ]
+    rows, _ = load_clv_population([pred], [], odds_books, odds_closes)
+    assert rows[0]["strict_clv_valid"] is True
+    assert rows[0]["closing_odds_source"] == "odds_closes"
+    assert rows[0]["closing_market_p_home"] is not None
+
+
+def test_load_clv_population_earliest_anchor() -> None:
+    older = _prediction(960, edge=0.03, offset_hours=0)
+    newer = _prediction(960, edge=0.05, offset_hours=24)
+    odds = [
+        _odds_row(older, snapshot_offset_minutes=30),
+        _odds_row(newer, snapshot_offset_minutes=30),
+    ]
+    rows, meta = load_clv_population(
+        [older, newer],
+        [],
+        odds,
+        prediction_anchor="earliest",
+    )
+    assert meta["n_latest_per_game"] == 1
+    assert rows[0]["edge"] == pytest.approx(0.03)
+
+
+def test_build_clv_report_documents_prediction_anchor() -> None:
+    pred = _prediction(970, edge=0.03)
+    odds = [_odds_row(pred, snapshot_offset_minutes=30)]
+    report = build_clv_report(
+        daily_records=[pred],
+        journal_records=[_journal(pred, actual_home_win=True)],
+        odds_records=odds,
+        odds_closes_records=[],
+        run_id="anchor-doc",
+        input_paths={"predictions": "d.jsonl", "journal": "j.jsonl", "odds_books": "o.jsonl"},
+        prediction_anchor="earliest",
+    )
+    assert "earliest prediction per game_pk" in report["population"]["prediction_anchor"]
+    md = render_markdown_report(report)
+    assert "Prediction anchor" in md
+
+
 def test_render_markdown_includes_slice_tables() -> None:
     pred = _prediction(900, edge=0.03)
     odds = [_odds_row(pred, snapshot_offset_minutes=30)]

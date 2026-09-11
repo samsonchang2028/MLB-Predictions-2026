@@ -432,7 +432,13 @@ Backlog: **SIM-001** walk-forward validation, **DOCS-002** ADR-007 policy.
 - **MARKET-007** — shadow PLAY dashboard merged (PR #2). Daily board shows baseline
   legacy PLAY plus exploratory no-crossover/consensus shadows with NOT PRODUCTION
   labels. Production PLAY unchanged (`DEFAULT_EDGE_THRESHOLD = 0.02`).
-- **MARKET-008** — closing line value (CLV) validation completed (candidate for merge):
+- **MARKET-009** — prospective closing odds capture completed (candidate for merge):
+  `src/market/odds_closes.py`, `scripts/closing_odds_capture.py`, CLV study
+  `--odds-closes` / `--prediction-anchor`. Backfill yields strict CLV N=113 with
+  earliest anchor (retrospective); rerun Case 2 (positive CLV, negative ROI).
+  Live capture ready; operator must install `state/predictions/odds_closes.jsonl`
+  as `mlbpred`. Reviewer APPROVE; Tester PASS (38 tests). ADR-007 still blocked.
+- **MARKET-008** — closing line value (CLV) validation completed (merged `f53ae31`):
   `src/market/clv.py`, `clv_evaluation.py`, `scripts/market_clv_study.py`, 23 unit
   tests. Live strict CLV N=**8** (pred < close ≤ first pitch); verdict **CLV DATA
   INSUFFICIENT** — edge-based PLAY promotion still blocked. Strict-close ROI +12.5%

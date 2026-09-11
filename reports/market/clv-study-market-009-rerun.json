@@ -1,0 +1,452 @@
+{
+  "adr_007_status": "PROPOSED \u2014 not accepted; observability only",
+  "aggregate": {
+    "outcome_all_latest_per_game": {
+      "losses": 166,
+      "n_candidates": 315,
+      "n_resolved": 308,
+      "pending": 7,
+      "roi": -0.04419819104961659,
+      "staked_units": 308,
+      "units": -13.61304284328191,
+      "win_rate": 0.461038961038961,
+      "wins": 142
+    },
+    "pregame_latest": {
+      "clv_n": 171,
+      "low_confidence": false,
+      "mean_clv": 0.0006690439102651847,
+      "median_clv": 0.0,
+      "outcome_n": 169,
+      "outcome_roi": -0.0849920784384656,
+      "outcome_units": -14.363661256100686,
+      "population": "pregame_latest",
+      "positive_clv_rate": 0.2631578947368421
+    },
+    "strict_close": {
+      "clv_n": 113,
+      "low_confidence": false,
+      "mean_clv": 0.0010124469792508546,
+      "median_clv": 0.0,
+      "outcome_n": 112,
+      "outcome_roi": -0.10159755815676966,
+      "outcome_units": -11.378926513558202,
+      "population": "strict_close",
+      "positive_clv_rate": 0.39823008849557523
+    }
+  },
+  "artifact_hashes": {
+    "journal": "4ae5a37a0e8b1b7aa417a35138b1663b4cac1fa68262d692990b0efa9b62d635",
+    "odds_books": "1678200eb5c07368d5065b7d003e70c8bfc6ea8bef9dc07fdb460f28a108dae3",
+    "odds_closes": "de0f89c85103430892f24877e622d1de324281d83bd55fb646f1952503667b57",
+    "predictions": "f092beead49f6a08da1527b58e36c05c3b3961dd46380bd9dd619942f5e20fb7"
+  },
+  "generated_at": "2026-09-11T00:50:12.889717+00:00",
+  "inputs": {
+    "journal": "state/predictions/journal.jsonl",
+    "odds_books": "state/predictions/odds_books.jsonl",
+    "odds_closes": "/tmp/odds_closes.jsonl",
+    "predictions": "state/predictions/daily.jsonl"
+  },
+  "journal_field_normalization": "journal.predicted_home_win records whether the edge-selected side won, not the raw model favorite. Analytics normalize on read; immutable history is never rewritten.",
+  "population": {
+    "journal_predicted_home_win_note": "journal.predicted_home_win records whether the edge-selected side won, not the raw model favorite. Analytics normalize on read; immutable history is never rewritten.",
+    "journal_side_mismatches": 0,
+    "model_version_filter": null,
+    "n_latest_per_game": 315,
+    "n_malformed_daily_skips": 0,
+    "prediction_after_first_pitch": 0,
+    "prediction_anchor": "earliest prediction per game_pk (retrospective CLV population)",
+    "pregame_latest_closing_definition": "Latest snapshot for source book where snapshot_timestamp <= game_start_timestamp (may equal prediction-time line -> CLV = 0).",
+    "strict_closing_definition": "odds_closes.jsonl snapshot for (run_date, game_pk, bookmaker, prediction_timestamp) where prediction_timestamp < snapshot_timestamp <= game_start_timestamp; falls back to odds_books.jsonl when no odds_closes row matches."
+  },
+  "rejection_summary": {
+    "close_after_first_pitch": 143,
+    "close_at_or_before_prediction": 58,
+    "missing_bookmaker_row": 1
+  },
+  "run_id": "market-009-rerun",
+  "slices": {
+    "agreement": {
+      "model_market_agree": {
+        "clv_n": 95,
+        "edge_selected_side_counts": {
+          "AWAY": 71,
+          "HOME": 24
+        },
+        "low_confidence": false,
+        "mean_clv": 0.0009531244004268197,
+        "median_clv": 0.0,
+        "outcome_n": 94,
+        "outcome_roi": -0.09340213085070181,
+        "outcome_units": -8.77980029996597,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3894736842105263
+      },
+      "model_market_disagree": {
+        "clv_n": 18,
+        "edge_selected_side_counts": {
+          "AWAY": 16,
+          "HOME": 2
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0013255383674888167,
+        "median_clv": 0.0,
+        "outcome_n": 18,
+        "outcome_roi": -0.144395900755124,
+        "outcome_units": -2.5991262135922324,
+        "population": "strict_close",
+        "positive_clv_rate": 0.4444444444444444
+      }
+    },
+    "bookmaker": {
+      "draftkings": {
+        "clv_n": 113,
+        "edge_selected_side_counts": {
+          "AWAY": 87,
+          "HOME": 26
+        },
+        "low_confidence": false,
+        "mean_clv": 0.0010124469792508546,
+        "median_clv": 0.0,
+        "outcome_n": 112,
+        "outcome_roi": -0.10159755815676966,
+        "outcome_units": -11.378926513558202,
+        "population": "strict_close",
+        "positive_clv_rate": 0.39823008849557523
+      }
+    },
+    "crossover": {
+      "crossover": {
+        "clv_n": 58,
+        "edge_selected_side_counts": {
+          "AWAY": 46,
+          "HOME": 12
+        },
+        "low_confidence": false,
+        "mean_clv": 0.002814166994499143,
+        "median_clv": 0.0,
+        "outcome_n": 58,
+        "outcome_roi": -0.13137931034482758,
+        "outcome_units": -7.619999999999999,
+        "population": "strict_close",
+        "positive_clv_rate": 0.4827586206896552
+      },
+      "no_crossover": {
+        "clv_n": 55,
+        "edge_selected_side_counts": {
+          "AWAY": 41,
+          "HOME": 14
+        },
+        "low_confidence": false,
+        "mean_clv": -0.0008875486731927951,
+        "median_clv": 0.0,
+        "outcome_n": 54,
+        "outcome_roi": -0.06960975025107784,
+        "outcome_units": -3.758926513558203,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3090909090909091
+      }
+    },
+    "edge_buckets_coarse_pp": {
+      "0-2pp": {
+        "clv_n": 35,
+        "edge_selected_side_counts": {
+          "AWAY": 25,
+          "HOME": 10
+        },
+        "low_confidence": false,
+        "mean_clv": 0.001467025228741614,
+        "median_clv": 0.0,
+        "outcome_n": 35,
+        "outcome_roi": 0.06658815536283359,
+        "outcome_units": 2.3305854376991757,
+        "population": "strict_close",
+        "positive_clv_rate": 0.37142857142857144
+      },
+      "2-4pp": {
+        "clv_n": 21,
+        "edge_selected_side_counts": {
+          "AWAY": 17,
+          "HOME": 4
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0015869742974930542,
+        "median_clv": 0.0,
+        "outcome_n": 21,
+        "outcome_roi": 0.15017904159068882,
+        "outcome_units": 3.153759873404465,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3333333333333333
+      },
+      "4-6pp": {
+        "clv_n": 18,
+        "edge_selected_side_counts": {
+          "AWAY": 15,
+          "HOME": 3
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0004345210807466989,
+        "median_clv": 0.0021692137852322713,
+        "outcome_n": 18,
+        "outcome_roi": -0.3103279941213947,
+        "outcome_units": -5.585903894185105,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5555555555555556
+      },
+      "6-8pp": {
+        "clv_n": 17,
+        "edge_selected_side_counts": {
+          "AWAY": 13,
+          "HOME": 4
+        },
+        "low_confidence": true,
+        "mean_clv": 0.003947265932619211,
+        "median_clv": 0.002143784330199794,
+        "outcome_n": 17,
+        "outcome_roi": -0.5284290503766274,
+        "outcome_units": -8.983293856402664,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5882352941176471
+      },
+      "8pp+": {
+        "clv_n": 22,
+        "edge_selected_side_counts": {
+          "AWAY": 17,
+          "HOME": 5
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0013430898181386395,
+        "median_clv": 0.0,
+        "outcome_n": 21,
+        "outcome_roi": -0.10924162257495587,
+        "outcome_units": -2.2940740740740733,
+        "population": "strict_close",
+        "positive_clv_rate": 0.22727272727272727
+      }
+    },
+    "edge_buckets_fine_pp": {
+      "0-1pp": {
+        "clv_n": 22,
+        "edge_selected_side_counts": {
+          "AWAY": 15,
+          "HOME": 7
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0034050130445988217,
+        "median_clv": 0.0,
+        "outcome_n": 22,
+        "outcome_roi": 0.0815493453196462,
+        "outcome_units": 1.7940855970322163,
+        "population": "strict_close",
+        "positive_clv_rate": 0.4090909090909091
+      },
+      "1-2pp": {
+        "clv_n": 13,
+        "edge_selected_side_counts": {
+          "AWAY": 10,
+          "HOME": 3
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0018126464596321219,
+        "median_clv": 0.0,
+        "outcome_n": 13,
+        "outcome_roi": 0.041269218512843014,
+        "outcome_units": 0.5364998406669592,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3076923076923077
+      },
+      "10pp+": {
+        "clv_n": 13,
+        "edge_selected_side_counts": {
+          "AWAY": 10,
+          "HOME": 3
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0006361409273216669,
+        "median_clv": 0.0,
+        "outcome_n": 13,
+        "outcome_roi": -0.10954415954415951,
+        "outcome_units": -1.4240740740740736,
+        "population": "strict_close",
+        "positive_clv_rate": 0.23076923076923078
+      },
+      "2-4pp": {
+        "clv_n": 21,
+        "edge_selected_side_counts": {
+          "AWAY": 17,
+          "HOME": 4
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0015869742974930542,
+        "median_clv": 0.0,
+        "outcome_n": 21,
+        "outcome_roi": 0.15017904159068882,
+        "outcome_units": 3.153759873404465,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3333333333333333
+      },
+      "4-6pp": {
+        "clv_n": 18,
+        "edge_selected_side_counts": {
+          "AWAY": 15,
+          "HOME": 3
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0004345210807466989,
+        "median_clv": 0.0021692137852322713,
+        "outcome_n": 18,
+        "outcome_roi": -0.3103279941213947,
+        "outcome_units": -5.585903894185105,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5555555555555556
+      },
+      "6-8pp": {
+        "clv_n": 17,
+        "edge_selected_side_counts": {
+          "AWAY": 13,
+          "HOME": 4
+        },
+        "low_confidence": true,
+        "mean_clv": 0.003947265932619211,
+        "median_clv": 0.002143784330199794,
+        "outcome_n": 17,
+        "outcome_roi": -0.5284290503766274,
+        "outcome_units": -8.983293856402664,
+        "population": "strict_close",
+        "positive_clv_rate": 0.5882352941176471
+      },
+      "8-10pp": {
+        "clv_n": 9,
+        "edge_selected_side_counts": {
+          "AWAY": 7,
+          "HOME": 2
+        },
+        "low_confidence": true,
+        "mean_clv": -0.004201978672692415,
+        "median_clv": 0.0,
+        "outcome_n": 8,
+        "outcome_roi": -0.10874999999999996,
+        "outcome_units": -0.8699999999999997,
+        "population": "strict_close",
+        "positive_clv_rate": 0.2222222222222222
+      }
+    },
+    "lead_time": {
+      "2_6h": {
+        "clv_n": 23,
+        "edge_selected_side_counts": {
+          "AWAY": 17,
+          "HOME": 6
+        },
+        "low_confidence": true,
+        "mean_clv": -0.00044918800703922803,
+        "median_clv": 0.0,
+        "outcome_n": 23,
+        "outcome_roi": 0.06811189955159574,
+        "outcome_units": 1.5665736896867022,
+        "population": "strict_close",
+        "positive_clv_rate": 0.34782608695652173
+      },
+      "6_24h": {
+        "clv_n": 90,
+        "edge_selected_side_counts": {
+          "AWAY": 70,
+          "HOME": 20
+        },
+        "low_confidence": false,
+        "mean_clv": 0.0013859759201916536,
+        "median_clv": 0.0,
+        "outcome_n": 89,
+        "outcome_roi": -0.14545505846342588,
+        "outcome_units": -12.945500203244904,
+        "population": "strict_close",
+        "positive_clv_rate": 0.4111111111111111
+      }
+    },
+    "market_favorite_role": {
+      "market_favorite": {
+        "clv_n": 30,
+        "edge_selected_side_counts": {
+          "AWAY": 19,
+          "HOME": 11
+        },
+        "low_confidence": false,
+        "mean_clv": -0.0022151381455451703,
+        "median_clv": 0.0,
+        "outcome_n": 30,
+        "outcome_roi": -0.0318512790311133,
+        "outcome_units": -0.9555383709333991,
+        "population": "strict_close",
+        "positive_clv_rate": 0.26666666666666666
+      },
+      "market_underdog": {
+        "clv_n": 70,
+        "edge_selected_side_counts": {
+          "AWAY": 57,
+          "HOME": 13
+        },
+        "low_confidence": false,
+        "mean_clv": 0.002638957443268811,
+        "median_clv": 0.0,
+        "outcome_n": 70,
+        "outcome_roi": -0.08842857142857141,
+        "outcome_units": -6.189999999999999,
+        "population": "strict_close",
+        "positive_clv_rate": 0.4714285714285714
+      },
+      "near_even": {
+        "clv_n": 13,
+        "edge_selected_side_counts": {
+          "AWAY": 11,
+          "HOME": 2
+        },
+        "low_confidence": true,
+        "mean_clv": -0.0002974129236242381,
+        "median_clv": 0.0,
+        "outcome_n": 12,
+        "outcome_roi": -0.3527823452187337,
+        "outcome_units": -4.233388142624804,
+        "population": "strict_close",
+        "positive_clv_rate": 0.3076923076923077
+      }
+    },
+    "selected_side": {
+      "AWAY": {
+        "clv_n": 87,
+        "edge_selected_side_counts": {
+          "AWAY": 87
+        },
+        "low_confidence": false,
+        "mean_clv": 0.0002314974516027699,
+        "median_clv": 0.0,
+        "outcome_n": 86,
+        "outcome_roi": -0.05135511218796634,
+        "outcome_units": -4.416539648165105,
+        "population": "strict_close",
+        "positive_clv_rate": 0.40229885057471265
+      },
+      "HOME": {
+        "clv_n": 26,
+        "edge_selected_side_counts": {
+          "HOME": 26
+        },
+        "low_confidence": true,
+        "mean_clv": 0.0036256242448425226,
+        "median_clv": 0.0,
+        "outcome_n": 26,
+        "outcome_roi": -0.2677841102074268,
+        "outcome_units": -6.962386865393097,
+        "population": "strict_close",
+        "positive_clv_rate": 0.38461538461538464
+      }
+    }
+  },
+  "status": "MARKET_008_CLV_VALIDATION",
+  "verdict": {
+    "adr_007_recommendation": "Edge may contain information but PLAY policy is not validated; do not accept ADR-007 or change production PLAY threshold.",
+    "case": 2,
+    "rationale": "Closing line moved favorably but realized ROI remains negative.",
+    "verdict": "POSITIVE CLV WITH NEGATIVE ROI"
+  }
+}

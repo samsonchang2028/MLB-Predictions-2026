@@ -25,6 +25,7 @@ from market.clv_evaluation import (  # noqa: E402
 DEFAULT_PREDICTIONS = Path("state/predictions/daily.jsonl")
 DEFAULT_JOURNAL = Path("state/predictions/journal.jsonl")
 DEFAULT_ODDS_BOOKS = Path("state/predictions/odds_books.jsonl")
+DEFAULT_ODDS_CLOSES = Path("state/predictions/odds_closes.jsonl")
 DEFAULT_REPORT_DIR = Path("reports/market")
 
 
@@ -44,6 +45,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--predictions", default=str(DEFAULT_PREDICTIONS))
     parser.add_argument("--journal", default=str(DEFAULT_JOURNAL))
     parser.add_argument("--odds-books", default=str(DEFAULT_ODDS_BOOKS))
+    parser.add_argument(
+        "--odds-closes",
+        default=None,
+        help="Optional odds_closes.jsonl path; when set, strict CLV prefers these rows.",
+    )
+    parser.add_argument(
+        "--prediction-anchor",
+        choices=("latest", "earliest"),
+        default="latest",
+        help="Prediction population anchor (earliest enables retrospective strict CLV).",
+    )
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--model-version", default=None)
     parser.add_argument("--output-dir", default=str(DEFAULT_REPORT_DIR))
@@ -53,27 +65,38 @@ def main(argv: list[str] | None = None) -> int:
     predictions_path = Path(args.predictions)
     journal_path = Path(args.journal)
     odds_books_path = Path(args.odds_books)
+    odds_closes_path = Path(args.odds_closes) if args.odds_closes else None
     daily_records = _read_jsonl(predictions_path)
     journal_records = _read_jsonl(journal_path)
     odds_records = _read_jsonl(odds_books_path)
+    odds_closes_records: list[dict[str, Any]] | None = None
+    if odds_closes_path is not None and odds_closes_path.exists():
+        odds_closes_records = _read_jsonl(odds_closes_path)
     print(
         f"[load] predictions={len(daily_records)} journal={len(journal_records)} "
-        f"odds_books={len(odds_records)}",
+        f"odds_books={len(odds_records)} odds_closes={len(odds_closes_records or [])} "
+        f"anchor={args.prediction_anchor}",
         flush=True,
     )
+
+    input_paths = {
+        "predictions": str(predictions_path),
+        "journal": str(journal_path),
+        "odds_books": str(odds_books_path),
+    }
+    if odds_closes_path is not None:
+        input_paths["odds_closes"] = str(odds_closes_path)
 
     try:
         report = build_clv_report(
             daily_records=daily_records,
             journal_records=journal_records,
             odds_records=odds_records,
+            odds_closes_records=odds_closes_records,
             run_id=args.run_id,
-            input_paths={
-                "predictions": str(predictions_path),
-                "journal": str(journal_path),
-                "odds_books": str(odds_books_path),
-            },
+            input_paths=input_paths,
             model_version=args.model_version,
+            prediction_anchor=args.prediction_anchor,
         )
     except ValueError as exc:
         print(f"[error] integrity failure: {exc}", file=sys.stderr, flush=True)

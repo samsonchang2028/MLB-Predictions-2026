@@ -37,7 +37,14 @@ from market.clv import (
     pregame_latest_valid,
     row_clv_diagnostics,
     selected_side_market_probability,
-    strict_close_valid,
+)
+from market.odds_closes import (
+    STRICT_CLOSING_SOURCE_DEFINITION,
+    PredictionAnchor,
+    filter_daily_for_anchor,
+    index_odds_closes,
+    prediction_anchor_label,
+    resolve_close_row,
 )
 from market.engine import no_vig_two_way
 from market.play_policy import edge_selected_side, raw_model_side
@@ -125,12 +132,19 @@ def load_clv_population(
     daily_records: Sequence[Mapping[str, Any]],
     journal_records: Sequence[Mapping[str, Any]],
     odds_records: Sequence[Mapping[str, Any]],
+    odds_closes_records: Sequence[Mapping[str, Any]] | None = None,
     *,
     model_version: str | None = None,
+    prediction_anchor: PredictionAnchor = "latest",
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Latest pregame snapshot per ``game_pk`` with journal and closing odds joined."""
+    """One pregame snapshot per ``game_pk`` with journal and closing odds joined."""
+    source_daily = (
+        filter_daily_for_anchor(daily_records, anchor=prediction_anchor)
+        if prediction_anchor != "latest"
+        else list(daily_records)
+    )
     board = load_daily_board_with_diagnostics(
-        _ListStore(daily_records),
+        _ListStore(source_daily),
         journal_store=_ListStore(journal_records),
         edge_threshold=DEFAULT_EDGE_THRESHOLD,
     )
@@ -138,8 +152,9 @@ def load_clv_population(
     if model_version is not None:
         rows = [r for r in rows if r.get("model_version") == model_version]
 
-    rows = _attach_raw_prediction_fields(rows, daily_records)
+    rows = _attach_raw_prediction_fields(rows, source_daily)
     odds_index = index_odds_books(odds_records)
+    odds_closes_index = index_odds_closes(odds_closes_records or [])
     journal_by_key = {
         _prediction_key(r.get("game_pk"), r.get("prediction_timestamp")): r
         for r in journal_records
@@ -169,9 +184,6 @@ def load_clv_population(
 
         bookmaker = bookmaker_from_source(record.get("source"))
         record["bookmaker"] = bookmaker
-        odds_key = (record.get("game_pk"), record.get("run_date"), bookmaker)
-        odds_row = odds_index.get(odds_key)
-        record["closing_odds_row_present"] = odds_row is not None
 
         prediction_ts = record.get("prediction_timestamp")
         if not isinstance(prediction_ts, datetime):
@@ -179,7 +191,26 @@ def load_clv_population(
             record["prediction_timestamp"] = prediction_ts
 
         start_ts = _parse_datetime(record.get("game_start_timestamp"))
-        close_ts = _parse_datetime(odds_row.get("snapshot_timestamp")) if odds_row else None
+        odds_books_row = odds_index.get(
+            (record.get("game_pk"), record.get("run_date"), bookmaker)
+        )
+        odds_row, close_source, odds_closes_rejection = resolve_close_row(
+            prediction_ts=prediction_ts,
+            run_date=record.get("run_date"),
+            game_pk=record.get("game_pk"),
+            bookmaker=bookmaker,
+            game_start_ts=start_ts,
+            odds_closes_index=odds_closes_index,
+            odds_books_index=odds_index,
+        )
+        diagnostic_row = odds_row if odds_row is not None else odds_books_row
+        record["closing_odds_row_present"] = diagnostic_row is not None
+        record["closing_odds_source"] = close_source
+        close_ts = (
+            _parse_datetime(diagnostic_row.get("snapshot_timestamp"))
+            if diagnostic_row is not None
+            else None
+        )
 
         if (
             isinstance(prediction_ts, datetime)
@@ -200,22 +231,35 @@ def load_clv_population(
             if side == "HOME"
             else (1.0 - closing_market_p_home if closing_market_p_home is not None else None)
         )
+        pregame_market_p_home = _closing_market_home_probability(diagnostic_row)
+        pregame_market_p_selected = (
+            pregame_market_p_home
+            if side == "HOME"
+            else (
+                1.0 - pregame_market_p_home if pregame_market_p_home is not None else None
+            )
+        )
 
-        strict_valid = strict_close_valid(prediction_ts, close_ts, start_ts)
+        strict_valid = odds_row is not None
         pregame_valid = pregame_latest_valid(close_ts, start_ts)
 
         clv = None
         pregame_clv = None
         if pred_market_p_selected is not None and closing_market_p_selected is not None:
-            pregame_clv = compute_clv(
+            clv = compute_clv(
                 prediction_market_p_selected=pred_market_p_selected,
                 closing_market_p_selected=closing_market_p_selected,
+            ) if strict_valid else None
+        if pred_market_p_selected is not None and pregame_market_p_selected is not None:
+            pregame_clv = compute_clv(
+                prediction_market_p_selected=pred_market_p_selected,
+                closing_market_p_selected=pregame_market_p_selected,
             )
-            if strict_valid:
-                clv = pregame_clv
 
         rejection_reason = None
-        if odds_row is None:
+        if not strict_valid and odds_closes_rejection is not None:
+            rejection_reason = odds_closes_rejection
+        elif diagnostic_row is None:
             rejection_reason = "missing_bookmaker_row"
         elif close_ts is None:
             rejection_reason = "missing_close_timestamp"
@@ -259,7 +303,12 @@ def load_clv_population(
         "journal_side_mismatches": journal_mismatches,
         "prediction_after_first_pitch": prediction_after_first_pitch,
         "model_version_filter": model_version,
-        "strict_closing_definition": STRICT_CLOSING_DEFINITION,
+        "prediction_anchor": prediction_anchor_label(prediction_anchor),
+        "strict_closing_definition": (
+            STRICT_CLOSING_SOURCE_DEFINITION
+            if odds_closes_records
+            else STRICT_CLOSING_DEFINITION
+        ),
         "pregame_latest_closing_definition": PREGAME_LATEST_CLOSING_DEFINITION,
     }
     return enriched, meta
@@ -419,15 +468,19 @@ def build_clv_report(
     daily_records: Sequence[Mapping[str, Any]],
     journal_records: Sequence[Mapping[str, Any]],
     odds_records: Sequence[Mapping[str, Any]],
+    odds_closes_records: Sequence[Mapping[str, Any]] | None = None,
     run_id: str,
     input_paths: Mapping[str, str],
     model_version: str | None = None,
+    prediction_anchor: PredictionAnchor = "latest",
 ) -> dict[str, Any]:
     population, population_meta = load_clv_population(
         daily_records,
         journal_records,
         odds_records,
+        odds_closes_records,
         model_version=model_version,
+        prediction_anchor=prediction_anchor,
     )
     if population_meta["journal_side_mismatches"]:
         raise ValueError(
@@ -514,6 +567,7 @@ def render_markdown_report(report: Mapping[str, Any]) -> str:
         f"- Latest-per-game rows: {population['n_latest_per_game']}",
         f"- Malformed daily skips: {population['n_malformed_daily_skips']}",
         f"- Journal side mismatches: {population['journal_side_mismatches']}",
+        f"- Prediction anchor: {population.get('prediction_anchor', 'latest prediction per game_pk (board default)')}",
         "",
         report.get("journal_field_normalization", ""),
         "",
