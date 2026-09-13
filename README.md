@@ -141,6 +141,7 @@ Dedicated sidebar pages split observability by question:
 | **Betting Results** | PLAY win rate / flat-stake ROI (not model evidence) |
 | **Prospective Evaluation** | Frozen production monitoring |
 | **Game Detail** | Per-game features + multi-book odds (incl. Kalshi when captured) |
+| **Parlay Builder** | Experimental 2/3/4-leg parlay suggestions from ranked legs (APP-015; not PLAY policy) |
 
 ### APP-014 — professor-readable model monitoring
 
