@@ -82,6 +82,60 @@ st.set_page_config(page_title="Parlay Builder", layout="wide")
 st.title("Parlay Builder")
 st.warning(PARLAY_DISCLAIMER)
 
+with st.expander("How to use this page", expanded=True):
+    st.markdown(
+        """
+This tab **pairs today's strongest single-game picks into example parlays**.
+It is for exploration only — not a validated betting system.
+
+### Step 1 — Choose settings (sidebar)
+
+1. **Slate date** — same MLB day as Daily Predictions.
+2. **Source policy** — which games become parlay legs:
+   - **Raw Model** *(default)* — every game; bet the model's favorite (`P(home) ≥ 50%` → home, else away).
+   - **PLAY** — only games that clear the display PLAY rule (`|edge| ≥ 2%`).
+   - **Top Edge** — the games with the largest model–market disagreement.
+   - **Agreement Only** — model and market favor the same side.
+3. **Leg count** — build 2-, 3-, or 4-leg parlays.
+4. **Rank by** — how legs are ordered before combinations are built:
+   - **Balanced** *(default)* — composite **parlay score** (see below).
+   - **Highest model confidence** — highest model probability on the picked side.
+   - **Highest expected payout** — longest American prices (bigger underdog payout).
+
+### Step 2 — Read the ranked legs table
+
+Each row is one possible **leg** (one game, one side):
+
+| Column | Meaning |
+|--------|---------|
+| **Pick** | Side the leg would bet (team name). |
+| **Model P** | Model's win probability for that side. |
+| **American / Decimal** | DraftKings moneyline at prediction time. |
+| **Parlay score** | Higher = stronger leg under **Balanced** ranking. Favors confident picks, model–market agreement, and penalizes crossover / risk flags. **Not the same as edge.** |
+| **Agree** | `True` if model and market favor the same side. |
+| **Crossover** | `True` if the edge-selected side differs from the raw model favorite — historically a weaker pattern in our data. |
+| **Risk flags** | Warnings such as large disagreement or crossover. |
+
+### Step 3 — Read suggested parlays
+
+Open a suggestion to see each leg, then the parlay totals:
+
+| Metric | Meaning |
+|--------|---------|
+| **Combined decimal odds** | Multiply each leg's decimal odds (e.g. 1.91 × 2.50). |
+| **Payout on $100** | What a **$100 stake** returns if **every leg wins** (includes stake). |
+| **Naive independence estimate** | Model probability that **all legs win**, assuming games are independent (`P₁ × P₂ × …`). **Not** a full joint model — label it as an estimate only. |
+
+**Implied P** on each leg is the book's no-vig implied probability from that leg's American odds.
+
+### Tips
+
+- Start with **Raw Model + Balanced + 2 legs** if you are unsure.
+- If you see **no suggestions**, try another source policy or a smaller leg count — the slate may not have enough eligible games.
+- Lower **parlay score** or **Crossover = True** does not forbid a leg, but those legs rank lower for a reason.
+        """
+    )
+
 path = _store_path()
 if not path.exists():
     st.info(f"No predictions found at {path}. Run the daily pipeline first.")
