@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.board import load_daily_board
+from app.play_policy_display import enrich_board_row_with_shadow
 from app.parlay_builder import (
     RankMode,
     SourcePolicy,
@@ -150,3 +152,52 @@ def test_build_parlay_report_no_predictions_empty_state() -> None:
     report = build_parlay_report([])
     assert report["status"] == "no_predictions"
     assert report["ranked_legs"] == []
+
+
+class _FakeStore:
+    def __init__(self, records):
+        self._records = records
+
+    def records(self):
+        return self._records
+
+
+def _prediction_record(
+    game_pk: int,
+    *,
+    p_home: float = 0.56,
+    market_home: float = 0.50,
+    edge: float | None = None,
+) -> dict:
+    if edge is None:
+        edge = p_home - market_home
+    return {
+        "game_pk": game_pk,
+        "run_date": "2026-09-14",
+        "model_probability": p_home,
+        "market_probability": market_home,
+        "edge": edge,
+        "odds_snapshot_timestamp": "2026-09-14T19:55:00+00:00",
+        "prediction_timestamp": "2026-09-14T20:00:00+00:00",
+        "game_start_timestamp": "2026-09-15T02:05:00+00:00",
+        "model_version": "v1",
+        "home_team_id": 147,
+        "away_team_id": 111,
+        "home_american": -130,
+        "away_american": 110,
+    }
+
+
+def test_shadow_enrichment_passes_odds_to_parlay_builder() -> None:
+    """Board rows omit american lines; raw records carry them for parlay legs."""
+    prediction = _prediction_record(1)
+    [board_row] = load_daily_board(_FakeStore([prediction]))
+    assert board_row.get("home_american") is None
+
+    shadow_row = enrich_board_row_with_shadow(board_row, prediction)
+    legs = filter_eligible_legs([shadow_row], source_policy=SourcePolicy.RAW_MODEL)
+
+    assert shadow_row["home_american"] == -130
+    assert shadow_row["away_american"] == 110
+    assert len(legs) == 1
+    assert legs[0]["american"] == -130

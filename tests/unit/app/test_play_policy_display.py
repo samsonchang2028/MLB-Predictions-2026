@@ -142,3 +142,12 @@ def test_no_crossover_shadow_blocks_crossover_row() -> None:
     decision = evaluate_policy(prediction, EXPLORATORY_NO_CROSSOVER_POLICY)
     assert decision.play is False
     assert shadow_status_label(decision) == "CROSSOVER BLOCKED"
+
+
+def test_enrich_board_row_with_shadow_passes_american_odds_from_raw_record() -> None:
+    prediction = _prediction(1, home_american=-145, away_american=122)
+    [board_row] = load_daily_board(_FakeStore([prediction]))
+    enriched = enrich_board_row_with_shadow(board_row, prediction)
+
+    assert enriched["home_american"] == -145
+    assert enriched["away_american"] == 122

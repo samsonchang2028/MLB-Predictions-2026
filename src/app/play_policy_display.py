@@ -141,7 +141,7 @@ def enrich_board_row_with_shadow(
     model_fav = raw_model_side(merged)
     market_fav = market_side(merged)
     return {
-        **dict(board_row),
+        **merged,
         "raw_model_favorite": model_fav,
         "market_favorite": market_fav,
         "model_market_agree": model_market_agree(merged),
