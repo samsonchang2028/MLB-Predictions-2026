@@ -142,6 +142,7 @@ Dedicated sidebar pages split observability by question:
 | **Prospective Evaluation** | Frozen production monitoring |
 | **Game Detail** | Per-game features + multi-book odds (incl. Kalshi when captured) |
 | **Parlay Builder** | Experimental 2/3/4-leg parlay suggestions from ranked legs (APP-015; not PLAY policy) |
+| **CLV Monitor** | Strict-close CLV metrics, capture health, recent games (APP-016; observability only) |
 
 ### APP-014 — professor-readable model monitoring
 
