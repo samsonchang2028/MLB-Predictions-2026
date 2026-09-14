@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 from pathlib import Path
 
 import streamlit as st
 
-from app.dashboard_analytics import (
-    DashboardPaths,
-    HISTORICAL_EVIDENCE_LABEL,
-    PROSPECTIVE_EVIDENCE_LABEL,
-    build_daily_monitoring_summary,
-    build_prospective_model_quality,
-    read_jsonl,
-)
+import app.dashboard_analytics as dashboard_analytics
+
+# Streamlit keeps long-lived imports; reload so Daily Monitoring picks up
+# strategy-comparison fields without a full service restart.
+importlib.reload(dashboard_analytics)
+
+DashboardPaths = dashboard_analytics.DashboardPaths
+HISTORICAL_EVIDENCE_LABEL = dashboard_analytics.HISTORICAL_EVIDENCE_LABEL
+PROSPECTIVE_EVIDENCE_LABEL = dashboard_analytics.PROSPECTIVE_EVIDENCE_LABEL
+build_daily_monitoring_summary = dashboard_analytics.build_daily_monitoring_summary
+build_prospective_model_quality = dashboard_analytics.build_prospective_model_quality
+read_jsonl = dashboard_analytics.read_jsonl
 from app.performance import (
     FINAL_HOLDOUT_LABEL,
     load_calibration_comparison,
@@ -80,27 +85,32 @@ def _daily_display_rows(rows: list[dict]) -> list[dict]:
             "Baseline win rate": _pct(row["play_win_rate"]),
             "Baseline ROI": _pct(row["play_roi"]),
             "Baseline units": _number(row["play_units"], 2),
-            "Raw model count": row["raw_model_count"],
+            "Raw model count": row.get("raw_model_count", 0),
             "Raw model W-L-P": (
-                f"{row['raw_model_wins']}-{row['raw_model_losses']}-{row['raw_model_pending']}"
+                f"{row.get('raw_model_wins', 0)}-{row.get('raw_model_losses', 0)}-"
+                f"{row.get('raw_model_pending', 0)}"
             ),
-            "Raw model win rate": _pct(row["raw_model_win_rate"]),
-            "Raw model ROI": _pct(row["raw_model_roi"]),
-            "Raw model units": _number(row["raw_model_units"], 2),
+            "Raw model win rate": _pct(row.get("raw_model_win_rate")),
+            "Raw model ROI": _pct(row.get("raw_model_roi")),
+            "Raw model units": _number(row.get("raw_model_units"), 2),
         }
         for row in sorted(rows, key=lambda item: item["run_date"], reverse=True)
     ]
 
 
 def _aggregate_strategy(rows: list[dict], prefix: str) -> dict[str, float | int | None]:
-    wins = sum(int(row[f"{prefix}_wins"]) for row in rows)
-    losses = sum(int(row[f"{prefix}_losses"]) for row in rows)
-    pending = sum(int(row[f"{prefix}_pending"]) for row in rows)
-    units_values = [row[f"{prefix}_units"] for row in rows if row[f"{prefix}_units"] is not None]
-    staked = sum(int(row[f"{prefix}_staked_units"]) for row in rows)
+    wins = sum(int(row.get(f"{prefix}_wins", 0) or 0) for row in rows)
+    losses = sum(int(row.get(f"{prefix}_losses", 0) or 0) for row in rows)
+    pending = sum(int(row.get(f"{prefix}_pending", 0) or 0) for row in rows)
+    units_values = [
+        row[f"{prefix}_units"]
+        for row in rows
+        if row.get(f"{prefix}_units") is not None
+    ]
+    staked = sum(int(row.get(f"{prefix}_staked_units", 0) or 0) for row in rows)
     finished = wins + losses
     return {
-        "count": sum(int(row[f"{prefix}_count"]) for row in rows),
+        "count": sum(int(row.get(f"{prefix}_count", 0) or 0) for row in rows),
         "wins": wins,
         "losses": losses,
         "pending": pending,
