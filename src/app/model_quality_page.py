@@ -75,16 +75,40 @@ def _daily_display_rows(rows: list[dict]) -> list[dict]:
             "Log loss": _number(row["log_loss"]),
             "Brier": _number(row["brier"]),
             "ECE": _number(row["ece"]),
-            "PLAY count": row["play_count"],
-            "PLAY W-L-P": f"{row['play_wins']}-{row['play_losses']}-{row['play_pending']}",
-            "PLAY win rate": _pct(row["play_win_rate"]),
-            "PLAY units": _number(row["play_units"], 2),
-            "PLAY ROI": _pct(row["play_roi"]),
-            "Staked": row["play_staked_units"],
-            "Missing odds": row["play_missing_odds"],
+            "Baseline count": row["play_count"],
+            "Baseline W-L-P": f"{row['play_wins']}-{row['play_losses']}-{row['play_pending']}",
+            "Baseline win rate": _pct(row["play_win_rate"]),
+            "Baseline ROI": _pct(row["play_roi"]),
+            "Baseline units": _number(row["play_units"], 2),
+            "Raw model count": row["raw_model_count"],
+            "Raw model W-L-P": (
+                f"{row['raw_model_wins']}-{row['raw_model_losses']}-{row['raw_model_pending']}"
+            ),
+            "Raw model win rate": _pct(row["raw_model_win_rate"]),
+            "Raw model ROI": _pct(row["raw_model_roi"]),
+            "Raw model units": _number(row["raw_model_units"], 2),
         }
         for row in sorted(rows, key=lambda item: item["run_date"], reverse=True)
     ]
+
+
+def _aggregate_strategy(rows: list[dict], prefix: str) -> dict[str, float | int | None]:
+    wins = sum(int(row[f"{prefix}_wins"]) for row in rows)
+    losses = sum(int(row[f"{prefix}_losses"]) for row in rows)
+    pending = sum(int(row[f"{prefix}_pending"]) for row in rows)
+    units_values = [row[f"{prefix}_units"] for row in rows if row[f"{prefix}_units"] is not None]
+    staked = sum(int(row[f"{prefix}_staked_units"]) for row in rows)
+    finished = wins + losses
+    return {
+        "count": sum(int(row[f"{prefix}_count"]) for row in rows),
+        "wins": wins,
+        "losses": losses,
+        "pending": pending,
+        "win_rate": wins / finished if finished else None,
+        "units": float(sum(units_values)) if units_values else None,
+        "roi": float(sum(units_values)) / staked if staked and units_values else None,
+        "staked_units": staked,
+    }
 
 
 st.set_page_config(page_title="Model Quality", layout="wide")
@@ -245,10 +269,40 @@ with monitoring_tab:
     if not daily_monitoring:
         st.info("No daily prediction artifacts found yet.")
     else:
+        baseline_total = _aggregate_strategy(daily_monitoring, "play")
+        raw_model_total = _aggregate_strategy(daily_monitoring, "raw_model")
+        st.markdown("**Strategy comparison (resolved slates only)**")
+        comparison_cols = st.columns(2)
+        with comparison_cols[0]:
+            st.markdown("**Baseline PLAY**")
+            st.metric(
+                "Win rate",
+                _pct(baseline_total["win_rate"]),
+                help="Edge-selected side when abs(edge) >= 2%",
+            )
+            st.write(
+                f"Record: {baseline_total['wins']}-{baseline_total['losses']}-"
+                f"{baseline_total['pending']} · ROI {_pct(baseline_total['roi'])} · "
+                f"Units {_number(baseline_total['units'], 2)}"
+            )
+        with comparison_cols[1]:
+            st.markdown("**Raw model favorite**")
+            st.metric(
+                "Win rate",
+                _pct(raw_model_total["win_rate"]),
+                help="Bet the model favorite on every game (P(home) >= 50% -> home)",
+            )
+            st.write(
+                f"Record: {raw_model_total['wins']}-{raw_model_total['losses']}-"
+                f"{raw_model_total['pending']} · ROI {_pct(raw_model_total['roi'])} · "
+                f"Units {_number(raw_model_total['units'], 2)}"
+            )
         st.dataframe(_daily_display_rows(daily_monitoring), use_container_width=True, hide_index=True)
         st.caption(
-            "Model metrics use all resolved predictions. PLAY win rate and ROI use only "
-            f"resolved PLAY rows where abs(edge) meets the board threshold; PASS rows are excluded."
+            "Model metrics use all resolved predictions. Baseline PLAY uses the "
+            "edge-selected side when abs(edge) meets the board threshold. Raw model "
+            "bets the model favorite on every game with valid odds. PASS rows are "
+            "excluded from baseline counts only."
         )
 
 with trust_tab:

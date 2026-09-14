@@ -20,6 +20,8 @@ from app.dashboard_analytics import (
     model_predicted_home,
     picked_home,
     prediction_key,
+    raw_model_bet_won,
+    raw_model_pick_american,
     resolved_prediction_rows,
     selected_side_probability,
 )
@@ -298,6 +300,76 @@ def test_daily_monitoring_summary_keeps_single_class_metrics_with_nullable_auc()
     assert math.isfinite(row["log_loss"])
     assert math.isfinite(row["brier"])
     assert row["roc_auc"] is None
+
+
+def test_raw_model_pick_uses_probability_boundary_not_edge_side():
+    crossover = {
+        **_prediction(1, edge=-0.06),
+        "model_probability": 0.54,
+        "home_american": -130,
+        "away_american": 110,
+    }
+    assert raw_model_pick_american(crossover) == -130
+    assert raw_model_bet_won({**crossover, "actual_home_win": True}) is True
+    assert raw_model_bet_won({**crossover, "actual_home_win": False}) is False
+
+
+def test_daily_monitoring_summary_includes_raw_model_and_baseline_comparison():
+    baseline_play = _prediction(1, edge=0.05, home_american=100)
+    crossover = {
+        **_prediction(2, edge=-0.05, away_american=120),
+        "model_probability": 0.54,
+    }
+
+    [row] = build_daily_monitoring_summary(
+        [baseline_play, crossover],
+        [
+            _journal_for(baseline_play, correct=True),
+            _journal_for(crossover, correct=True, actual_home_win=True),
+        ],
+    )
+
+    assert row["play_count"] == 2
+    assert row["play_wins"] == 2
+    assert row["raw_model_count"] == 2
+    assert row["raw_model_wins"] == 2
+    assert row["raw_model_losses"] == 0
+    assert row["raw_model_win_rate"] == 1.0
+
+
+def test_daily_monitoring_summary_raw_model_differs_from_baseline_on_crossover_loss():
+    crossover = {
+        **_prediction(1, edge=-0.05, home_american=-130, away_american=120),
+        "model_probability": 0.54,
+    }
+
+    [row] = build_daily_monitoring_summary(
+        [crossover],
+        [_journal_for(crossover, correct=False, actual_home_win=True)],
+    )
+
+    assert row["play_count"] == 1
+    assert row["play_wins"] == 0
+    assert row["play_losses"] == 1
+    assert row["raw_model_wins"] == 1
+    assert row["play_units"] == pytest.approx(-1.0)
+    assert row["raw_model_units"] == pytest.approx(100 / 130)
+
+
+def test_resolved_prediction_rows_include_raw_model_fields():
+    crossover = {
+        **_prediction(1, edge=-0.05, home_american=-130, away_american=120),
+        "model_probability": 0.54,
+    }
+    [row] = resolved_prediction_rows(
+        [crossover],
+        [_journal_for(crossover, correct=True, actual_home_win=True)],
+    )
+
+    assert row["raw_model_pick_american"] == -130
+    assert row["raw_model_correct"] is True
+    assert row["correct"] is True
+    assert row["pick_american"] == 120
 
 
 def test_daily_monitoring_summary_groups_dates_and_tracks_missing_odds():

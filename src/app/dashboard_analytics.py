@@ -155,6 +155,18 @@ def pick_american_odds(row: Mapping[str, Any]) -> int | None:
     return _valid_american(row.get(field))
 
 
+def raw_model_pick_american(row: Mapping[str, Any]) -> int | None:
+    field = "home_american" if model_predicted_home(row) else "away_american"
+    return _valid_american(row.get(field))
+
+
+def raw_model_bet_won(row: Mapping[str, Any]) -> bool | None:
+    actual_home_win = row.get("actual_home_win")
+    if not isinstance(actual_home_win, bool):
+        return None
+    return actual_home_win == model_predicted_home(row)
+
+
 def flat_stake_profit(*, won: bool, american: int | None) -> float | None:
     american = _valid_american(american)
     if american is None:
@@ -203,9 +215,16 @@ def resolved_prediction_rows(
                 "play": is_play(prediction),
                 "model_predicted_home": model_predicted_home(prediction),
                 "picked_home": picked_home(prediction),
+                "raw_model_correct": raw_model_bet_won(
+                    {
+                        "actual_home_win": actual_home_win,
+                        "model_probability": prediction["model_probability"],
+                    }
+                ),
                 "selected_model_probability": selected_side_probability(prediction),
                 "selected_market_probability": selected_side_market_probability(prediction),
                 "pick_american": pick_american_odds(prediction),
+                "raw_model_pick_american": raw_model_pick_american(prediction),
                 "home_american": prediction.get("home_american"),
                 "away_american": prediction.get("away_american"),
                 "source": prediction.get("source"),
@@ -345,15 +364,58 @@ def build_betting_results_summary(
     }
 
 
+def _strategy_day_metrics(
+    *,
+    candidate_count: int,
+    resolved_rows: Sequence[Mapping[str, Any]],
+    pending_count: int,
+    won: Any,
+    american: Any,
+) -> dict[str, Any]:
+    wins = sum(1 for row in resolved_rows if won(row) is True)
+    losses = sum(1 for row in resolved_rows if won(row) is False)
+    profits: list[float] = []
+    missing_odds = 0
+    for row in resolved_rows:
+        line = american(row)
+        result = won(row)
+        if line is None:
+            missing_odds += 1
+            continue
+        if result is None:
+            continue
+        profit = flat_stake_profit(won=result, american=line)
+        if profit is not None:
+            profits.append(profit)
+    staked = len(profits)
+    finished = wins + losses
+    return {
+        "count": candidate_count,
+        "wins": wins,
+        "losses": losses,
+        "pending": pending_count,
+        "win_rate": wins / finished if finished else None,
+        "roi": sum(profits) / staked if staked else None,
+        "units": float(sum(profits)) if profits else None,
+        "staked_units": staked,
+        "missing_odds": missing_odds,
+    }
+
+
+def _prefix_strategy_metrics(metrics: dict[str, Any], prefix: str) -> dict[str, Any]:
+    return {f"{prefix}_{key}": value for key, value in metrics.items()}
+
+
 def build_daily_monitoring_summary(
     predictions: Sequence[Mapping[str, Any]],
     journal: Sequence[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Summarize prospective model quality and PLAY outcomes by slate date.
+    """Summarize prospective model quality and strategy outcomes by slate date.
 
     Model-quality fields use every resolved latest prediction for the day.
-    PLAY fields use only latest predictions whose edge crosses the display
-    threshold. Pending rows are excluded from win rate and ROI.
+    Baseline PLAY fields use only latest predictions whose edge crosses the
+    display threshold. Raw-model fields bet the model favorite on every game.
+    Pending rows are excluded from win rate and ROI.
     """
     latest_predictions = _latest_predictions_per_game(predictions)
     resolved = resolved_prediction_rows(predictions, journal)
@@ -382,45 +444,42 @@ def build_daily_monitoring_summary(
         pending_plays = sum(
             1 for row in plays_for_day if prediction_key(row) not in resolved_keys
         )
-        wins = sum(1 for row in resolved_plays if row.get("correct") is True)
-        losses = sum(1 for row in resolved_plays if row.get("correct") is False)
-        profits = [
-            profit
-            for row in resolved_plays
-            if (profit := flat_stake_profit(
-                won=row.get("correct") is True,
-                american=row.get("pick_american"),
-            )) is not None
-        ]
+        pending_raw_model = sum(
+            1 for row in predictions_for_day if prediction_key(row) not in resolved_keys
+        )
+        baseline_metrics = _strategy_day_metrics(
+            candidate_count=len(plays_for_day),
+            resolved_rows=resolved_plays,
+            pending_count=pending_plays,
+            won=lambda row: row.get("correct"),
+            american=lambda row: row.get("pick_american"),
+        )
+        raw_model_metrics = _strategy_day_metrics(
+            candidate_count=len(predictions_for_day),
+            resolved_rows=resolved_for_day,
+            pending_count=pending_raw_model,
+            won=lambda row: row.get("raw_model_correct"),
+            american=lambda row: row.get("raw_model_pick_american"),
+        )
         metrics = compute_probability_metrics(
             [row["actual_home_win"] for row in resolved_for_day],
             [row["model_probability"] for row in resolved_for_day],
         )
-        rows.append(
-            {
-                "run_date": run_date,
-                "games": len(predictions_for_day),
-                "resolved": len(resolved_for_day),
-                "pending": pending_predictions,
-                "log_loss": None if metrics is None else metrics["log_loss"],
-                "brier": None if metrics is None else metrics["brier"],
-                "ece": None if metrics is None else metrics["ece"],
-                "accuracy": None if metrics is None else metrics["accuracy"],
-                "roc_auc": None if metrics is None else metrics["roc_auc"],
-                "home_win_rate": None if metrics is None else metrics["positive_rate"],
-                "play_count": len(plays_for_day),
-                "play_wins": wins,
-                "play_losses": losses,
-                "play_pending": pending_plays,
-                "play_win_rate": wins / (wins + losses) if wins + losses else None,
-                "play_roi": sum(profits) / len(profits) if profits else None,
-                "play_units": float(sum(profits)) if profits else None,
-                "play_staked_units": len(profits),
-                "play_missing_odds": sum(
-                    1 for row in resolved_plays if row.get("pick_american") is None
-                ),
-            }
-        )
+        row = {
+            "run_date": run_date,
+            "games": len(predictions_for_day),
+            "resolved": len(resolved_for_day),
+            "pending": pending_predictions,
+            "log_loss": None if metrics is None else metrics["log_loss"],
+            "brier": None if metrics is None else metrics["brier"],
+            "ece": None if metrics is None else metrics["ece"],
+            "accuracy": None if metrics is None else metrics["accuracy"],
+            "roc_auc": None if metrics is None else metrics["roc_auc"],
+            "home_win_rate": None if metrics is None else metrics["positive_rate"],
+        }
+        row.update(_prefix_strategy_metrics(baseline_metrics, "play"))
+        row.update(_prefix_strategy_metrics(raw_model_metrics, "raw_model"))
+        rows.append(row)
     return rows
 
 
